@@ -7,6 +7,7 @@
 
 require(raster)
 require(rgdal)
+require(rgeos)
 require(landscapeAnalysis)
 
 #
@@ -70,6 +71,8 @@ imbcrTableToShapefile <- function(filename=NULL,outfile=NULL,write=F){
   }
   return(s)
 }
+
+stripCommonName <- function(x) tolower(gsub(x,pattern=" |'|-",replacement=""))
 
 #
 # PLJV Region Priority Species (Breeding Season)
@@ -240,7 +243,76 @@ c(
   "Rufous-crowned Sparrow",
   "Summer Tanager"
 )
+#' parse an IMBCR SpatialPointsDataFrame
+#'
+#' @export
+lCalculateSummaryStatistics <- function(s=NULL,sppList=NULL,listName=NULL){
+  #
+  # Parse detections across our priority species lists
+  #
 
+  # Transect metrics
+  total_transects      <- length(unique(as.character(s@data$transectnum)))
+  total_transects_obs  <- length(unique(as.character(s@data[grepl(stripCommonName(s$common.name),pattern=paste(stripCommonName(sppList),collapse="|",sep="")),]$transectnum)))
+  transect_prev        <- total_transects_obs/total_transects
 
+  # calculate naive occupancy, counts, and CV of each spp across all transects
+  spp_prevalence <- list()
+  spp_counts <- list()
+  spp_sampling_effort <- list()
+  spp_cv <- list()
+
+  for(i in 1:length(sppList)){
+    # occupancy at the transect-level
+    spp_prevalence[[i]] <- length(unique(as.character(s@data[grepl(stripCommonName(s$common.name),pattern=stripCommonName(sppList[i])),]$transectnum))) / total_transects
+    # average count at the transect-level, taken as the average of the sum of counts across stations where the species was observed
+    focal_transects <- unique(as.character(s@data[grepl(stripCommonName(s$common.name),pattern=stripCommonName(sppList[i])),]$transectnum))
+    if(length(focal_transects)>0){
+      route_sums <- list()
+      for(j in focal_transects){
+        j <- s@data[s@data$transectnum == j,]
+          route_sums[[length(route_sums)+1]] <- sum(as.vector(j[j$common.name == sppList[i],'cl_count']),na.rm=T)
+      }
+      spp_counts[[length(spp_counts)+1]] <- mean(as.vector(unlist(route_sums))) # mean count across positive transects
+      spp_cv[[length(spp_cv)+1]] <- sd(as.vector(unlist(route_sums)),na.rm=T)/mean(as.vector(unlist(route_sums)),na.rm=T)
+    } else { # if not observed, report zeros
+      spp_counts[[length(spp_counts)+1]] <- 0
+      spp_cv[[length(spp_cv)+1]] <- 0
+    }
+  }
+  # post-process
+  spp_prevalence <- round(as.vector(unlist(spp_prevalence)),3)
+  spp_counts <- round(as.vector(unlist(spp_counts)))
+  spp_cv <- round(as.vector(unlist(spp_cv)),3)
+  # build a data.frame and return to user
+  spp <- data.frame(PLJV_Species_List=listName,Common_Name=sppList,
+                    Prevalence=as.numeric(spp_prevalence),
+                    Average_Count=spp_counts,
+                    Coefficient_of_Variation=spp_cv,
+                    Active_Transects=round(as.numeric(spp_prevalence)*total_transects)
+                    )
+    return(spp)
+}
+
+#
+# MAIN
+#
 
 s <- imbcrTableToShapefile(filename=recursiveFindFile(name="RawData_PLJV_IMBCR_20161024.csv",root="/home/ktaylora/Incoming")[1])
+
+pif_waterbirds_shorebirds_trend_3 <- lCalculateSummaryStatistics(s,sppList=pif_waterbirds_shorebirds_trend_3,listName="PIF (Waterbirds and Shorebirds) [Trend 3 List]")
+pif_landbirds_trend_3 <- lCalculateSummaryStatistics(s,sppList=pif_landbirds_trend_3,listName="PIF (Landbirds) [Trend 3 List]")
+sgcn_tier_2_swap_waterbirds <- lCalculateSummaryStatistics(s,sppList=sgcn_tier_2_swap_waterbirds,listName="sgcn_tier_2_swap_waterbirds")
+sgcn_tier_2_swap_landbirds <- lCalculateSummaryStatistics(s,sppList=sgcn_tier_2_swap_landbirds,listName="sgcn_tier_2_swap_landbirds")
+sgcn_tier_1_swap_waterbirds_shorebirds <- lCalculateSummaryStatistics(s,sppList=sgcn_tier_1_swap_waterbirds_shorebirds,listName="sgcn_tier_1_swap_waterbirds_shorebirds")
+esa_pif_declining_spp_landbirds <- lCalculateSummaryStatistics(s,sppList=esa_pif_declining_spp_landbirds,listName="esa_pif_declining_spp_landbirds")
+esa_pif_declining_spp_waterbirds_shorebirds <- lCalculateSummaryStatistics(s,sppList=esa_pif_declining_spp_waterbirds_shorebirds,listName="esa_pif_declining_spp_waterbirds_shorebirds")
+sgcn_tier_1_swap_landbirds <- lCalculateSummaryStatistics(s,sppList=sgcn_tier_1_swap_landbirds,listName="sgcn_tier_1_swap_landbirds")
+
+master <-
+rbind(pif_waterbirds_shorebirds_trend_3,pif_landbirds_trend_3,
+      sgcn_tier_2_swap_waterbirds,sgcn_tier_2_swap_landbirds,
+      sgcn_tier_1_swap_waterbirds_shorebirds,esa_pif_declining_spp_landbirds,
+      esa_pif_declining_spp_waterbirds_shorebirds,sgcn_tier_1_swap_landbirds)
+
+write.csv(master,"summary_statistics.csv",row.names=F)
