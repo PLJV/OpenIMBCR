@@ -13,7 +13,62 @@ require(landscapeAnalysis)
 # local functions
 #
 recursiveFindFile <- function(name=NULL,root=Sys.getenv("HOME")){
-  return(list.files(root,pattern=name,recursive=T,full.names=T))
+  if(is.null(name)){
+    return(NULL)
+  } else {
+    return(list.files(root,pattern=name,recursive=T,full.names=T))
+  }
+}
+
+imbcrTableToShapefile <- function(filename=NULL,outfile=NULL,write=F){
+  if(is.null(outfile) && write && !is.character(filename)){
+    stop("cannot write shapefile to disk without an outfile= or filename.ext to parse")
+  }
+  # sanity-check to see if our output shapefile already exists
+  s <- recursiveFindFile(outfile)[1]
+  if(!is.null(s)){
+    s <- landscapeAnalysis:::readOGRfromPath(s)
+  } else {
+    #
+    # Parse ALL BCR raw data tables into a single table
+    #
+    if(class(filename) == "data.frame"){
+      t <- filename
+    } else {
+      if(file.exists(filename)){
+        t <- read.csv(filename)
+      } else {
+        t <- recursiveFindFile(name=filename)
+          t <- lapply(t,read.csv)
+            t <- do.call(what=rbind,t)
+      }
+    }
+    names(t) <- tolower(names(t))
+    #
+    # iterate over each UTM zone in the table, creating SpatialPoints
+    # projected to a focal UTM.  Then merge all of the zones together into
+    # a single shapfile with an arbitrary CRS.
+    #
+    s <- list()
+    for (zone in unique(na.omit(t$ptvisitzone))){
+      s[[length(s) + 1]] <- na.omit(t[t$ptvisitzone == zone,])
+      s[[length(s)]] <- SpatialPointsDataFrame(
+                                  coords = data.frame(x = s[[length(s)]]$ptvisiteasting,
+                                  y = s[[length(s)]]$ptvisitnorthing),
+                                  data = s[[length(s)]],
+                                  proj4string = CRS(projection(paste("+init=epsg:269", zone, sep = "")))
+                        )
+    }
+
+    s <- lapply(s,FUN=spTransform,CRS(projection(s[[1]])))
+      s <- suppressMessages(do.call(rbind,s))
+        s$FID <- 1:nrow(s)
+    # write to disk -- and allow some wiggle-room on filename conventions
+    if(write){
+      writeOGR(s,".",ifelse(is.null(outfile),gsub(filename,pattern=".csv",replacement=""),outfile),driver="ESRI Shapefile",overwrite=T)
+    }
+  }
+  return(s)
 }
 
 #
@@ -188,4 +243,4 @@ c(
 
 
 
-t <- read.csv(recursiveFindFile(name="RawData_PLJV_IMBCR_20161024.csv",root="/home/ktaylora/Incoming"))
+s <- imbcrTableToShapefile(filename=recursiveFindFile(name="RawData_PLJV_IMBCR_20161024.csv",root="/home/ktaylora/Incoming")[1])
