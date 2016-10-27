@@ -269,26 +269,33 @@ lCalculateSummaryStatistics <- function(s=NULL,sppList=NULL,listName=NULL){
     focal_transects <- unique(as.character(s@data[grepl(stripCommonName(s$common.name),pattern=stripCommonName(sppList[i])),]$transectnum))
     if(length(focal_transects)>0){
       route_sums <- list()
+      station_maxs <- list()
       for(j in focal_transects){
         j <- s@data[s@data$transectnum == j,]
           route_sums[[length(route_sums)+1]] <- sum(as.vector(j[j$common.name == sppList[i],'cl_count']),na.rm=T)
+          station_maxs[[length(station_maxs)+1]] <- max(j$point)
       }
       spp_counts[[length(spp_counts)+1]] <- mean(as.vector(unlist(route_sums))) # mean count across positive transects
       spp_cv[[length(spp_cv)+1]] <- sd(as.vector(unlist(route_sums)),na.rm=T)/mean(as.vector(unlist(route_sums)),na.rm=T)
+      spp_sampling_effort[[length(spp_sampling_effort)+1]] <- mean(as.vector(unlist(station_maxs))/16,na.rm=T)
     } else { # if not observed, report zeros
       spp_counts[[length(spp_counts)+1]] <- 0
       spp_cv[[length(spp_cv)+1]] <- 0
+      spp_sampling_effort[[length(spp_sampling_effort)+1]] <- NA
     }
   }
   # post-process
   spp_prevalence <- round(as.vector(unlist(spp_prevalence)),3)
   spp_counts <- round(as.vector(unlist(spp_counts)))
   spp_cv <- round(as.vector(unlist(spp_cv)),3)
+  spp_sampling_effort <- round(as.vector(unlist(spp_sampling_effort)),3)
+
   # build a data.frame and return to user
   spp <- data.frame(PLJV_Species_List=listName,Common_Name=sppList,
                     Prevalence=as.numeric(spp_prevalence),
                     Average_Count=spp_counts,
                     Coefficient_of_Variation=spp_cv,
+                    Effort=as.numeric(spp_sampling_effort),
                     Active_Transects=round(as.numeric(spp_prevalence)*total_transects)
                     )
     return(spp)
@@ -302,12 +309,12 @@ s <- imbcrTableToShapefile(filename=recursiveFindFile(name="RawData_PLJV_IMBCR_2
 
 pif_waterbirds_shorebirds_trend_3 <- lCalculateSummaryStatistics(s,sppList=pif_waterbirds_shorebirds_trend_3,listName="PIF (Waterbirds and Shorebirds) [Trend 3 List]")
 pif_landbirds_trend_3 <- lCalculateSummaryStatistics(s,sppList=pif_landbirds_trend_3,listName="PIF (Landbirds) [Trend 3 List]")
-sgcn_tier_2_swap_waterbirds <- lCalculateSummaryStatistics(s,sppList=sgcn_tier_2_swap_waterbirds,listName="sgcn_tier_2_swap_waterbirds")
-sgcn_tier_2_swap_landbirds <- lCalculateSummaryStatistics(s,sppList=sgcn_tier_2_swap_landbirds,listName="sgcn_tier_2_swap_landbirds")
-sgcn_tier_1_swap_waterbirds_shorebirds <- lCalculateSummaryStatistics(s,sppList=sgcn_tier_1_swap_waterbirds_shorebirds,listName="sgcn_tier_1_swap_waterbirds_shorebirds")
-esa_pif_declining_spp_landbirds <- lCalculateSummaryStatistics(s,sppList=esa_pif_declining_spp_landbirds,listName="esa_pif_declining_spp_landbirds")
-esa_pif_declining_spp_waterbirds_shorebirds <- lCalculateSummaryStatistics(s,sppList=esa_pif_declining_spp_waterbirds_shorebirds,listName="esa_pif_declining_spp_waterbirds_shorebirds")
-sgcn_tier_1_swap_landbirds <- lCalculateSummaryStatistics(s,sppList=sgcn_tier_1_swap_landbirds,listName="sgcn_tier_1_swap_landbirds")
+sgcn_tier_2_swap_waterbirds <- lCalculateSummaryStatistics(s,sppList=sgcn_tier_2_swap_waterbirds,listName="SGCN/SWAP (Waterbirds) [Tier 2]")
+sgcn_tier_2_swap_landbirds <- lCalculateSummaryStatistics(s,sppList=sgcn_tier_2_swap_landbirds,listName="SGCN/SWAP (Landbirds) [Tier 2]")
+sgcn_tier_1_swap_waterbirds_shorebirds <- lCalculateSummaryStatistics(s,sppList=sgcn_tier_1_swap_waterbirds_shorebirds,listName="SGCN/SWAP (Waterbirds) [Tier 1]")
+esa_pif_declining_spp_landbirds <- lCalculateSummaryStatistics(s,sppList=esa_pif_declining_spp_landbirds,listName="ESA/PIF (Landbirds) [Declining Species]")
+esa_pif_declining_spp_waterbirds_shorebirds <- lCalculateSummaryStatistics(s,sppList=esa_pif_declining_spp_waterbirds_shorebirds,listName="ESA/PIF (Waterbirds/Shorebirds) [Declining Species]")
+sgcn_tier_1_swap_landbirds <- lCalculateSummaryStatistics(s,sppList=sgcn_tier_1_swap_landbirds,listName="SGCN/SWAP (Landbirds) [Tier 1]")
 
 master <-
 rbind(pif_waterbirds_shorebirds_trend_3,pif_landbirds_trend_3,
