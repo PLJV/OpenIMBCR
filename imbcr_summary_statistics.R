@@ -261,10 +261,19 @@ lCalculateSummaryStatistics <- function(s=NULL,sppList=NULL,listName=NULL){
   spp_counts <- list()
   spp_sampling_effort <- list()
   spp_cv <- list()
+  spp_habitat_mode <- list()
+  spp_habitat_nClasses <- list()
+  spp_habitat_cv <- list()
 
   for(i in 1:length(sppList)){
     # occupancy at the transect-level
     spp_prevalence[[i]] <- length(unique(as.character(s@data[grepl(stripCommonName(s$common.name),pattern=stripCommonName(sppList[i])),]$transectnum))) / total_transects
+    # habitat (association) observations
+    spp_habitat_mode[[i]] <- landscapeAnalysis:::Mode(as.vector(s@data[grepl(stripCommonName(s$common.name),pattern=stripCommonName(sppList[i])),]$primaryhabitat))
+    spp_habitat_nClasses[[i]] <- length(unique(as.vector(s@data[grepl(stripCommonName(s$common.name),pattern=stripCommonName(sppList[i])),]$primaryhabitat)))
+    spp_habitat_cv[[i]] <- sd(table(as.vector(s@data[grepl(stripCommonName(s$common.name),pattern=stripCommonName(sppList[i])),]$primaryhabitat)))/
+                           mean(table(as.vector(s@data[grepl(stripCommonName(s$common.name),pattern=stripCommonName(sppList[i])),]$primaryhabitat)))
+
     # average count at the transect-level, taken as the average of the sum of counts across stations where the species was observed
     focal_transects <- unique(as.character(s@data[grepl(stripCommonName(s$common.name),pattern=stripCommonName(sppList[i])),]$transectnum))
     if(length(focal_transects)>0){
@@ -296,7 +305,10 @@ lCalculateSummaryStatistics <- function(s=NULL,sppList=NULL,listName=NULL){
                     Average_Count=spp_counts,
                     Coefficient_of_Variation=spp_cv,
                     Effort=as.numeric(spp_sampling_effort),
-                    Active_Transects=round(as.numeric(spp_prevalence)*total_transects)
+                    Active_Transects=round(as.numeric(spp_prevalence)*total_transects),
+                    Habitat_Median=unlist(spp_habitat_mode),
+                    Habitat_Classes=unlist(spp_habitat_nClasses),
+                    Habitat_CV=unlist(spp_habitat_cv)
                     )
     return(spp)
 }
