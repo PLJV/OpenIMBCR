@@ -322,24 +322,85 @@ lCalculateSummaryStatistics <- function(s=NULL,sppList=NULL,listName=NULL){
 
 s <- imbcrTableToShapefile(filename=recursiveFindFile(name="RawData_PLJV_IMBCR_20161024.csv",root="/home/ktaylora/Incoming")[1])
 
-pif_waterbirds_shorebirds_trend_3 <- lCalculateSummaryStatistics(s,sppList=pif_waterbirds_shorebirds_trend_3,listName="PIF (Waterbirds and Shorebirds) [Trend 3 List]")
-pif_landbirds_trend_3 <- lCalculateSummaryStatistics(s,sppList=pif_landbirds_trend_3,listName="PIF (Landbirds) [Trend 3 List]")
-sgcn_tier_2_swap_waterbirds <- lCalculateSummaryStatistics(s,sppList=sgcn_tier_2_swap_waterbirds,listName="SGCN/SWAP (Waterbirds) [Tier 2]")
-sgcn_tier_2_swap_landbirds <- lCalculateSummaryStatistics(s,sppList=sgcn_tier_2_swap_landbirds,listName="SGCN/SWAP (Landbirds) [Tier 2]")
-sgcn_tier_1_swap_waterbirds_shorebirds <- lCalculateSummaryStatistics(s,sppList=sgcn_tier_1_swap_waterbirds_shorebirds,listName="SGCN/SWAP (Waterbirds) [Tier 1]")
-esa_pif_declining_spp_landbirds <- lCalculateSummaryStatistics(s,sppList=esa_pif_declining_spp_landbirds,listName="ESA/PIF (Landbirds) [Declining Species]")
-esa_pif_declining_spp_waterbirds_shorebirds <- lCalculateSummaryStatistics(s,sppList=esa_pif_declining_spp_waterbirds_shorebirds,listName="ESA/PIF (Waterbirds/Shorebirds) [Declining Species]")
-sgcn_tier_1_swap_landbirds <- lCalculateSummaryStatistics(s,sppList=sgcn_tier_1_swap_landbirds,listName="SGCN/SWAP (Landbirds) [Tier 1]")
+a <- lCalculateSummaryStatistics(s,sppList=pif_waterbirds_shorebirds_trend_3,listName="PIF (Waterbirds and Shorebirds) [Trend 3 List]")
+b <- lCalculateSummaryStatistics(s,sppList=pif_landbirds_trend_3,listName="PIF (Landbirds) [Trend 3 List]")
+c <- lCalculateSummaryStatistics(s,sppList=sgcn_tier_2_swap_waterbirds,listName="SGCN/SWAP (Waterbirds) [Tier 2]")
+d <- lCalculateSummaryStatistics(s,sppList=sgcn_tier_2_swap_landbirds,listName="SGCN/SWAP (Landbirds) [Tier 2]")
+e <- lCalculateSummaryStatistics(s,sppList=sgcn_tier_1_swap_waterbirds_shorebirds,listName="SGCN/SWAP (Waterbirds) [Tier 1]")
+f <- lCalculateSummaryStatistics(s,sppList=esa_pif_declining_spp_landbirds,listName="ESA/PIF (Landbirds) [Declining Species]")
+g <- lCalculateSummaryStatistics(s,sppList=esa_pif_declining_spp_waterbirds_shorebirds,listName="ESA/PIF (Waterbirds/Shorebirds) [Declining Species]")
+h <- lCalculateSummaryStatistics(s,sppList=sgcn_tier_1_swap_landbirds,listName="SGCN/SWAP (Landbirds) [Tier 1]")
 
 master <-
-rbind(pif_waterbirds_shorebirds_trend_3,pif_landbirds_trend_3,
-      sgcn_tier_2_swap_waterbirds,sgcn_tier_2_swap_landbirds,
-      sgcn_tier_1_swap_waterbirds_shorebirds,esa_pif_declining_spp_landbirds,
-      esa_pif_declining_spp_waterbirds_shorebirds,sgcn_tier_1_swap_landbirds)
+rbind(a,b,
+      c,d,
+      e,f,
+      g,h)
 
 write.csv(master,"summary_statistics.csv",row.names=F)
 
+s_pl <- s[grepl(unlist(lapply(strsplit(as.character(s$transectnum),split="-"),FUN=function(x) return(x[3]))),pattern="PL"),] # strata with stations that have at-least 1 "playa" observation
+
+a <- lCalculateSummaryStatistics(s_pl,sppList=pif_waterbirds_shorebirds_trend_3,listName="PIF (Waterbirds and Shorebirds) [Trend 3 List]")
+b <- lCalculateSummaryStatistics(s_pl,sppList=pif_landbirds_trend_3,listName="PIF (Landbirds) [Trend 3 List]")
+c <- lCalculateSummaryStatistics(s_pl,sppList=sgcn_tier_2_swap_waterbirds,listName="SGCN/SWAP (Waterbirds) [Tier 2]")
+d <- lCalculateSummaryStatistics(s_pl,sppList=sgcn_tier_2_swap_landbirds,listName="SGCN/SWAP (Landbirds) [Tier 2]")
+e <- lCalculateSummaryStatistics(s_pl,sppList=sgcn_tier_1_swap_waterbirds_shorebirds,listName="SGCN/SWAP (Waterbirds) [Tier 1]")
+f <- lCalculateSummaryStatistics(s_pl,sppList=esa_pif_declining_spp_landbirds,listName="ESA/PIF (Landbirds) [Declining Species]")
+g <- lCalculateSummaryStatistics(s_pl,sppList=esa_pif_declining_spp_waterbirds_shorebirds,listName="ESA/PIF (Waterbirds/Shorebirds) [Declining Species]")
+h <- lCalculateSummaryStatistics(s_pl,sppList=sgcn_tier_1_swap_landbirds,listName="SGCN/SWAP (Landbirds) [Tier 1]")
+
+master <-
+rbind(a,b,
+      c,d,
+      e,f,
+      g,h)
+
+master <- master[,!grepl(names(master),pattern="Habitat")]
+write.csv(master,"pl_summary_statistics.csv",row.names=F)
+
+s_ri <- s[grepl(unlist(lapply(strsplit(as.character(s$transectnum),split="-"),FUN=function(x) return(x[3]))),pattern="RV|AR|PT"),]
+
+a <- lCalculateSummaryStatistics(s_ri,sppList=pif_waterbirds_shorebirds_trend_3,listName="PIF (Waterbirds and Shorebirds) [Trend 3 List]")
+b <- lCalculateSummaryStatistics(s_ri,sppList=pif_landbirds_trend_3,listName="PIF (Landbirds) [Trend 3 List]")
+c <- lCalculateSummaryStatistics(s_ri,sppList=sgcn_tier_2_swap_waterbirds,listName="SGCN/SWAP (Waterbirds) [Tier 2]")
+d <- lCalculateSummaryStatistics(s_ri,sppList=sgcn_tier_2_swap_landbirds,listName="SGCN/SWAP (Landbirds) [Tier 2]")
+e <- lCalculateSummaryStatistics(s_ri,sppList=sgcn_tier_1_swap_waterbirds_shorebirds,listName="SGCN/SWAP (Waterbirds) [Tier 1]")
+f <- lCalculateSummaryStatistics(s_ri,sppList=esa_pif_declining_spp_landbirds,listName="ESA/PIF (Landbirds) [Declining Species]")
+g <- lCalculateSummaryStatistics(s_ri,sppList=esa_pif_declining_spp_waterbirds_shorebirds,listName="ESA/PIF (Waterbirds/Shorebirds) [Declining Species]")
+h <- lCalculateSummaryStatistics(s_ri,sppList=sgcn_tier_1_swap_landbirds,listName="SGCN/SWAP (Landbirds) [Tier 1]")
+
+master <-
+rbind(a,b,
+      c,d,
+      e,f,
+      g,h)
+
+master <- master[,!grepl(names(master),pattern="Habitat")]
+write.csv(master,"ri_summary_statistics.csv",row.names=F)
+
+s_ao <- s[grepl(unlist(lapply(strsplit(as.character(s$transectnum),split="-"),FUN=function(x) return(x[3]))),pattern="AO"),]
+
+a <- lCalculateSummaryStatistics(s_ao,sppList=pif_waterbirds_shorebirds_trend_3,listName="PIF (Waterbirds and Shorebirds) [Trend 3 List]")
+b <- lCalculateSummaryStatistics(s_ao,sppList=pif_landbirds_trend_3,listName="PIF (Landbirds) [Trend 3 List]")
+c <- lCalculateSummaryStatistics(s_ao,sppList=sgcn_tier_2_swap_waterbirds,listName="SGCN/SWAP (Waterbirds) [Tier 2]")
+d <- lCalculateSummaryStatistics(s_ao,sppList=sgcn_tier_2_swap_landbirds,listName="SGCN/SWAP (Landbirds) [Tier 2]")
+e <- lCalculateSummaryStatistics(s_ao,sppList=sgcn_tier_1_swap_waterbirds_shorebirds,listName="SGCN/SWAP (Waterbirds) [Tier 1]")
+f <- lCalculateSummaryStatistics(s_ao,sppList=esa_pif_declining_spp_landbirds,listName="ESA/PIF (Landbirds) [Declining Species]")
+g <- lCalculateSummaryStatistics(s_ao,sppList=esa_pif_declining_spp_waterbirds_shorebirds,listName="ESA/PIF (Waterbirds/Shorebirds) [Declining Species]")
+h <- lCalculateSummaryStatistics(s_ao,sppList=sgcn_tier_1_swap_landbirds,listName="SGCN/SWAP (Landbirds) [Tier 1]")
+
+master <-
+rbind(a,b,
+      c,d,
+      e,f,
+      g,h)
+
+master <- master[,!grepl(names(master),pattern="Habitat")]
+write.csv(master,"ao_summary_statistics.csv",row.names=F)
+
 # stratum-level summary statistics
+
 stratum <- unique(as.vector(s$stratum))
 stratum_stats <- list()
 for(i in stratum){
