@@ -273,6 +273,8 @@ lCalculateSummaryStatistics <- function(s=NULL,sppList=NULL,listName=NULL){
     spp_habitat_nClasses[[i]] <- length(unique(as.vector(s@data[grepl(stripCommonName(s$common.name),pattern=stripCommonName(sppList[i])),]$primaryhabitat)))
     spp_habitat_cv[[i]] <- sd(table(as.vector(s@data[grepl(stripCommonName(s$common.name),pattern=stripCommonName(sppList[i])),]$primaryhabitat)))/
                            mean(table(as.vector(s@data[grepl(stripCommonName(s$common.name),pattern=stripCommonName(sppList[i])),]$primaryhabitat)))
+    spp_habitat_max[[i]] <- max(table(as.vector(s@data[grepl(stripCommonName(s$common.name),pattern=stripCommonName(sppList[i])),]$primaryhabitat)))
+      names(spp_habitat_max[[i]]) <- spp_habitat_mode[[i]]
 
     # average count at the transect-level, taken as the average of the sum of counts across stations where the species was observed
     focal_transects <- unique(as.character(s@data[grepl(stripCommonName(s$common.name),pattern=stripCommonName(sppList[i])),]$transectnum))
@@ -307,7 +309,8 @@ lCalculateSummaryStatistics <- function(s=NULL,sppList=NULL,listName=NULL){
                     Effort=as.numeric(spp_sampling_effort),
                     Active_Transects=round(as.numeric(spp_prevalence)*total_transects),
                     Habitat_Median=unlist(spp_habitat_mode),
-                    Habitat_Classes=unlist(spp_habitat_nClasses),
+                    N_Predominant_Habitat_Type=unlist(spp_habitat_max),
+                    Total_Habitat_Classes=unlist(spp_habitat_nClasses),
                     Habitat_CV=unlist(spp_habitat_cv)
                     )
     return(spp)
@@ -335,3 +338,38 @@ rbind(pif_waterbirds_shorebirds_trend_3,pif_landbirds_trend_3,
       esa_pif_declining_spp_waterbirds_shorebirds,sgcn_tier_1_swap_landbirds)
 
 write.csv(master,"summary_statistics.csv",row.names=F)
+
+# stratum-level summary statistics
+stratum <- unique(as.vector(s$stratum))
+stratum_stats <- list()
+for(i in stratum){
+  nTransects <- length(unique(s[s$stratum == i,]$transectnum))
+  nScheduledStations <- nTransects*16
+  nCompletedStations <- vector()
+  for(j in unique(s[s$stratum == i,]$transectnum)){
+    nCompletedStations <- append(nCompletedStations,max(s[s$stratum == i & s$transectnum == j,]$point))
+  }
+  stratum_stats[[length(stratum_stats)+1]] <- data.frame(stratum=i,
+                                                         nTransects=nTransects,
+                                                         nScheduledStations=nScheduledStations,
+                                                         nCompletedStations=sum(nCompletedStations),
+                                                         completionRate=round(sum(nCompletedStations)/nScheduledStations,2)
+                                                         )
+}
+stratum_stats <- do.call(rbind,stratum_stats)
+
+write.csv(stratum_stats,"stratum_stats.csv",row.names=F)
+
+# habitat-level summary statistics
+association_stats <- list()
+for(i in as.character(unique(s$transectnum))){ # iterate over each transect
+  association_stats[[i]] <- data.frame(id=i,
+                                       playa_any=sum(table(s[as.character(s$transectnum) == i,]$primaryhabitat)[13])/sum(table(s[as.character(s$transectnum) == i,]$primaryhabitat)),
+                                       riparian_any=sum(table(s[as.character(s$transectnum) == i,]$primaryhabitat)[15])/sum(table(s[as.character(s$transectnum) == i,]$primaryhabitat)),
+                                       perc_transect=max(table(s[as.character(s$transectnum) == i,]$primaryhabitat))/sum(table(s[as.character(s$transectnum) == i,]$primaryhabitat)),
+                                       mode_habitat=names(which(table(s[as.character(s$transectnum) == i,]$primaryhabitat) == max(table(s[as.character(s$transectnum) == i,]$primaryhabitat))))
+                                       )
+}
+association_stats <- do.call(rbind,association_stats)
+
+write.csv(association_stats,"association_stats.csv",row.names=F)
