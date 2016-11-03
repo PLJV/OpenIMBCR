@@ -3,7 +3,7 @@
 #
 # Author: Kyle Taylor
 #
-# I stole a lot of this from earlier implementations described by David Pavlacky (Bird Conservancy of the Rockies)
+# I stole the likelihood analysis from earlier implementations described by David Pavlacky (Bird Conservancy of the Rockies)
 # and by Andy Royle (USFWS).
 #
 
