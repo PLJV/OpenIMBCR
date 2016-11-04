@@ -152,7 +152,7 @@ intensity  <- matrix(abs(rnorm(n=M,mean=(M:1),sd=10)/M),ncol=1) # simulate getti
 elevation2 <- matrix(rnorm(n=M,mean=(1:M)^2,sd=1),ncol=1)
 
 
-multiScaleOccupancy <- function(parameters,vars=c("a0","intensity","b0","elevation","elevation2")){
+singleScaleOccupancy <- function(parameters,vars=c("a0","intensity","b0","elevation","elevation2")){
   # name of all potential variables
   covarNames <- c("a0","intensity","b0","elevation","elevation2")
   intercept <- rep(1:M)
@@ -177,7 +177,7 @@ multiScaleOccupancy <- function(parameters,vars=c("a0","intensity","b0","elevati
     na_det <- is.na(detections) # any NA values?
     nd <- sum(detections[!na_det]) # check for zero-detections
     p <- prob[i,] # what is the predicted probability of detections for this site, given our parameters?
-    # calculate joint likelihood of detection, given site-level occupancy
+    # calculate likelihood of occupancy, given our calculated probability of detection for the focal transect
     cp <- (p^detections)*((1-p)^(1-detections))
       cp[na_det] <- 1 # set any NA values to 1
     likelihood[i] <- log(prod(cp)*psi[i] + ifelse(nd==0,1,0)*(1-psi[i]))
