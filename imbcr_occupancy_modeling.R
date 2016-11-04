@@ -180,7 +180,7 @@ singleScaleOccupancy <- function(parameters,vars=c("a0","intensity","b0","elevat
     # calculate likelihood of occupancy, given our calculated probability of detection for the focal transect
     cp <- (p^detections)*((1-p)^(1-detections))
       cp[na_det] <- 1 # set any NA values to 1
-    likelihood[i] <- log(prod(cp)*psi[i] + ifelse(nd==0,1,0)*(1-psi[i]))
+    likelihood[i] <- log(prod(cp)*psi[i] + ifelse(nd==0,1,0)*(1-psi[i])) # http://stats.stackexchange.com/questions/211848/likelihood-why-multiply
   }
   sum(-1*likelihood)
 }
