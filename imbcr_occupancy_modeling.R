@@ -151,8 +151,12 @@ intensity  <- matrix(abs(rnorm(n=M,mean=(M:1),sd=10)/M),ncol=1) # simulate getti
  elevation <- matrix(rnorm(n=M,mean=1:M,sd=15),ncol=1)
 elevation2 <- matrix(rnorm(n=M,mean=(1:M)^2,sd=1),ncol=1)
 
-
-singleScaleOccupancy <- function(parameters,vars=c("a0","intensity","b0","elevation","elevation2")){
+#
+# Fit a single-season occupancy model that allows for heterogeneity in detection probability
+# across transects, using Andy Royle's (2012) model specification.
+#
+  
+singleSeasonOccupancy <- function(parameters,vars=c("a0","intensity","b0","elevation","elevation2")){
   # name of all potential variables
   covarNames <- c("a0","intensity","b0","elevation","elevation2")
   intercept <- rep(1:M)
@@ -184,9 +188,3 @@ singleScaleOccupancy <- function(parameters,vars=c("a0","intensity","b0","elevat
   }
   sum(-1*likelihood)
 }
-
-
-#
-# Fit a single-season occupancy model that allows for heterogeneity in detection probability
-# across transects, using Andy Royle's (2012) model specification.
-#
