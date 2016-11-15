@@ -7,11 +7,14 @@
 # and by Andy Royle (USFWS).
 #
 
+require(raster)
+require(rgdal)
+
 expit <- function(x) 1/(1+exp(-x))
 logit <- function(x) log(x/(1-x))
 
-getAIC <- function(m) (m$minimum*2) + (2*length(m))
- getSE <- function(m) sqrt(diag(solve(m$hessian)))
+AIC <- function(m) (m$minimum*2) + (2*length(m))
+ SE <- function(m) sqrt(diag(solve(m$hessian)))
 
 stripCommonName <- function(x) tolower(gsub(x,pattern=" |'|-",replacement=""))
 
@@ -73,7 +76,10 @@ imbcrTableToShapefile <- function(filename=NULL,outfile=NULL,write=F){
   }
   return(s)
 }
-
+#' accepts a SpatialPointsDataFrame of IMBCR data and parses observations into counts for a focal
+#' species specified by the user.
+#' @param spp character string specifying focal species common name
+#' @export
 parseDetectionsBySpecies <- function(s,spp=NULL){
   in_sample <- which(stripCommonName(s$common.name) %in% stripCommonName(spp[1]))
   out_sample <- which(!(1:length(s) %in% in_sample))
@@ -91,7 +97,7 @@ parseDetectionsBySpecies <- function(s,spp=NULL){
 #' return a list of M data.frames (one for each IMBCR transect) that can be post-processed later for occupancy or abundance
 #' modeling.
 #' @export
-calcStationLevelMetadata <- function(s,spp=NULL){
+parseStationLevelMetadata <- function(s,spp=NULL){
 
 
         s_spp <- parseDetectionsBySpecies(s,spp=spp) # parse our SpatialPointsDataFrame for focal species (spp)
@@ -125,6 +131,30 @@ calcStationLevelMetadata <- function(s,spp=NULL){
   # return our list of data.frames to user
   return(detectionHist)
 }
+#' accepts a list of data.frames (as returned by parseStationLevelMetadata) and post-processes
+#' the counts into binomial detections that can be used to fit occupancy.
+#' @export
+parseStationCountsAsOccupancy <- function(detectionHist,na.rm=F){
+  for(i in 1:M){
+    d <- as.numeric(aggregate(counts~station,detectionHist[[i]],function(x){sum(x>0)})$counts > 0)  # did we observe ANY birds across our 6 minute count for each station?
+    if(!na.rm){
+      det <- rep(".",16)
+      det[which(as.numeric(unique(detectionHist[[i]]$station)) %in% 1:16)] <- d
+        det <- paste(det,collapse="")
+    } else {
+      det <- d;
+    }
+    tod <- round(median(detectionHist[[i]]$tod,na.rm=T))
+    obs <- landscapeAnalysis:::Mode(detectionHist[[i]]$obs)
+    intensity <- exp(max(detectionHist[[i]]$station))
+    detectionHist[[i]] <- data.frame(det=det,tod=tod,obs=obs,intensity=intensity)
+  }
+  do.call(rbind,detectionHist)
+}
+
+#
+# MAIN
+#
 
 spp <-
 c(
@@ -146,25 +176,14 @@ c(
 # data frame -> spatial points data frame
 s <- imbcrTableToShapefile(filename=recursiveFindFile(name="RawData_PLJV_IMBCR_20161024.csv",root="/home/ktaylora/Incoming")[1])
 # number of unique 1-km2 transects?
-M <- length(as.character(unique(s_spp$transectnum))) # number of transects
+M <- length(as.character(unique(s$transectnum))) # number of transects
 
 #
 # parse our count observations and metadata into something we can use for est. p-detection
 # and occupancy
 #
 
-detectionHist <- calcStationLevelMetadata(s,spp=spp[1])
-
-for(i in 1:M){
-  det <- paste(as.numeric(aggregate(counts~station,detectionHist[[i]],function(x){sum(x>0)})$counts > 0),collapse="") # did we observe ANY birds across our 6 minute count for each station?
-  tod <- round(median(detectionHist[[i]]$tod,na.rm=T))
-  obs <- landscapeAnalysis:::Mode(detectionHist[[i]]$obs)
-  intensity <- exp(max(detectionHist[[i]]$station))
-  detectionHist[[i]] <- data.frame(det=det,tod=tod,obs=obs,intensity=intensity)
-}
-
-detectionHist <- do.call(rbind,detectionHist)
-
+detectionHist <- parseStationCountsAsOccupancy(parseStationLevelMetadata(s,spp=spp[1]))
 
 #
 # Fit a basic model that estimates probability of detection using IMBCR metadata
