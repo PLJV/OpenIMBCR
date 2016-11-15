@@ -151,7 +151,40 @@ parseStationCountsAsOccupancy <- function(detectionHist,na.rm=F){
   }
   do.call(rbind,detectionHist)
 }
+#'
+#'
+parseHabitatMetadataByTransect <- function(s){
+  # aggregate by IMBCR habitat codes
+       WOOD <- c("PP","DW","LA","LP","MB","MC","OA","PJ","SF","II","BU")
+    WETLAND <- c("HW","OW","PL","RI","WE")
+  SHRUBLAND <- c("DS","SA","SH")
+      GRASS <- c("MM","GR")
+  # build a data.frame and return to user
+  transects <- unique(s$transectnum)
+   habitat <- list()
+  for(i in 1:length(transects)){
+    # percent cover of our 1-km2 transect
+    habSummary <- s[s$transectnum == transects[i],]@data$primaryhab
+      habSummary <- as.data.frame(table(habSummary)*100/(length(habSummary)))
+        names(habSummary) <- c("habitat","perc_cover")
 
+    habSummary <-
+    data.frame(perc_ag=habSummary[habSummary$habitat == "AR",2],
+               perc_grass=sum(habSummary[habSummary$habitat %in% GRASS, 2]),
+               perc_shrub=sum(habSummary[habSummary$habitat %in% SHRUBLAND, 2]),
+               perc_tree=sum(habSummary[habSummary$habitat %in% WOOD,2]),
+               perc_playa=habSummary[habSummary$habitat == "PL", 2],
+               perc_wetland=sum(habSummary[habSummary$habitat %in% WETLAND,2]),
+               perc_urban=habSummary[habSummary$habitat == "UR", 2],
+               perc_other=habSummary[habSummary$habitat == "XX", 2]
+               )
+     habitat[[i]] <- cbind(transect=transects[[i]],habSummary)
+     if(sum(habitat[[i]][1,2:ncol(habitat[[i]])]) < 100){
+       warning(paste("transect:",transects[[i]]," % cover only adds up to ",round(sum(habitat[[i]][1,2:ncol(habitat[[i]])])),sep=""))
+     }
+  }
+  do.call(rbind,habitat)
+}
 #
 # MAIN
 #
@@ -169,7 +202,6 @@ c(
   "Ring-necked Pheasant",
   "Northern bobwhite",
   "Wild-turkey",
-  "Redhead",
   "Great blue heron"
 )
 
@@ -183,7 +215,11 @@ M <- length(as.character(unique(s$transectnum))) # number of transects
 # and occupancy
 #
 
-detectionHist <- parseStationCountsAsOccupancy(parseStationLevelMetadata(s,spp=spp[1]))
+transect_habitat_covs <- parseHabitatMetadataByTransect(s) # transect-level habitat covariates
+        detectionHist <- parseStationCountsAsOccupancy(parseStationLevelMetadata(s,spp=spp[1])) # covariates for probability of detection
+
+pairs(transect_habitat_covs,cex=0.7,pch=15,log=T)
+abs(cor(transect_habitat_covs[,2:ncol(transect_habitat_covs)])) > 0.25
 
 #
 # Fit a basic model that estimates probability of detection using IMBCR metadata
