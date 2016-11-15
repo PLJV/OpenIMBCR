@@ -1,7 +1,7 @@
 #
 # Single-season occupancy modeling work for 2016 data
 #
-# Author: Kyle Taylor
+# Author: Kyle Taylor [2016]
 #
 # Much of this is based on earlier implementations described by David Pavlacky (Bird Conservancy of the Rockies)
 # and by Andy Royle (USFWS).
@@ -9,6 +9,9 @@
 
 expit <- function(x) 1/(1+exp(-x))
 logit <- function(x) log(x/(1-x))
+
+getAIC <- function(m) (m$minimum*2) + (2*length(m))
+ getSE <- function(m) sqrt(diag(solve(m$hessian)))
 
 stripCommonName <- function(x) tolower(gsub(x,pattern=" |'|-",replacement=""))
 
@@ -84,55 +87,83 @@ parseDetectionsBySpecies <- function(s,spp=NULL){
   s@data <- t
   return(s)
 }
+#' parse relavent metadata for estimating p-detection and leave station-level count information in-place
+#' return a list of M data.frames (one for each IMBCR transect) that can be post-processed later for occupancy or abundance
+#' modeling.
+#' @export
+calcStationLevelMetadata <- function(s,spp=NULL){
+
+
+        s_spp <- parseDetectionsBySpecies(s,spp=spp) # parse our SpatialPointsDataFrame for focal species (spp)
+  n_occupancy <- length(unique(s_spp[s_spp$cl_count > 0,]$transectnum))/length(unique(s$transectnum))
+
+  detectionHist <- list()
+  for(t in as.character(unique(s_spp$transectnum))){
+
+      counts   <- s_spp[s_spp$transectnum == t,]$cl_count
+           det <- as.numeric(counts > 0)
+      station  <- s_spp[s_spp$transectnum == t,]$point
+      interval <- s_spp[s_spp$transectnum == t,]$timeperiod
+           doy <- as.numeric(strftime(as.POSIXct(as.Date(as.character(s_spp[s_spp$transectnum == t,]$date), "%m/%d/%Y")),format="%j"))
+           tod <- as.numeric(s_spp[s_spp$transectnum == t,]$starttime)
+           obs <- as.character(s_spp[s_spp$transectnum == t,]$observer)
+
+      distance_disqualifier <- s_spp[s_spp$transectnum == t,]$radialdistance
+        distance_disqualifier <- (distance_disqualifier < 0 | distance_disqualifier > 400)
+
+        detectionHist[[length(detectionHist)+1]] <- data.frame(
+                                                      counts=counts,
+                                                      detection=det,
+                                                      station=station,
+                                                      interval=interval,
+                                                      doy=doy,
+                                                      tod=tod,
+                                                      obs=obs,
+                                                      disqualified=distance_disqualifier
+                                                    )
+  }
+  # return our list of data.frames to user
+  return(detectionHist)
+}
 
 spp <-
-c(start
-  'Grasshopper sparrow',
-  'Lark bunting',
-  'Swainson’s Hawk',
-  'Killdeer',
-  'Upland sandpiper',
-  'Ring-necked Pheasant',
-  'Wild-turkey',
-  'Mallard',
-  'Redhead',
-  'Great blue heron'
+c(
+  "Grasshopper sparrow",
+  "Lark bunting",
+  "Swainson’s Hawk",
+  "Cassin's Sparrow",
+  "McCown's Longspur",
+  "Long-billed curlew",
+  "Killdeer",
+  "Upland sandpiper",
+  "Ring-necked Pheasant",
+  "Northern bobwhite",
+  "Wild-turkey",
+  "Redhead",
+  "Great blue heron"
 )
 
+# data frame -> spatial points data frame
 s <- imbcrTableToShapefile(filename=recursiveFindFile(name="RawData_PLJV_IMBCR_20161024.csv",root="/home/ktaylora/Incoming")[1])
+# number of unique 1-km2 transects?
+M <- length(as.character(unique(s_spp$transectnum))) # number of transects
 
 #
-# Estimate naive occupancy for each species
+# parse our count observations and metadata into something we can use for est. p-detection
+# and occupancy
 #
 
-      s_spp <- parseDetectionsBySpecies(s,spp=spp[1])
-n_occupancy <- length(unique(s_spp[s_spp$cl_count > 0,]$transectnum))/length(unique(s$transectnum))
+detectionHist <- calcStationLevelMetadata(s,spp=spp[1])
 
-detectionHist <- list()
-for(t in as.character(unique(s_spp$transectnum))){
-
-    counts   <- s_spp[s_spp$transectnum == t,]$cl_count
-         det <- as.numeric(counts > 0)
-    station  <- s_spp[s_spp$transectnum == t,]$point
-    interval <- s_spp[s_spp$transectnum == t,]$timeperiod
-         doy <- as.numeric(strftime(as.POSIXct(as.Date(as.character(s_spp[s_spp$transectnum == t,]$date), "%m/%d/%Y")),format="%j"))
-         tod <- as.numeric(s_spp[s_spp$transectnum == t,]$starttime)
-         obs <- as.character(s_spp[s_spp$transectnum == t,]$observer)
-
-    distance_disqualifier <- s_spp[s_spp$transectnum == t,]$radialdistance
-      distance_disqualifier <- (distance_disqualifier < 0 | distance_disqualifier > 400)
-
-      detectionHist[[length(detectionHist)+1]] <- data.frame(
-                                                    counts=counts,
-                                                    detection=det,
-                                                    station=station,
-                                                    interval=interval,
-                                                    doy=doy,
-                                                    tod=tod,
-                                                    obs=obs,
-                                                    disqualified=distance_disqualifier
-                                                  )
+for(i in 1:M){
+  det <- paste(as.numeric(aggregate(counts~station,detectionHist[[i]],function(x){sum(x>0)})$counts > 0),collapse="") # did we observe ANY birds across our 6 minute count for each station?
+  tod <- round(median(detectionHist[[i]]$tod,na.rm=T))
+  obs <- landscapeAnalysis:::Mode(detectionHist[[i]]$obs)
+  intensity <- exp(max(detectionHist[[i]]$station))
+  detectionHist[[i]] <- data.frame(det=det,tod=tod,obs=obs,intensity=intensity)
 }
+
+detectionHist <- do.call(rbind,detectionHist)
 
 
 #
@@ -140,22 +171,20 @@ for(t in as.character(unique(s_spp$transectnum))){
 # across 1-km transects and evaluate its accuracy using an 80/20 k-fold cross-validation
 #
 
-M <- 300 # number of sites
-
 # fake some presence/absence data that is strongly correlated with "elevation" to inform
-# building our occupancy model
-intensity  <- matrix(abs(rnorm(n=M,mean=(M:1),sd=10)/M),ncol=1) # simulate getting kinda worse at sampling as we go, because we are tired
-         y <- rbinom(n=(M*6),size=1,prob=abs(((1:M)/M)*(1-intensity))) # there is a clear trend of increase associated with elevation, partially obscured by our sampling effort
-         y <- matrix(y,ncol=6) # format as six repeat visits per site
-
- elevation <- matrix(rnorm(n=M,mean=1:M,sd=15),ncol=1)
-elevation2 <- matrix(rnorm(n=M,mean=(1:M)^2,sd=1),ncol=1)
+# building/testing our occupancy model
+# intensity  <- matrix(abs(rnorm(n=M,mean=(M:1),sd=10)/M),ncol=1) # simulate getting kinda worse at sampling as we go, because we are tired
+#          y <- rbinom(n=(M*6),size=1,prob=abs(((1:M)/M)*(1-intensity))) # there is a clear trend of increase associated with elevation, partially obscured by our sampling effort
+#          y <- matrix(y,ncol=6) # format as six repeat visits per site
+#
+#  elevation <- matrix(rnorm(n=M,mean=1:M,sd=15),ncol=1)
+# elevation2 <- matrix(rnorm(n=M,mean=(1:M)^2,sd=1),ncol=1)
 
 #
 # Fit a single-season occupancy model that allows for heterogeneity in detection probability
 # across transects, using Andy Royle's (2012) model specification.
 #
-  
+
 singleSeasonOccupancy <- function(parameters,vars=c("a0","intensity","b0","elevation","elevation2")){
   # name of all potential variables
   covarNames <- c("a0","intensity","b0","elevation","elevation2")
@@ -165,9 +194,10 @@ singleSeasonOccupancy <- function(parameters,vars=c("a0","intensity","b0","eleva
     names(coeffs) <- covarNames
   # for those vars used in this run, set coefficients to the parameter value given by nlm()
   coeffs[vars] <- parameters
+  # parameters on detection
   a0 <- coeffs[1];
   a1 <- coeffs[2];
-
+  # parameters on occupancy
   b0 <- coeffs[3];
   b1 <- coeffs[4];
   b2 <- coeffs[5];
@@ -188,3 +218,6 @@ singleSeasonOccupancy <- function(parameters,vars=c("a0","intensity","b0","eleva
   }
   sum(-1*likelihood)
 }
+
+# Optimize with NLM
+m <- nlm(singleSeasonOccupancy,c(0,0,0,0,0),vars=c("a0","intensity","b0","elevation","elevation2"),hessian=TRUE)
