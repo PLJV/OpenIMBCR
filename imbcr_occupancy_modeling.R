@@ -76,6 +76,15 @@ imbcrTableToShapefile <- function(filename=NULL,outfile=NULL,write=F){
   }
   return(s)
 }
+#' fetch IMBCR Metadata to Landfire conversions
+#'
+imbcrHabitatToLandfire <-function(url="https://docs.google.com/spreadsheets/d/1wJ3Xwr67GTYYfim29cKQ9m3AJgoOQryYTHc9v5gJB2g/pub?gid=0&single=true&output=csv"){
+  download.file(url,destfile="imbcr_meta_codes.csv");
+    t <- read.csv("imbcr_meta_codes.csv")
+  # clean-up and return
+  file.remove("imbcr_meta_codes.csv")
+  return(t)        
+}
 #' accepts a SpatialPointsDataFrame of IMBCR data and parses observations into counts for a focal
 #' species specified by the user.
 #' @param spp character string specifying focal species common name
@@ -175,9 +184,10 @@ parseHabitatMetadataByTransect <- function(s){
                perc_tree=sum(habSummary[habSummary$habitat %in% WOOD,2]),
                perc_playa=habSummary[habSummary$habitat == "PL", 2],
                perc_wetland=sum(habSummary[habSummary$habitat %in% WETLAND,2]),
-               perc_urban=habSummary[habSummary$habitat == "UR", 2],
-               perc_other=habSummary[habSummary$habitat == "XX", 2]
+               perc_urban=habSummary[habSummary$habitat == "UR", 2]
                )
+     # here's a more fool-proof way of estimating the "other" class than just 'XX'
+     habSummary$perc_other <- 100-rowSums(habSummary)
      habitat[[i]] <- cbind(transect=transects[[i]],habSummary)
      if(sum(habitat[[i]][1,2:ncol(habitat[[i]])]) < 100){
        warning(paste("transect:",transects[[i]]," % cover only adds up to ",round(sum(habitat[[i]][1,2:ncol(habitat[[i]])])),sep=""))
