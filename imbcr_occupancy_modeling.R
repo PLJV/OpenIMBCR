@@ -83,8 +83,9 @@ imbcrHabitatToLandfire <-function(url="https://docs.google.com/spreadsheets/d/1w
     t <- read.csv("imbcr_meta_codes.csv")
   # clean-up and return
   file.remove("imbcr_meta_codes.csv")
-  return(t)        
+  return(t[,c(1,2)])
 }
+
 #' accepts a SpatialPointsDataFrame of IMBCR data and parses observations into counts for a focal
 #' species specified by the user.
 #' @param spp character string specifying focal species common name
@@ -163,11 +164,15 @@ parseStationCountsAsOccupancy <- function(detectionHist,na.rm=F){
 #'
 #'
 parseHabitatMetadataByTransect <- function(s){
+  # fetch our source table of habitat associations
+  t <- imbcrHabitatToLandfire()
   # aggregate by IMBCR habitat codes
-       WOOD <- c("PP","DW","LA","LP","MB","MC","OA","PJ","SF","II","BU")
-    WETLAND <- c("HW","OW","PL","RI","WE")
-  SHRUBLAND <- c("DS","SA","SH")
-      GRASS <- c("MM","GR")
+         AG  <- as.vector(t[t$To == "AG",1])
+       TREES <- as.vector(t[t$To == "TR",1])
+    WETLANDS <- as.vector(t[t$To == "WE",1])
+  SHRUBLANDS <- as.vector(t[t$To == "SH",1])
+       GRASS <- as.vector(t[t$To == "GR",1])
+       OTHER <- as.vector(t[t$To == "XX",1])
   # build a data.frame and return to user
   transects <- unique(s$transectnum)
    habitat <- list()
@@ -178,16 +183,16 @@ parseHabitatMetadataByTransect <- function(s){
         names(habSummary) <- c("habitat","perc_cover")
 
     habSummary <-
-    data.frame(perc_ag=habSummary[habSummary$habitat == "AR",2],
+    data.frame(perc_ag=sum(habSummary[habSummary$habitat %in% AG, 2]),
                perc_grass=sum(habSummary[habSummary$habitat %in% GRASS, 2]),
                perc_shrub=sum(habSummary[habSummary$habitat %in% SHRUBLAND, 2]),
-               perc_tree=sum(habSummary[habSummary$habitat %in% WOOD,2]),
+               perc_tree=sum(habSummary[habSummary$habitat %in% TREES,2]),
                perc_playa=habSummary[habSummary$habitat == "PL", 2],
-               perc_wetland=sum(habSummary[habSummary$habitat %in% WETLAND,2]),
-               perc_urban=habSummary[habSummary$habitat == "UR", 2]
+               perc_wetland=sum(habSummary[habSummary$habitat %in% WETLANDS,2]),
+               perc_urban=habSummary[habSummary$habitat == "UR", 2],
+               perc_other=sum(habSummary[habSummary$habitat %in% OTHER,2])
                )
-     # here's a more fool-proof way of estimating the "other" class than just 'XX'
-     habSummary$perc_other <- 100-rowSums(habSummary)
+     # bind to a table
      habitat[[i]] <- cbind(transect=transects[[i]],habSummary)
      if(sum(habitat[[i]][1,2:ncol(habitat[[i]])]) < 100){
        warning(paste("transect:",transects[[i]]," % cover only adds up to ",round(sum(habitat[[i]][1,2:ncol(habitat[[i]])])),sep=""))
