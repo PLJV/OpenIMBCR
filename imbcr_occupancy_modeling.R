@@ -76,11 +76,12 @@ imbcrTableToShapefile <- function(filename=NULL,outfile=NULL,write=F){
   }
   return(s)
 }
-#' fetch IMBCR Metadata to Landfire conversions
+#' fetch IMBCR Metadata to Landfire code conversions
 #'
-imbcrHabitatToLandfire <-function(url="https://docs.google.com/spreadsheets/d/1wJ3Xwr67GTYYfim29cKQ9m3AJgoOQryYTHc9v5gJB2g/pub?gid=0&single=true&output=csv"){
-  download.file(url,destfile="imbcr_meta_codes.csv");
+fetchImbcrToLandfireMetadata <-function(url="https://docs.google.com/spreadsheets/d/1wJ3Xwr67GTYYfim29cKQ9m3AJgoOQryYTHc9v5gJB2g/pub?gid=0&single=true&output=csv"){
+  download.file(url,destfile="imbcr_meta_codes.csv",quiet=T);
     t <- read.csv("imbcr_meta_codes.csv")
+      names(t) <- tolower(names(t))
   # clean-up and return
   file.remove("imbcr_meta_codes.csv")
   return(t[,c(1,2)])
@@ -165,14 +166,14 @@ parseStationCountsAsOccupancy <- function(detectionHist,na.rm=F){
 #'
 parseHabitatMetadataByTransect <- function(s){
   # fetch our source table of habitat associations
-  t <- imbcrHabitatToLandfire()
+  t <- fetchImbcrToLandfireMetadata()
   # aggregate by IMBCR habitat codes
-         AG  <- as.vector(t[t$To == "AG",1])
-       TREES <- as.vector(t[t$To == "TR",1])
-    WETLANDS <- as.vector(t[t$To == "WE",1])
-  SHRUBLANDS <- as.vector(t[t$To == "SH",1])
-       GRASS <- as.vector(t[t$To == "GR",1])
-       OTHER <- as.vector(t[t$To == "XX",1])
+         AG  <- as.vector(t[t$to == "AG",1])
+       TREES <- as.vector(t[t$to == "TR",1])
+    WETLANDS <- as.vector(t[t$to == "WE",1])
+  SHRUBLANDS <- as.vector(t[t$to == "SH",1])
+       GRASS <- as.vector(t[t$to == "GR",1])
+       OTHER <- as.vector(t[t$to == "XX",1])
   # build a data.frame and return to user
   transects <- unique(s$transectnum)
    habitat <- list()
