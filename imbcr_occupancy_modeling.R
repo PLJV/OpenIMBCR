@@ -13,7 +13,7 @@ require(rgdal)
 expit <- function(x) 1/(1+exp(-x))
 logit <- function(x) log(x/(1-x))
 
-AIC <- function(m) (m$minimum*2) + (2*length(m))
+AIC <- function(m) (m$minimum*2) + (2*length(m$estimate))
  SE <- function(m) sqrt(diag(solve(m$hessian)))
 
 permutations <- function(n){
@@ -340,7 +340,7 @@ inputTable[,!grepl(names(inputTable),pattern="det|obs")] <- scale(inputTable[,!g
 
 # test combindations of input variables
 combinations <- list()
-vars <- names(inputTable)
+vars <- paste(names(inputTable),c("a0","b0")) # tack our intercept terms on here.  They are handled internally by singleSeasonOccupancy()
 for(i in 1:length(names(inputTable))){
   c <- utils::combn(vars,m=i)
   for(j in 1:ncol(c)){
@@ -354,6 +354,10 @@ for(i in 1:length(names(inputTable))){
   }
   cat(".")
 }; cat("\n");
+
+permuted_aics <- unlist(lapply(combinations,FUN=function(x) AIC(x[[1]])))
+
+which(permuted_aics ==min(permuted_aics))
 
 m <- nlm(f=singleSeasonOccupancy,p=rep(0,10),
          vars=c("a0","tod","doy","intensity","b0","perc_ag","perc_grass", "perc_shrub", "perc_tree","perc_playa"),
