@@ -112,7 +112,6 @@ parseStationLevelMetadata <- function(s,spp=NULL){
 
 
         s_spp <- parseDetectionsBySpecies(s,spp=spp) # parse our SpatialPointsDataFrame for focal species (spp)
-  n_occupancy <- length(unique(s_spp[s_spp$cl_count > 0,]$transectnum))/length(unique(s$transectnum))
 
   detectionHist <- list()
   for(t in as.character(unique(s_spp$transectnum))){
@@ -150,7 +149,7 @@ parseStationCountsAsOccupancy <- function(detectionHist,na.rm=F){
   hhmm_to_min <- function(x){
     (as.numeric(substr(as.character(x),1,nchar(as.character(x))-2))*60) + (as.numeric(substr(as.character(x),2,nchar(as.character(x)))))
   }
-  for(i in 1:M){
+  for(i in 1:length(detectionHist)){
     d <- as.numeric(aggregate(counts~station,detectionHist[[i]],function(x){sum(x>0)})$counts > 0)  # did we observe ANY birds across our 6 minute count for each station?
     if(!na.rm){
       det <- rep(".",16)
@@ -162,7 +161,7 @@ parseStationCountsAsOccupancy <- function(detectionHist,na.rm=F){
     tod <- hhmm_to_min(round(median(detectionHist[[i]]$tod,na.rm=T)))
     doy <- round(median(detectionHist[[i]]$doy,na.rm=T))
     obs <- landscapeAnalysis:::Mode(detectionHist[[i]]$obs)
-    intensity <- max(detectionHist[[i]]$station)
+    intensity <- length(unique(detectionHist[[i]]$station))
     detectionHist[[i]] <- data.frame(det=det,tod=tod,doy=doy,obs=obs,intensity=intensity)
   }
   do.call(rbind,detectionHist)
@@ -266,10 +265,15 @@ abs(cor(transect_habitat_covs[,2:ncol(transect_habitat_covs)])) > 0.25
 # across transects, using Andy Royle's (2012) model specification.
 #
 
-singleSeasonOccupancy <- function(parameters,vars=c("a0","intensity","b0","elevation","elevation2")){
+singleSeasonOccupancy <- function(parameters,
+                                  table=NULL,
+                                  vars=c("a0","tod","doy","intensity","b0","perc_ag","perc_grass", "perc_shrub", "perc_tree","perc_playa")){
   # name of all potential variables
-  covarNames <- c("a0","intensity","b0","elevation","elevation2")
-  intercept <- rep(1:M)
+  covarNames <- c("a0","tod","doy","intensity","b0","perc_ag","perc_grass", "perc_shrub", "perc_tree","perc_playa")
+  t <- matrix(rep(0,M*length(covarNames)),ncol=length(covarNames))
+    colnames(t) <- covarNames
+     t[,"a0"] <- rep(1,M) # fill our intercept columns
+       t[,"b0"] <- rep(1,M)
   # by default, set our coefficients = 0 for this run
   coeffs <- rep(0,length(covarNames))
     names(coeffs) <- covarNames
@@ -277,14 +281,19 @@ singleSeasonOccupancy <- function(parameters,vars=c("a0","intensity","b0","eleva
   coeffs[vars] <- parameters
   # parameters on detection
   a0 <- coeffs[1];
-  a1 <- coeffs[2];
+  a1 <- coeffs[2]; # Time of day
+  a2 <- coeffs[3]; # Day of year
+  a3 <- coeffs[4]; # Intensity
   # parameters on occupancy
-  b0 <- coeffs[3];
-  b1 <- coeffs[4];
-  b2 <- coeffs[5];
+  b0 <- coeffs[5];
+  b1 <- coeffs[6];  # Percent agriculture
+  b2 <- coeffs[7];  # Percent grass
+  b3 <- coeffs[8];  # Percent shrub
+  b4 <- coeffs[9];  # Percent tree
+  b5 <- coeffs[10]; # Percent playa
   # prediction for
-  prob <- expit(a0*intercept + a1*intensity)
-   psi <- expit(b0*intercept + b1*elevation + b2*elevation2)
+  prob <- expit(a0*t[,'a0'] + a1*t[,"tod"] + a2*t[,"doy"] + a3*t[,"intensity"])
+   psi <- expit(b0*t[,'b0'] + b1*t[,"perc_ag"] + b2*t[,"perc_grass"] + b3*t[,"perc_shrub"] + b4*t[,"perc_tree"] + b5*t[,"perc_playa"])
   # solve for likelihood
   likelihood <- rep(NA,M)
   for(i in 1:M){
