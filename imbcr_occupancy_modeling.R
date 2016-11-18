@@ -16,6 +16,20 @@ logit <- function(x) log(x/(1-x))
 AIC <- function(m) (m$minimum*2) + (2*length(m))
  SE <- function(m) sqrt(diag(solve(m$hessian)))
 
+permutations <- function(n){
+   if(n==1){
+       return(matrix(1))
+   } else {
+       sp <- permutations(n-1)
+       p <- nrow(sp)
+       A <- matrix(nrow=n*p,ncol=n)
+       for(i in 1:n){
+           A[(i-1)*p+1:p,] <- cbind(i,sp+(sp>=i))
+       }
+       return(A)
+   }
+}
+
 stripCommonName <- function(x) tolower(gsub(x,pattern=" |'|-",replacement=""))
 
 recursiveFindFile <- function(name=NULL,root=Sys.getenv("HOME")){
@@ -268,12 +282,21 @@ abs(cor(transect_habitat_covs[,2:ncol(transect_habitat_covs)])) > 0.25
 singleSeasonOccupancy <- function(parameters,
                                   table=NULL,
                                   vars=c("a0","tod","doy","intensity","b0","perc_ag","perc_grass", "perc_shrub", "perc_tree","perc_playa")){
+  if(is.null(table)){
+    stop("table= argument requires an input table containing covariates and a 'det' field defining detection histories for your sites.")
+  }
   # name of all potential variables
   covarNames <- c("a0","tod","doy","intensity","b0","perc_ag","perc_grass", "perc_shrub", "perc_tree","perc_playa")
+  y <- table[,'det']
+    y <- suppressWarnings(matrix(as.numeric(matrix(unlist(strsplit(as.character(y),split="")))),nrow=M,ncol=16))
   t <- matrix(rep(0,M*length(covarNames)),ncol=length(covarNames))
     colnames(t) <- covarNames
      t[,"a0"] <- rep(1,M) # fill our intercept columns
-       t[,"b0"] <- rep(1,M)
+     t[,"b0"] <- rep(1,M)
+  # assign values for our focal table from user-specific source table
+  t <- data.frame(t)
+  table <- data.frame(table)
+  t[,vars[!grepl(vars,pattern=0)]] <- table[,vars[!grepl(vars,pattern=0)]]
   # by default, set our coefficients = 0 for this run
   coeffs <- rep(0,length(covarNames))
     names(coeffs) <- covarNames
@@ -300,7 +323,7 @@ singleSeasonOccupancy <- function(parameters,
     detections <- y[i,] # individual detections for our repeat visits at site i
     na_det <- is.na(detections) # any NA values?
     nd <- sum(detections[!na_det]) # check for zero-detections
-    p <- prob[i,] # what is the predicted probability of detections for this site, given our parameters?
+    p <- prob[i] # what is the predicted probability of detections for this site, given our parameters?
     # calculate likelihood of occupancy, given our calculated probability of detection for the focal transect
     cp <- (p^detections)*((1-p)^(1-detections))
       cp[na_det] <- 1 # set any NA values to 1
@@ -310,4 +333,28 @@ singleSeasonOccupancy <- function(parameters,
 }
 
 # Optimize with NLM
-m <- nlm(singleSeasonOccupancy,c(0,0,0,0,0),vars=c("a0","intensity","b0","elevation","elevation2"),hessian=TRUE)
+
+inputTable <- cbind(transect_habitat_covs[,2:ncol(transect_habitat_covs)],detectionHist)
+# re-scale our input variables
+inputTable[,!grepl(names(inputTable),pattern="det|obs")] <- scale(inputTable[,!grepl(names(inputTable),pattern="det|obs")])
+
+# test combindations of input variables
+combinations <- list()
+vars <- names(inputTable)
+for(i in 1:length(names(inputTable))){
+  c <- utils::combn(vars,m=i)
+  for(j in 1:ncol(c)){
+    m <- nlm(f=singleSeasonOccupancy,p=rep(0,i),
+             vars=c[,j],
+             table=inputTable,hessian=TRUE)
+    focal <- list()
+      focal[[1]] <- m
+        focal[[2]] <- c[,j]
+    combinations[[length(combinations)+1]] <- focal
+  }
+  cat(".")
+}; cat("\n");
+
+m <- nlm(f=singleSeasonOccupancy,p=rep(0,10),
+         vars=c("a0","tod","doy","intensity","b0","perc_ag","perc_grass", "perc_shrub", "perc_tree","perc_playa"),
+         table=inputTable,hessian=TRUE)
