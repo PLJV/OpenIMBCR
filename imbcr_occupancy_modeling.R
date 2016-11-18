@@ -146,6 +146,10 @@ parseStationLevelMetadata <- function(s,spp=NULL){
 #' the counts into binomial detections that can be used to fit occupancy.
 #' @export
 parseStationCountsAsOccupancy <- function(detectionHist,na.rm=F){
+  # tod (HH:MM) -> Minutes since midnight
+  hhmm_to_min <- function(x){
+    (as.numeric(substr(as.character(x),1,nchar(as.character(x))-2))*60) + (as.numeric(substr(as.character(x),2,nchar(as.character(x)))))
+  }
   for(i in 1:M){
     d <- as.numeric(aggregate(counts~station,detectionHist[[i]],function(x){sum(x>0)})$counts > 0)  # did we observe ANY birds across our 6 minute count for each station?
     if(!na.rm){
@@ -155,10 +159,11 @@ parseStationCountsAsOccupancy <- function(detectionHist,na.rm=F){
     } else {
       det <- d;
     }
-    tod <- round(median(detectionHist[[i]]$tod,na.rm=T))
+    tod <- hhmm_to_min(round(median(detectionHist[[i]]$tod,na.rm=T)))
+    doy <- round(median(detectionHist[[i]]$doy,na.rm=T))
     obs <- landscapeAnalysis:::Mode(detectionHist[[i]]$obs)
-    intensity <- exp(max(detectionHist[[i]]$station))
-    detectionHist[[i]] <- data.frame(det=det,tod=tod,obs=obs,intensity=intensity)
+    intensity <- max(detectionHist[[i]]$station)
+    detectionHist[[i]] <- data.frame(det=det,tod=tod,doy=doy,obs=obs,intensity=intensity)
   }
   do.call(rbind,detectionHist)
 }
@@ -186,7 +191,7 @@ parseHabitatMetadataByTransect <- function(s){
     habSummary <-
     data.frame(perc_ag=sum(habSummary[habSummary$habitat %in% AG, 2]),
                perc_grass=sum(habSummary[habSummary$habitat %in% GRASS, 2]),
-               perc_shrub=sum(habSummary[habSummary$habitat %in% SHRUBLAND, 2]),
+               perc_shrub=sum(habSummary[habSummary$habitat %in% SHRUBLANDS, 2]),
                perc_tree=sum(habSummary[habSummary$habitat %in% TREES,2]),
                perc_playa=habSummary[habSummary$habitat == "PL", 2],
                perc_wetland=sum(habSummary[habSummary$habitat %in% WETLANDS,2]),
@@ -200,6 +205,11 @@ parseHabitatMetadataByTransect <- function(s){
      }
   }
   do.call(rbind,habitat)
+}
+#' validate transect-level habitat metadata vs. LANDFIRE
+#'
+validateTransectMetadata <- function(s){
+  focal <- s[s$transectnum == transect_habitat_covs$transect[1],][!duplicated(s[s$transectnum == transect_habitat_covs$transect[1],]$point),]
 }
 #
 # MAIN
@@ -285,7 +295,7 @@ singleSeasonOccupancy <- function(parameters,vars=c("a0","intensity","b0","eleva
     # calculate likelihood of occupancy, given our calculated probability of detection for the focal transect
     cp <- (p^detections)*((1-p)^(1-detections))
       cp[na_det] <- 1 # set any NA values to 1
-    likelihood[i] <- log(prod(cp)*psi[i] + ifelse(nd==0,1,0)*(1-psi[i])) # http://stats.stackexchange.com/questions/211848/likelihood-why-multiply
+    likelihood[i] <- log(prod(cp)*psi[i] + ifelse(nd==0,1,0)*(1-psi[i])) # joint probability across detections, e.g.: http://stats.stackexchange.com/questions/211848/likelihood-why-multiply
   }
   sum(-1*likelihood)
 }
