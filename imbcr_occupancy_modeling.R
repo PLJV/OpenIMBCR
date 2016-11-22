@@ -3,8 +3,8 @@
 #
 # Author: Kyle Taylor [2016]
 #
-# Much of this is based on earlier implementations described by David Pavlacky (Bird Conservancy of the Rockies)
-# and by Andy Royle (USFWS).
+# Much of this is based on earlier discussions and implementations described by David Pavlacky (Bird Conservancy of the Rockies)
+# and by Andy Royle (USFWS). This could use some cleaning-up.
 #
 
 require(raster)
