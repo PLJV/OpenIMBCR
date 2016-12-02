@@ -78,10 +78,11 @@ imbcrTableToShapefile <- function(filename=NULL,outfile=NULL,write=F){
                                   data = s[[length(s)]],
                                   proj4string = CRS(projection(paste("+init=epsg:269", zone, sep = "")))
                         )
+      row.names(s[[length(s)]]) <- paste(letters[length(s)],row.names(s[[length(s)]]),sep=".") # based on : http://gis.stackexchange.com/questions/155328/merging-multiple-spatialpolygondataframes-into-1-spdf-in-r
     }
 
     s <- lapply(s,FUN=spTransform,CRS(projection(s[[1]])))
-      s <- suppressMessages(do.call(rbind,s))
+      s <- do.call(rbind,s)
         s$FID <- 1:nrow(s)
     # write to disk -- and allow some wiggle-room on filename conventions
     if(write){
