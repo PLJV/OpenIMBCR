@@ -131,7 +131,7 @@ parseStationLevelMetadata <- function(s,spp=NULL){
   detectionHist <- list()
   for(t in as.character(unique(s_spp$transectnum))){
 
-      counts   <- s_spp[s_spp$transectnum == t,]$cl_count
+        counts <- s_spp[s_spp$transectnum == t,]$cl_count
            det <- as.numeric(counts > 0)
       station  <- s_spp[s_spp$transectnum == t,]$point
       interval <- s_spp[s_spp$transectnum == t,]$timeperiod
@@ -276,8 +276,9 @@ abs(cor(transect_habitat_covs[,2:ncol(transect_habitat_covs)])) > 0.25
 # elevation2 <- matrix(rnorm(n=M,mean=(1:M)^2,sd=1),ncol=1)
 
 #
-# Fit a single-season occupancy model that allows for heterogeneity in detection probability
-# across transects, using Andy Royle's (2012) model specification.
+# Fit a single-season occupancy model that (inappropriately) assumes a constant
+# detection probability across transects. This is "Model m0", and loosely follows
+# Andy Royle's (2008) model specification.
 #
 
 singleSeasonOccupancy <- function(parameters,
