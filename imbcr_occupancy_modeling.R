@@ -242,12 +242,12 @@ extractByTransect <- function(s=NULL,r=NULL,fun=NULL){
     rVal <- extract(r,focal)
     # assign a summary statistic, specified by fun=function()
     if(is.function(fun)){
-      s@data[s@data[,transect_field] == as.vector(unique(focal@data[,transect_field])),'R_VAL'] <- fun(rVal)
+      s@data[s@data[,transect_field] == as.vector(unique(focal@data[,transect_field])),names(r)[1]] <- fun(rVal)
     }
     # assign our values point-by-point
     else {
       for(j in 1:length(focal$point)){
-        s@data[s@data[,'point'] == focal$point[j],'R_VAL'] <-  rVal[j]
+        s@data[s@data[,'point'] == focal$point[j],names(r)[1]] <-  rVal[j]
       }
     }
   }
