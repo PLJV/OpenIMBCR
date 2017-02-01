@@ -220,6 +220,41 @@ parseHabitatMetadataByTransect <- function(s){
   }
   do.call(rbind,habitat)
 }
+#' extract (and optionally, summarize using the fun= argument) raster data across IMBCR transects
+#'
+extractByTransect <- function(s=NULL,r=NULL,fun=NULL){
+  # sanity-check
+  if(sum(is.null(list(s,r)))>0) stop("s= and r= arguments can't be null")
+  # ensure consistent projections
+  orig_crs <- sp::CRS(raster::projection(s))
+  s <- sp::spTransform(s,sp::CRS(raster::projection(r)))
+  # search for a meaningful transect field
+  transect_field <- names(s)
+    transect_field <- transect_field[grepl(transect_field, pattern="trns|transect")][1] # by convention, use the first field that has "transect" or "trns" in it
+      if(length(transect_field) == 0) stop("couldn't find a meaningful IMBCR transect field in object s=")
+  # iterate over our transect data, processing as we go
+  transects <- unique(as.character(s@data[,transect_field]))
+  for(i in 1:length(transects)){
+    focal <- s@data[,transect_field] == transects[i]
+      focal <- s[focal,]
+        focal <- focal[!duplicated(focal$point),]
+    # extract and assign our habitat values
+    rVal <- extract(r,focal)
+    # assign a summary statistic, specified by fun=function()
+    if(is.function(fun)){
+      s@data[s@data[,transect_field] == as.vector(unique(focal@data[,transect_field])),'R_VAL'] <- fun(rVal)
+    }
+    # assign our values point-by-point
+    else {
+      for(j in 1:length(focal$point)){
+        s@data[s@data[,'point'] == focal$point[j],'R_VAL'] <-  rVal[j]
+      }
+    }
+  }
+  # restore our original CRS
+  s <- sp::spTransform(s,orig_crs)
+  return(s)
+}
 #' validate transect-level habitat metadata vs. LANDFIRE
 #'
 validateTransectMetadata <- function(s){
