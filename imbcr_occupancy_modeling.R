@@ -10,6 +10,7 @@
 require(raster)
 require(rgdal)
 
+# 'link' functions
 expit <- function(x) 1/(1+exp(-x))
 logit <- function(x) log(x/(1-x))
 
@@ -260,6 +261,7 @@ extractByTransect <- function(s=NULL,r=NULL,fun=NULL){
 validateTransectMetadata <- function(s){
   focal <- s[s$transectnum == transect_habitat_covs$transect[1],][!duplicated(s[s$transectnum == transect_habitat_covs$transect[1],]$point),]
 }
+
 #
 # MAIN
 #
@@ -296,26 +298,16 @@ transect_habitat_covs <- parseHabitatMetadataByTransect(s) # transect-level habi
 pairs(transect_habitat_covs,cex=0.7,pch=15,log=T)
 abs(cor(transect_habitat_covs[,2:ncol(transect_habitat_covs)])) > 0.25
 
-#
-# Fit a basic model that estimates probability of detection using IMBCR metadata
-# across 1-km transects and evaluate its accuracy using an 80/20 k-fold cross-validation
-#
-
-# fake some presence/absence data that is strongly correlated with "elevation" to inform
-# building/testing our occupancy model
-# intensity  <- matrix(abs(rnorm(n=M,mean=(M:1),sd=10)/M),ncol=1) # simulate getting kinda worse at sampling as we go, because we are tired
-#          y <- rbinom(n=(M*6),size=1,prob=abs(((1:M)/M)*(1-intensity))) # there is a clear trend of increase associated with elevation, partially obscured by our sampling effort
-#          y <- matrix(y,ncol=6) # format as six repeat visits per site
-#
-#  elevation <- matrix(rnorm(n=M,mean=1:M,sd=15),ncol=1)
-# elevation2 <- matrix(rnorm(n=M,mean=(1:M)^2,sd=1),ncol=1)
-
-#
-# Fit a single-season occupancy model that (inappropriately) assumes a constant
-# detection probability across transects. This is "Model m0", and loosely follows
-# Andy Royle's (2008) model specification.
-#
-
+#' Fit a single-season occupancy model  assumes a constant probability of species
+#' detection across transects, which is probably inappropriate for IMBCR data and will
+#' lead to inaccurate predictions of occupancy. This is "model m0" from the literature
+#' and loosely follows Andy Royle's (2008) model specification.
+#'
+#' @param table a data.frame of detection histories ('det') and covariates on
+#' occupancy ('b0') and probability of detection ('a0')
+#' @param vars a vector of strings specifying the covariates used for the analysis.
+#'
+#' @export
 singleSeasonOccupancy <- function(parameters,
                                   table=NULL,
                                   vars=c("a0","tod","doy","intensity","b0","perc_ag","perc_grass", "perc_shrub", "perc_tree","perc_playa")){
@@ -368,9 +360,13 @@ singleSeasonOccupancy <- function(parameters,
   }
   sum(-1*likelihood)
 }
+#' Fit the single-season abundance model of Royle-Nichols (the "RN" model) to IMBCR data
+#' @export
+singleSeasonAbundance <- function(x){
+
+}
 
 # Optimize with NLM
-
 inputTable <- cbind(transect_habitat_covs[,2:ncol(transect_habitat_covs)],detectionHist)
 # re-scale our input variables
 inputTable[,!grepl(names(inputTable),pattern="det|obs")] <- scale(inputTable[,!grepl(names(inputTable),pattern="det|obs")])
