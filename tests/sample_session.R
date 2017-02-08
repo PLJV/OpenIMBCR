@@ -1,6 +1,8 @@
 #
 # MAIN
 #
+require(OpenIMBCR)
+require(rgdal)
 
 spp <-
 c(
@@ -19,7 +21,7 @@ c(
 )
 
 # data frame -> spatial points data frame
-s <- imbcrTableToShapefile(filename=recursiveFindFile(name="RawData_PLJV_IMBCR_20161024.csv",root="/home/ktaylora/Incoming")[1])
+s <- OpenIMBCR::imbcrTableToShapefile(filename=OpenIMBCR:::recursiveFindFile(name="RawData_PLJV_IMBCR_20161024.csv",root="/home/ktaylora/Incoming")[1])
 # number of unique 1-km2 transects?
 M <- length(as.character(unique(s$transectnum))) # number of transects
 
@@ -28,8 +30,8 @@ M <- length(as.character(unique(s$transectnum))) # number of transects
 # and occupancy
 #
 
-transect_habitat_covs <- parseHabitatMetadataByTransect(s) # transect-level habitat covariates
-        detectionHist <- parseStationCountsAsOccupancy(parseStationLevelMetadata(s,spp=spp[1])) # covariates for probability of detection
+transect_habitat_covs <- OpenIMBCR:::parseHabitatMetadataByTransect(s) # transect-level habitat covariates
+        detectionHist <- OpenIMBCR:::parseStationCountsAsOccupancy(OpenIMBCR:::parseStationLevelMetadata(s,spp=spp[1])) # covariates for probability of detection
 
 pairs(transect_habitat_covs,cex=0.7,pch=15,log=T)
 abs(cor(transect_habitat_covs[,2:ncol(transect_habitat_covs)])) > 0.25
