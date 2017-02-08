@@ -1,22 +1,27 @@
 #
-# Single-season occupancy modeling work for 2016 data
+# OpenIMBCR
 #
-# Author: Kyle Taylor [2016]
+# Author: Kyle Taylor [2016] (kyle.taylor@pljv.org)
 #
 # Much of this is based on earlier discussions and implementations described by David Pavlacky (Bird Conservancy of the Rockies)
-# and by Andy Royle (USFWS). This could use some cleaning-up.
+# Rob Sparks (Bird Conservancy of the Rockies), and Andy Royle (USFWS).
+#
+# Please report bugs to Kyle Taylor
 #
 
-require(raster)
-require(rgdal)
-
-# 'link' functions
+#' expit link function
+#' @export
 expit <- function(x) 1/(1+exp(-x))
+#' logit link function
+#' @export
 logit <- function(x) log(x/(1-x))
-
+#' calculate AIC from a likelihood function optimization procedure
+#' @export
 AIC <- function(m) (m$minimum*2) + (2*length(m$estimate))
- SE <- function(m) sqrt(diag(solve(m$hessian)))
-
+#' calculate SE from a likelihood function optimization procedure
+#' @export
+SE <- function(m) sqrt(diag(solve(m$hessian)))
+#' recursively calculate all possible permutations of an input table n
 permutations <- function(n){
    if(n==1){
        return(matrix(1))
@@ -30,9 +35,9 @@ permutations <- function(n){
        return(A)
    }
 }
-
+#' strip non-essential characters and spaces from a species common name in a field
 stripCommonName <- function(x) tolower(gsub(x,pattern=" |'|-",replacement=""))
-
+#' recursively find all files in folder (root) that match the pattern (name)
 recursiveFindFile <- function(name=NULL,root=Sys.getenv("HOME")){
   if(is.null(name)){
     return(NULL)
@@ -40,7 +45,9 @@ recursiveFindFile <- function(name=NULL,root=Sys.getenv("HOME")){
     return(list.files(root,pattern=name,recursive=T,full.names=T))
   }
 }
-
+#' parse a source CSV (published by BCR) for IMBCR data and return as a SpatialPointsDataFrame
+#' to the user
+#' @export
 imbcrTableToShapefile <- function(filename=NULL,outfile=NULL,write=F){
   if(is.null(outfile) && write && !is.character(filename)){
     stop("cannot write shapefile to disk without an outfile= or filename.ext to parse")
@@ -93,7 +100,7 @@ imbcrTableToShapefile <- function(filename=NULL,outfile=NULL,write=F){
   return(s)
 }
 #' fetch IMBCR Metadata to Landfire code conversions
-#'
+#' @export
 fetchImbcrToLandfireMetadata <-function(url="https://docs.google.com/spreadsheets/d/1wJ3Xwr67GTYYfim29cKQ9m3AJgoOQryYTHc9v5gJB2g/pub?gid=0&single=true&output=csv"){
   download.file(url,destfile="imbcr_meta_codes.csv",quiet=T);
     t <- read.csv("imbcr_meta_codes.csv")
@@ -182,8 +189,8 @@ parseStationCountsAsOccupancy <- function(detectionHist,na.rm=F){
   }
   do.call(rbind,detectionHist)
 }
-#'
-#'
+#' generate plant community composition data from the associated IMBCR metadata
+#'@export
 parseHabitatMetadataByTransect <- function(s){
   # fetch our source table of habitat associations
   t <- fetchImbcrToLandfireMetadata()
@@ -222,7 +229,7 @@ parseHabitatMetadataByTransect <- function(s){
   do.call(rbind,habitat)
 }
 #' extract (and optionally, summarize using the fun= argument) raster data across IMBCR transects
-#'
+#' @export
 extractByTransect <- function(s=NULL,r=NULL,fun=NULL){
   # sanity-check
   if(sum(is.null(list(s,r)))>0) stop("s= and r= arguments can't be null")
@@ -258,46 +265,10 @@ extractByTransect <- function(s=NULL,r=NULL,fun=NULL){
 }
 #' validate transect-level habitat metadata vs. LANDFIRE
 #'
+#' @export
 validateTransectMetadata <- function(s){
   focal <- s[s$transectnum == transect_habitat_covs$transect[1],][!duplicated(s[s$transectnum == transect_habitat_covs$transect[1],]$point),]
 }
-
-#
-# MAIN
-#
-
-spp <-
-c(
-  "Grasshopper sparrow",
-  "Lark bunting",
-  "Swainson’s Hawk",
-  "Cassin's Sparrow",
-  "McCown's Longspur",
-  "Long-billed curlew",
-  "Killdeer",
-  "Upland sandpiper",
-  "Ring-necked Pheasant",
-  "Northern bobwhite",
-  "Wild-turkey",
-  "Great blue heron"
-)
-
-# data frame -> spatial points data frame
-s <- imbcrTableToShapefile(filename=recursiveFindFile(name="RawData_PLJV_IMBCR_20161024.csv",root="/home/ktaylora/Incoming")[1])
-# number of unique 1-km2 transects?
-M <- length(as.character(unique(s$transectnum))) # number of transects
-
-#
-# parse our count observations and metadata into something we can use for est. p-detection
-# and occupancy
-#
-
-transect_habitat_covs <- parseHabitatMetadataByTransect(s) # transect-level habitat covariates
-        detectionHist <- parseStationCountsAsOccupancy(parseStationLevelMetadata(s,spp=spp[1])) # covariates for probability of detection
-
-pairs(transect_habitat_covs,cex=0.7,pch=15,log=T)
-abs(cor(transect_habitat_covs[,2:ncol(transect_habitat_covs)])) > 0.25
-
 #' Fit a single-season occupancy model  assumes a constant probability of species
 #' detection across transects, which is probably inappropriate for IMBCR data and will
 #' lead to inaccurate predictions of occupancy. This is "model m0" from the literature
@@ -365,33 +336,3 @@ singleSeasonOccupancy <- function(parameters,
 singleSeasonAbundance <- function(x){
 
 }
-
-# Optimize with NLM
-inputTable <- cbind(transect_habitat_covs[,2:ncol(transect_habitat_covs)],detectionHist)
-# re-scale our input variables
-inputTable[,!grepl(names(inputTable),pattern="det|obs")] <- scale(inputTable[,!grepl(names(inputTable),pattern="det|obs")])
-
-# test combindations of input variables
-combinations <- list()
-vars <- paste(names(inputTable),c("a0","b0")) # tack our intercept terms on here.  They are handled internally by singleSeasonOccupancy()
-for(i in 1:length(names(inputTable))){
-  c <- utils::combn(vars,m=i)
-  for(j in 1:ncol(c)){
-    m <- nlm(f=singleSeasonOccupancy,p=rep(0,i),
-             vars=c[,j],
-             table=inputTable,hessian=TRUE)
-    focal <- list()
-      focal[[1]] <- m
-        focal[[2]] <- c[,j]
-    combinations[[length(combinations)+1]] <- focal
-  }
-  cat(".")
-}; cat("\n");
-
-permuted_aics <- unlist(lapply(combinations,FUN=function(x) AIC(x[[1]])))
-
-which(permuted_aics ==min(permuted_aics))
-
-m <- nlm(f=singleSeasonOccupancy,p=rep(0,10),
-         vars=c("a0","tod","doy","intensity","b0","perc_ag","perc_grass", "perc_shrub", "perc_tree","perc_playa"),
-         table=inputTable,hessian=TRUE)

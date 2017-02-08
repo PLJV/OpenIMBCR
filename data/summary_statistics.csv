@@ -1,0 +1,133 @@
+"PLJV_Species_List","Common_Name","Prevalence","Average_Count","Coefficient_of_Variation","Effort","Active_Transects","Habitat_Median","Habitat_Classes","Habitat_CV"
+"PIF (Waterbirds and Shorebirds) [Trend 3 List]","American Coot",0.023,260,2.598,0.866,7,"GR",4,0.888746843613587
+"PIF (Waterbirds and Shorebirds) [Trend 3 List]","American White Pelican",0.013,6,1.233,0.812,4,"GR",3,0.5
+"PIF (Waterbirds and Shorebirds) [Trend 3 List]","American Wigeon",0.003,1,NA,0.875,1,"GR",1,NA
+"PIF (Waterbirds and Shorebirds) [Trend 3 List]","Black Tern",0,0,0,NA,0,NA,0,NA
+"PIF (Waterbirds and Shorebirds) [Trend 3 List]","Black-crowned Night-Heron",0.003,1,NA,1,1,"RI",1,NA
+"PIF (Waterbirds and Shorebirds) [Trend 3 List]","Blue-winged Teal",0.063,3,0.916,0.836,19,"GR",6,0.558950834602614
+"PIF (Waterbirds and Shorebirds) [Trend 3 List]","Canvasback",0,0,0,NA,0,NA,0,NA
+"PIF (Waterbirds and Shorebirds) [Trend 3 List]","Cattle Egret",0.013,12,0.514,0.781,4,"AR",3,0.686348585024614
+"PIF (Waterbirds and Shorebirds) [Trend 3 List]","Cinnamon Teal",0.007,2,0,0.688,2,"GR",1,NA
+"PIF (Waterbirds and Shorebirds) [Trend 3 List]","Double-crested Cormorant",0.02,3,0.787,0.875,6,"RI",5,0.559016994374947
+"PIF (Waterbirds and Shorebirds) [Trend 3 List]","Eared Grebe",0,0,0,NA,0,NA,0,NA
+"PIF (Waterbirds and Shorebirds) [Trend 3 List]","Forster's Tern",0,0,0,NA,0,NA,0,NA
+"PIF (Waterbirds and Shorebirds) [Trend 3 List]","Gadwall",0.013,5,1.082,0.922,4,"GR",3,0.346410161513775
+"PIF (Waterbirds and Shorebirds) [Trend 3 List]","Great Blue Heron",0.157,2,1.39,0.883,47,"GR",13,1.27169801893265
+"PIF (Waterbirds and Shorebirds) [Trend 3 List]","Green-winged Teal",0.013,3,1.273,0.844,4,"RI",4,0
+"PIF (Waterbirds and Shorebirds) [Trend 3 List]","Lesser Scaup",0.003,3,NA,0.875,1,"GR",2,0
+"PIF (Waterbirds and Shorebirds) [Trend 3 List]","Mallard",0.197,3,0.865,0.873,59,"AR",8,1.16708593570569
+"PIF (Waterbirds and Shorebirds) [Trend 3 List]","Northern Pintail",0.007,4,1.061,0.938,2,"AR",2,0.471404520791032
+"PIF (Waterbirds and Shorebirds) [Trend 3 List]","Northern Shoveler",0.03,5,1.03,0.938,9,"PL",5,0.712609640686961
+"PIF (Waterbirds and Shorebirds) [Trend 3 List]","Pied-billed Grebe",0.01,1,0.433,0.75,3,"AR",2,0.707106781186548
+"PIF (Waterbirds and Shorebirds) [Trend 3 List]","Redhead",0.143,0,6.557,0.875,43,"GR",11,1.21698417347407
+"PIF (Waterbirds and Shorebirds) [Trend 3 List]","Ruddy Duck",0.013,25,0.931,0.969,4,"GR",4,0.841319754933374
+"PIF (Waterbirds and Shorebirds) [Trend 3 List]","Western Grebe",0.007,37,1.376,0.938,2,"GR",3,1.38924439894498
+"PIF (Waterbirds and Shorebirds) [Trend 3 List]","White-faced Ibis",0.01,23,1.177,0.708,3,"GR",4,0.425523159002817
+"PIF (Waterbirds and Shorebirds) [Trend 3 List]","American Avocet",0.017,4,0.919,0.838,5,"PL",3,0.7806247497998
+"PIF (Waterbirds and Shorebirds) [Trend 3 List]","Spotted Sandpiper",0.033,1,0.351,0.919,10,"RI",6,0.637661015154552
+"PIF (Waterbirds and Shorebirds) [Trend 3 List]","Willet",0,0,0,NA,0,NA,0,NA
+"PIF (Landbirds) [Trend 3 List]","Burrowing Owl",0.067,3,1.666,0.866,20,"GR",2,1.23367566079355
+"PIF (Landbirds) [Trend 3 List]","Great Horned Owl",0.077,1,0.549,0.878,23,"GR",6,0.677772085586298
+"PIF (Landbirds) [Trend 3 List]","Greater Prairie-Chicken",0.017,13,1.105,0.888,5,"GR",3,1.37661847320453
+"PIF (Landbirds) [Trend 3 List]","Greater Roadrunner",0.1,4,0.865,0.846,30,"GR",13,1.02889634382104
+"PIF (Landbirds) [Trend 3 List]","Northern Bobwhite",0.36,8,0.9,0.862,108,"GR",14,1.46207575462907
+"PIF (Landbirds) [Trend 3 List]","Orchard Oriole",0.053,2,0.545,0.82,16,"GR",5,0.900906179601652
+"PIF (Landbirds) [Trend 3 List]","Painted Bunting",0.087,11,0.903,0.803,26,"PJ",11,0.780688224555403
+"PIF (Landbirds) [Trend 3 List]","Prairie Falcon",0.01,1,0,0.917,3,"GR",1,NA
+"PIF (Landbirds) [Trend 3 List]","Red-headed Woodpecker",0.14,6,1.112,0.875,42,"GR",11,1.20611119767842
+"PIF (Landbirds) [Trend 3 List]","Wild Turkey",0.143,3,1.111,0.897,43,"GR",14,1.45665576288437
+"SGCN/SWAP (Waterbirds) [Tier 2]","Clark's Grebe",0,0,0,NA,0,NA,0,NA
+"SGCN/SWAP (Waterbirds) [Tier 2]","King Rail",0,0,0,NA,0,NA,0,NA
+"SGCN/SWAP (Landbirds) [Tier 2]","Bobolink",0.013,2,0.667,1,4,"AR",3,0.5
+"SGCN/SWAP (Landbirds) [Tier 2]","Common Poorwill",0,0,0,NA,0,NA,0,NA
+"SGCN/SWAP (Landbirds) [Tier 2]","Lewis's Woodpecker",0,0,0,NA,0,NA,0,NA
+"SGCN/SWAP (Landbirds) [Tier 2]","Black-and-White Warbler",0.007,0,NA,1,2,"RI",1,NA
+"SGCN/SWAP (Landbirds) [Tier 2]","Black-billed Magpie",0.073,3,0.943,0.969,22,"GR",10,1.36819514556363
+"SGCN/SWAP (Landbirds) [Tier 2]","Brewer's Blackbird",0.06,6,1.497,0.861,18,"AR",7,1.10348859297681
+"SGCN/SWAP (Landbirds) [Tier 2]","Brown Creeper",0,0,0,NA,0,NA,0,NA
+"SGCN/SWAP (Landbirds) [Tier 2]","Carolina Wren",0.03,2,0.688,0.854,9,"GR",7,0.350438322025231
+"SGCN/SWAP (Landbirds) [Tier 2]","Cassin's Finch",0,0,0,NA,0,NA,0,NA
+"SGCN/SWAP (Landbirds) [Tier 2]","Cassin's Kingbird",0.033,5,1.218,0.925,10,"GR",3,1.33917453296875
+"SGCN/SWAP (Landbirds) [Tier 2]","Clark's Nutcracker",0,0,0,NA,0,NA,0,NA
+"SGCN/SWAP (Landbirds) [Tier 2]","Cordilleran Flycatcher",0.003,1,NA,1,1,"DW",1,NA
+"SGCN/SWAP (Landbirds) [Tier 2]","Dark-eyed Junco",0,0,0,NA,0,NA,0,NA
+"SGCN/SWAP (Landbirds) [Tier 2]","Gray Vireo",0,0,0,NA,0,NA,0,NA
+"SGCN/SWAP (Landbirds) [Tier 2]","Juniper Titmouse",0,0,0,NA,0,NA,0,NA
+"SGCN/SWAP (Landbirds) [Tier 2]","Kentucky Warbler",0,0,0,NA,0,NA,0,NA
+"SGCN/SWAP (Landbirds) [Tier 2]","Lazuli Bunting",0.06,3,1.045,0.934,18,"GR",7,0.814043405886115
+"SGCN/SWAP (Landbirds) [Tier 2]","Louisiana Waterthrush",0,0,0,NA,0,NA,0,NA
+"SGCN/SWAP (Landbirds) [Tier 2]","Merlin",0.003,1,NA,0.75,1,"GR",1,NA
+"SGCN/SWAP (Landbirds) [Tier 2]","Olive-sided Flycatcher",0,0,0,NA,0,NA,0,NA
+"SGCN/SWAP (Landbirds) [Tier 2]","Pileated Woodpecker",0,0,0,NA,0,NA,0,NA
+"SGCN/SWAP (Landbirds) [Tier 2]","Pine Siskin",0.02,2,0.49,0.844,6,"UR",5,0.612372435695794
+"SGCN/SWAP (Landbirds) [Tier 2]","Pinyon Jay",0,0,0,NA,0,NA,0,NA
+"SGCN/SWAP (Landbirds) [Tier 2]","Plumbeous Vireo",0.003,1,NA,0.812,1,"SA",1,NA
+"SGCN/SWAP (Landbirds) [Tier 2]","Prothonotary Warbler",0,0,0,NA,0,NA,0,NA
+"SGCN/SWAP (Landbirds) [Tier 2]","Purple Martin",0.01,1,0,0.667,3,"GR",3,0
+"SGCN/SWAP (Landbirds) [Tier 2]","Pygmy Nuthatch",0.013,4,0.78,0.875,4,"PP",3,0.661437827766148
+"SGCN/SWAP (Landbirds) [Tier 2]","Red-tailed Hawk",0.17,2,0.906,0.93,51,"GR",13,1.55299089674152
+"SGCN/SWAP (Landbirds) [Tier 2]","Ruby-throated Hummingbird",0,0,0,NA,0,NA,0,NA
+"SGCN/SWAP (Landbirds) [Tier 2]","Savannah Sparrow",0.037,3,1.848,0.847,11,"AR",2,0.385694607919935
+"SGCN/SWAP (Landbirds) [Tier 2]","Sedge Wren",0,0,0,NA,0,NA,0,NA
+"SGCN/SWAP (Landbirds) [Tier 2]","Sharp-shinned Hawk",0.007,1,0,1,2,"GR",2,0
+"SGCN/SWAP (Landbirds) [Tier 2]","Spotted Towhee",0.127,7,0.96,0.936,38,"GR",11,0.957882298736895
+"SGCN/SWAP (Landbirds) [Tier 2]","Townsend's Solitaire",0,0,0,NA,0,NA,0,NA
+"SGCN/SWAP (Landbirds) [Tier 2]","Tufted Titmouse",0.013,2,0.577,0.875,4,"UR",4,0.577350269189626
+"SGCN/SWAP (Landbirds) [Tier 2]","Violet-green Swallow",0.04,4,1.111,0.958,12,"PJ",7,0.930390217347027
+"SGCN/SWAP (Landbirds) [Tier 2]","Virginia's Warbler",0,0,0,NA,0,NA,0,NA
+"SGCN/SWAP (Landbirds) [Tier 2]","White-eyed Vireo",0,0,0,NA,0,NA,0,NA
+"SGCN/SWAP (Landbirds) [Tier 2]","White-throated Swift",0.02,5,1.356,0.99,6,"PJ",6,0.447213595499958
+"SGCN/SWAP (Landbirds) [Tier 2]","Yellow-throated Vireo",0,0,0,NA,0,NA,0,NA
+"SGCN/SWAP (Waterbirds) [Tier 1]","Upland Sandpiper",0.133,2,0.82,0.814,40,"GR",6,1.39349852329693
+"ESA/PIF (Landbirds) [Declining Species]","Baltimore Oriole",0.02,4,0.975,0.875,6,"AR",6,0.790569415042095
+"ESA/PIF (Landbirds) [Declining Species]","Bell's Vireo",0.03,3,1.179,0.854,9,"DS",7,1.02772224737595
+"ESA/PIF (Landbirds) [Declining Species]","Black-capped Vireo",0,0,0,NA,0,NA,0,NA
+"ESA/PIF (Landbirds) [Declining Species]","Bewick's Wren",0.097,5,1.378,0.849,29,"PJ",11,0.804227513210108
+"ESA/PIF (Landbirds) [Declining Species]","Brown-headed Cowbird",0.653,6,1.052,0.879,196,"GR",18,1.63339974865398
+"ESA/PIF (Landbirds) [Declining Species]","Bullock's Oriole",0.203,3,1.125,0.925,61,"GR",16,1.65426752655011
+"ESA/PIF (Landbirds) [Declining Species]","Chichuahuan Raven",0,0,0,NA,0,NA,0,NA
+"ESA/PIF (Landbirds) [Declining Species]","Cassin's Sparrow",0.443,20,0.981,0.876,133,"GR",14,2.52321021068464
+"ESA/PIF (Landbirds) [Declining Species]","Common Grackle",0.343,7,1.354,0.919,103,"AR",12,1.39812252158755
+"ESA/PIF (Landbirds) [Declining Species]","Common Nighthawk",0.227,3,1.301,0.878,68,"GR",9,1.59529350137495
+"ESA/PIF (Landbirds) [Declining Species]","Eastern Kingbird",0.19,4,0.934,0.876,57,"GR",13,1.426267976027
+"ESA/PIF (Landbirds) [Declining Species]","Eastern Meadowlark",0.193,9,0.842,0.847,58,"GR",13,1.99110009220334
+"ESA/PIF (Landbirds) [Declining Species]","Ferruginous Hawk",0.013,2,1,1,4,"SA",3,0.57282196186948
+"ESA/PIF (Landbirds) [Declining Species]","Grasshopper Sparrow",0.587,11,0.903,0.885,176,"GR",13,2.86676624690158
+"ESA/PIF (Landbirds) [Declining Species]","Horned Lark",0.63,23,0.95,0.892,189,"GR",12,2.23748187932575
+"ESA/PIF (Landbirds) [Declining Species]","Lark Bunting",0.467,29,1.768,0.894,140,"GR",13,2.4979406989333
+"ESA/PIF (Landbirds) [Declining Species]","Lark Sparrow",0.6,5,1.168,0.88,180,"GR",19,2.35154024561542
+"ESA/PIF (Landbirds) [Declining Species]","Lesser Prairie-Chicken",0.02,12,1.244,0.76,6,"GR",5,1.86313260063457
+"ESA/PIF (Landbirds) [Declining Species]","Loggerhead Shrike",0.077,2,1.052,0.891,23,"GR",6,0.816496580927726
+"ESA/PIF (Landbirds) [Declining Species]","Mississippi Kite",0.05,3,0.613,0.9,15,"RI",8,0.864751649008015
+"ESA/PIF (Landbirds) [Declining Species]","Mourning Dove",0.93,11,0.746,0.876,279,"GR",20,2.16207989588967
+"ESA/PIF (Landbirds) [Declining Species]","Northern Mockingbird",0.363,7,1.083,0.876,109,"GR",16,1.49837193473653
+"ESA/PIF (Landbirds) [Declining Species]","Ring-necked Pheasant",0.41,9,0.838,0.864,123,"AR",15,2.23931551582848
+"ESA/PIF (Landbirds) [Declining Species]","Scaled Quail",0.183,7,1.008,0.868,55,"GR",11,1.42151934136672
+"ESA/PIF (Landbirds) [Declining Species]","Scissor-tailed Flycatcher",0.147,3,0.856,0.825,44,"GR",11,1.25276106682297
+"ESA/PIF (Landbirds) [Declining Species]","Swainson's Hawk",0.203,2,1.017,0.916,61,"GR",12,1.85820539209205
+"ESA/PIF (Landbirds) [Declining Species]","Western Kingbird",0.55,5,1.234,0.889,165,"GR",17,1.79204411533421
+"ESA/PIF (Landbirds) [Declining Species]","Western Meadowlark",0.823,31,0.732,0.887,247,"GR",19,3.01010653517393
+"ESA/PIF (Waterbirds/Shorebirds) [Declining Species]","Killdeer",0.527,4,0.921,0.874,158,"AR",13,1.79387256823804
+"ESA/PIF (Waterbirds/Shorebirds) [Declining Species]","Least Tern",0,0,0,NA,0,NA,0,NA
+"ESA/PIF (Waterbirds/Shorebirds) [Declining Species]","Long-billed Curlew",0.05,4,0.954,0.925,15,"GR",3,1.16674258742283
+"ESA/PIF (Waterbirds/Shorebirds) [Declining Species]","Mountain Plover",0,0,0,NA,0,NA,0,NA
+"ESA/PIF (Waterbirds/Shorebirds) [Declining Species]","Piping Plover",0,0,0,NA,0,NA,0,NA
+"ESA/PIF (Waterbirds/Shorebirds) [Declining Species]","Snowy Plover",0.003,5,NA,1,1,"PL",1,NA
+"SGCN/SWAP (Landbirds) [Tier 1]","McCown's Longspur",0.017,15,1.073,1,5,"GR",2,1.371998232153
+"SGCN/SWAP (Landbirds) [Tier 1]","Bald Eagle",0,0,0,NA,0,NA,0,NA
+"SGCN/SWAP (Landbirds) [Tier 1]","Barn Owl",0.003,1,NA,0.75,1,"GR",1,NA
+"SGCN/SWAP (Landbirds) [Tier 1]","Brewer's Sparrow",0.09,4,1.56,0.88,27,"GR",7,1.14232143570012
+"SGCN/SWAP (Landbirds) [Tier 1]","Chuck-will's-widow",0.003,1,NA,1,1,"OA",1,NA
+"SGCN/SWAP (Landbirds) [Tier 1]","Dickcissel",0.23,9,1.376,0.875,69,"AR",12,2.10701567425042
+"SGCN/SWAP (Landbirds) [Tier 1]","Golden Eagle",0.007,1,0,0.938,2,"GR",2,0
+"SGCN/SWAP (Landbirds) [Tier 1]","Harris's Hawk",0,0,0,NA,0,NA,0,NA
+"SGCN/SWAP (Landbirds) [Tier 1]","Henslow's Sparrow",0,0,0,NA,0,NA,0,NA
+"SGCN/SWAP (Landbirds) [Tier 1]","Northern Harrier",0.03,1,0.3,0.792,9,"AR",3,0.754983443527075
+"SGCN/SWAP (Landbirds) [Tier 1]","Peregrine Falcon",0.007,1,0,0.969,2,"AR",2,0
+"SGCN/SWAP (Landbirds) [Tier 1]","Short-eared Owl",0.003,3,NA,1,1,"RI",1,NA
+"SGCN/SWAP (Landbirds) [Tier 1]","Sharp-tailed Grouse",0.007,7,1.212,0.938,2,"GR",1,NA
+"SGCN/SWAP (Landbirds) [Tier 1]","Carolina Chickadee",0.013,1,0,0.797,4,"GR",3,0.433012701892219
+"SGCN/SWAP (Landbirds) [Tier 1]","Great-tailed Grackle",0.14,9,1.749,0.839,42,"AR",11,1.48606889347152
+"SGCN/SWAP (Landbirds) [Tier 1]","Red-naped Sapsucker",0,0,0,NA,0,NA,0,NA
+"SGCN/SWAP (Landbirds) [Tier 1]","Rufous-crowned Sparrow",0.047,3,0.923,0.906,14,"DS",7,0.689008352843466
+"SGCN/SWAP (Landbirds) [Tier 1]","Summer Tanager",0.01,4,1.033,1,3,"OA",3,0.314918328648887
