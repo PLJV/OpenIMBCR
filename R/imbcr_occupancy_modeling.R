@@ -273,7 +273,9 @@ validateTransectMetadata <- function(s){
 #' Fit a single-season occupancy model  assumes a constant probability of species
 #' detection across transects, which is probably inappropriate for IMBCR data and will
 #' lead to inaccurate predictions of occupancy. This is "model m0" from the literature
-#' and loosely follows Andy Royle's (2008) model specification.
+#' and loosely follows Andy Royle's (2008) model specification. It is designed so that
+#' parameter estimates can be derived through an optimization procedure like nlm() and
+#' variables can be easily selected/de-selected, such as for calculating AIC.
 #'
 #' @param table a data.frame of detection histories ('det') and covariates on
 #' occupancy ('b0') and probability of detection ('a0')
@@ -282,9 +284,7 @@ validateTransectMetadata <- function(s){
 #' in the vector. e.g., vars=c("a0","timeDay","intensity","b0","perc_grass","mean_temp_winter")
 #'
 #' @export
-singleSeasonOccupancy <- function(parameters,
-                                  table=NULL,
-                                  vars=NULL){
+singleSeasonOccupancy <- function(parameters,table=NULL,vars=NULL){
   if(is.null(table)){
     stop("table= argument requires an input table containing covariates and a 'det' field defining detection histories for your sites.")
   }
@@ -297,11 +297,15 @@ singleSeasonOccupancy <- function(parameters,
   if(sum(grepl(vars,pattern="a0|b0")) < 2){
     stop("couldn't find our a0 and b0 column deliminators in the data.frame provided by table=")
   }
+  if(length(parameters) > length(colnames(table[,2:ncol(table)]))-1 ){
+    stop("length of paramters is greater than the number of columns in table=")
+  }
+  # define the number of transects, number of stations per transect, and target variables we are considering for this iteration
+           M <- nrow(table) # number of sites (IMBCR transects)
+   nStations <- nchar(as.character(table[1,1])) # number of stations in each transect (should be 16)
+   covarNames <- vars
   # re-build a consistent table (t) of detection histories, intercepts, and covariate data we can work with
-  M <- nrow(table) # number of sites (IMBCR transects)
-  nStations <- nchar(as.character(table[1,1])) # number of stations in each transect (should be 16)
-  covarNames <- vars
-  y <- table[,1] # our 'detection' field is always the first column
+  y <- table[,1] # assume our 'detection' field is always the first column
     y <- suppressWarnings(matrix(as.numeric(matrix(unlist(strsplit(as.character(y),split="")))),nrow=M,ncol=nStations))
   t <- matrix(rep(0,M*length(covarNames)),ncol=length(covarNames)) # build a table of zeros for our covariate data
     colnames(t) <- covarNames

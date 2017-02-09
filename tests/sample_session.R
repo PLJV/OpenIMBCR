@@ -1,8 +1,10 @@
 #
 # MAIN
 #
-require(OpenIMBCR)
+
 require(rgdal)
+require(raster)
+require(OpenIMBCR)
 
 spp <-
 c(
@@ -40,6 +42,13 @@ abs(cor(transect_habitat_covs[,2:ncol(transect_habitat_covs)])) > 0.25
 inputTable <- cbind(transect_habitat_covs[,2:ncol(transect_habitat_covs)],detectionHist)
 # re-scale our input variables
 inputTable[,!grepl(names(inputTable),pattern="det|obs")] <- scale(inputTable[,!grepl(names(inputTable),pattern="det|obs")])
+# make it something that singleSeasonOccupancy can digest
+inputTable <- inputTable[,c('det',names(inputTable)[!grepl(names(inputTable),pattern="det")])]
+  inputTable <- cbind(inputTable[,'det'],a0=1,inputTable[,n[!grepl(n,pattern="perc_|det")]],b0=1,inputTable[,n[grepl(n,pattern="perc_")]])
+    inputTable <- inputTable[,!grepl(names(inputTable),pattern="obs")]
+# fit a test model
+n <- names(inputTable)
+singleSeasonOccupancy(parameters=runif(n=length(n[!grepl(n,pattern="det")])),table=inputTable)
 
 # test combindations of input variables
 combinations <- list()
