@@ -4,7 +4,7 @@
 # Author: Kyle Taylor [2016] (kyle.taylor@pljv.org)
 #
 # Much of this is based on earlier discussions and implementations described by David Pavlacky (Bird Conservancy of the Rockies)
-# Rob Sparks (Bird Conservancy of the Rockies), and Andy Royle (USFWS).
+# Rob Sparks (Bird Conservancy of the Rockies), and a lot of work by Andy Royle (USFWS).
 #
 # Please report bugs to Kyle Taylor
 #
@@ -38,6 +38,7 @@ permutations <- function(n){
 #' strip non-essential characters and spaces from a species common name in a field
 stripCommonName <- function(x) tolower(gsub(x,pattern=" |'|-",replacement=""))
 #' recursively find all files in folder (root) that match the pattern (name)
+#' @export
 recursiveFindFile <- function(name=NULL,root=Sys.getenv("HOME")){
   if(is.null(name)){
     return(NULL)
@@ -276,47 +277,68 @@ validateTransectMetadata <- function(s){
 #'
 #' @param table a data.frame of detection histories ('det') and covariates on
 #' occupancy ('b0') and probability of detection ('a0')
-#' @param vars a vector of strings specifying the covariates used for the analysis.
+#' @param vars a vector of strings specifying the covariates used for the analysis. Function will
+#' determine the user-specified covariates for occupany and detection based on the position of a0 and b0
+#' in the vector. e.g., vars=c("a0","timeDay","intensity","b0","perc_grass","mean_temp_winter")
 #'
 #' @export
 singleSeasonOccupancy <- function(parameters,
                                   table=NULL,
-                                  vars=c("a0","tod","doy","intensity","b0","perc_ag","perc_grass", "perc_shrub", "perc_tree","perc_playa")){
+                                  vars=NULL){
   if(is.null(table)){
     stop("table= argument requires an input table containing covariates and a 'det' field defining detection histories for your sites.")
   }
   # name of all potential variables
-  covarNames <- c("a0","tod","doy","intensity","b0","perc_ag","perc_grass", "perc_shrub", "perc_tree","perc_playa")
-  y <- table[,'det']
-    y <- suppressWarnings(matrix(as.numeric(matrix(unlist(strsplit(as.character(y),split="")))),nrow=M,ncol=16))
-  t <- matrix(rep(0,M*length(covarNames)),ncol=length(covarNames))
+  if(is.null(vars)){
+    # let's assume the first column is always our response and all the remaining column names are explanatory vars
+    vars <- colnames(table[,2:ncol(table)])
+  }
+  # sanity-check our input table for a0/b0
+  if(sum(grepl(vars,pattern="a0|b0")) < 2){
+    stop("couldn't find our a0 and b0 column deliminators in the data.frame provided by table=")
+  }
+  # re-build a consistent table (t) of detection histories, intercepts, and covariate data we can work with
+  M <- nrow(table) # number of sites (IMBCR transects)
+  nStations <- nchar(as.character(table[1,1])) # number of stations in each transect (should be 16)
+  covarNames <- vars
+  y <- table[,1] # our 'detection' field is always the first column
+    y <- suppressWarnings(matrix(as.numeric(matrix(unlist(strsplit(as.character(y),split="")))),nrow=M,ncol=nStations))
+  t <- matrix(rep(0,M*length(covarNames)),ncol=length(covarNames)) # build a table of zeros for our covariate data
     colnames(t) <- covarNames
      t[,"a0"] <- rep(1,M) # fill our intercept columns
      t[,"b0"] <- rep(1,M)
   # assign values for our focal table from user-specific source table
   t <- data.frame(t)
   table <- data.frame(table)
-  t[,vars[!grepl(vars,pattern=0)]] <- table[,vars[!grepl(vars,pattern=0)]]
+  t[,vars[!grepl(vars,pattern=0)]] <- table[,vars[!grepl(vars,pattern=0)]] # assign all covariate data (minus intercept data) from source table
   # by default, set our coefficients = 0 for this run
   coeffs <- rep(0,length(covarNames))
     names(coeffs) <- covarNames
-  # for those vars used in this run, set coefficients to the parameter value given by nlm()
+  # assign proposed parameters for this optimization step, from nlm()
   coeffs[vars] <- parameters
+  detection_coeffs <- 1:(which(grepl(vars,pattern="b0$"))-1)
+  occupancy_coeffs <- which(grepl(vars,pattern="b0$")):length(vars)
   # parameters on detection
-  a0 <- coeffs[1];
-  a1 <- coeffs[2]; # Time of day
-  a2 <- coeffs[3]; # Day of year
-  a3 <- coeffs[4]; # Intensity
+  o <- is.na(unlist(mapply(paste("a",seq(0,length(detection_coeffs)-1),sep=""),
+        FUN=assign, value=coeffs[detection_coeffs],
+         pos=1)))
+  # sanity-check our variable assignments
+  if(sum(o)>0)
+    stop("failed to assign detection parameters to global environment. This shouldn't happen.")
   # parameters on occupancy
-  b0 <- coeffs[5];
-  b1 <- coeffs[6];  # Percent agriculture
-  b2 <- coeffs[7];  # Percent grass
-  b3 <- coeffs[8];  # Percent shrub
-  b4 <- coeffs[9];  # Percent tree
-  b5 <- coeffs[10]; # Percent playa
+  o <- is.na(unlist(mapply(paste("b",seq(0,length(occupancy_coeffs)-1),sep=""),
+        FUN=assign, value=coeffs[occupancy_coeffs],
+         pos=1)))
+  # sanity-check our variable assignments
+  if(sum(o)>0)
+    stop("failed to assign occupancy parameters to global environment. This shouldn't happen.")
   # prediction for
-  prob <- expit(a0*t[,'a0'] + a1*t[,"tod"] + a2*t[,"doy"] + a3*t[,"intensity"])
-   psi <- expit(b0*t[,'b0'] + b1*t[,"perc_ag"] + b2*t[,"perc_grass"] + b3*t[,"perc_shrub"] + b4*t[,"perc_tree"] + b5*t[,"perc_playa"])
+  # matrix operation : prob <- expit(a0*t[,'a0'] + a1*t[,"tod"] + a2*t[,"doy"] + a3*t[,"intensity"])
+  prob <- sweep(t[,vars[detection_coeffs]], MARGIN=2, unlist(lapply(ls(pattern="^a"),FUN=get)),`*`)
+    prob <- expit(rowSums(prob))
+  # matrix operation : psi <- expit(b0*t[,'b0'] + b1*t[,"perc_ag"] + b2*t[,"perc_grass"] + b3*t[,"perc_shrub"] + b4*t[,"perc_tree"] + b5*t[,"perc_playa"])
+  psi <- expit(sweep(t[,vars[occupancy_coeffs]], MARGIN=2, unlist(lapply(ls(pattern="^b"),FUN=get)),`*`))
+    psi <- expit(rowSums(psi))
   # solve for likelihood
   likelihood <- rep(NA,M)
   for(i in 1:M){
