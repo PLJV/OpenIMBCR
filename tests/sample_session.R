@@ -4,6 +4,7 @@
 
 require(rgdal)
 require(raster)
+require(landscapeAnalysis)
 require(OpenIMBCR)
 
 spp <-
@@ -46,9 +47,11 @@ inputTable[,!grepl(names(inputTable),pattern="det|obs")] <- scale(inputTable[,!g
 inputTable <- inputTable[,c('det',names(inputTable)[!grepl(names(inputTable),pattern="det")])]
   inputTable <- cbind(inputTable[,'det'],a0=1,inputTable[,n[!grepl(n,pattern="perc_|det")]],b0=1,inputTable[,n[grepl(n,pattern="perc_")]])
     inputTable <- inputTable[,!grepl(names(inputTable),pattern="obs")]
-# fit a test model
+
 n <- names(inputTable)
-singleSeasonOccupancy(parameters=runif(n=length(n[!grepl(n,pattern="det")])),table=inputTable)
+
+# fit a test model
+singleSeasonOccupancy(parameters=runif(n=length(n[!grepl(n,pattern="det|obs")])),table=inputTable)
 
 # test combindations of input variables
 combinations <- list()

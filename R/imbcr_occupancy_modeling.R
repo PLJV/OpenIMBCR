@@ -297,8 +297,8 @@ singleSeasonOccupancy <- function(parameters,table=NULL,vars=NULL){
   if(sum(grepl(vars,pattern="a0|b0")) < 2){
     stop("couldn't find our a0 and b0 column deliminators in the data.frame provided by table=")
   }
-  if(length(parameters) > length(colnames(table[,2:ncol(table)]))-1 ){
-    stop("length of paramters is greater than the number of columns in table=")
+  if(length(parameters) > ncol(table)-1 ){ # ignoring the first column (detections)
+    stop("length of paramters is greater than the number of columns specified by table=")
   }
   # define the number of transects, number of stations per transect, and target variables we are considering for this iteration
            M <- nrow(table) # number of sites (IMBCR transects)
@@ -323,26 +323,12 @@ singleSeasonOccupancy <- function(parameters,table=NULL,vars=NULL){
   detection_coeffs <- 1:(which(grepl(vars,pattern="b0$"))-1)
   occupancy_coeffs <- which(grepl(vars,pattern="b0$")):length(vars)
   # parameters on detection
-  o <- is.na(unlist(mapply(paste("a",seq(0,length(detection_coeffs)-1),sep=""),
-        FUN=assign, value=coeffs[detection_coeffs],
-         pos=1)))
-  # sanity-check our variable assignments
-  if(sum(o)>0)
-    stop("failed to assign detection parameters to global environment. This shouldn't happen.")
-  # parameters on occupancy
-  o <- is.na(unlist(mapply(paste("b",seq(0,length(occupancy_coeffs)-1),sep=""),
-        FUN=assign, value=coeffs[occupancy_coeffs],
-         pos=1)))
-  # sanity-check our variable assignments
-  if(sum(o)>0)
-    stop("failed to assign occupancy parameters to global environment. This shouldn't happen.")
-  # prediction for
   # matrix operation : prob <- expit(a0*t[,'a0'] + a1*t[,"tod"] + a2*t[,"doy"] + a3*t[,"intensity"])
-  prob <- sweep(t[,vars[detection_coeffs]], MARGIN=2, unlist(lapply(ls(pattern="^a"),FUN=get)),`*`)
+  prob <- sweep(t[,vars[detection_coeffs]], MARGIN=2, coeffs[detection_coeffs],`*`)
     prob <- expit(rowSums(prob))
   # matrix operation : psi <- expit(b0*t[,'b0'] + b1*t[,"perc_ag"] + b2*t[,"perc_grass"] + b3*t[,"perc_shrub"] + b4*t[,"perc_tree"] + b5*t[,"perc_playa"])
-  psi <- expit(sweep(t[,vars[occupancy_coeffs]], MARGIN=2, unlist(lapply(ls(pattern="^b"),FUN=get)),`*`))
-    psi <- expit(rowSums(psi))
+  psi <- sweep(t[,vars[occupancy_coeffs]], MARGIN=2, coeffs[occupancy_coeffs],`*`)
+     psi <- expit(rowSums(psi))
   # solve for likelihood
   likelihood <- rep(NA,M)
   for(i in 1:M){
