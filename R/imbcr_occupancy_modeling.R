@@ -279,27 +279,32 @@ validateTransectMetadata <- function(s){
 #'
 #' @param table a data.frame of detection histories ('det') and covariates on
 #' occupancy ('b0') and probability of detection ('a0')
-#' @param vars a vector of strings specifying the covariates used for the analysis. Function will
-#' determine the user-specified covariates for occupany and detection based on the position of a0 and b0
-#' in the vector. e.g., vars=c("a0","timeDay","intensity","b0","perc_grass","mean_temp_winter")
+#' @param det_parameters proposed parameter values for detection, including 1 intercept (a0)
+#' @param occ_parameters proposed paramter values for occupancy, including 1 intercept (b0)
 #'
 #' @export
-singleSeasonOccupancy <- function(parameters,table=NULL,vars=NULL){
+singleSeasonOccupancy <- function(det_parameters=NULL, occ_parameters=NULL, p=NULL, table=NULL){
   if(is.null(table)){
     stop("table= argument requires an input table containing covariates and a 'det' field defining detection histories for your sites.")
   }
-  # name of all potential variables
-  if(is.null(vars)){
-    # let's assume the first column is always our response and all the remaining column names are explanatory vars
-    vars <- colnames(table[,2:ncol(table)])
+  # assign a vars vector containing a composite of our det_parameters and occ_parameters
+  if(is.null(p)){
+    vars <- c("a0", colnames(table[,2:(length(det_parameters)+1)]), "b0", colnames(table[,(length(det_parameters)+2):ncol(table)]))
+  } else {
+    vars <- c("a0",colnames(table[,2:(det_parameters+1)]), "b0", colnames(table[,(det_parameters+2):ncol(table)])) 
   }
   # sanity-check our input table for a0/b0
   if(sum(grepl(vars,pattern="a0|b0")) < 2){
     stop("couldn't find our a0 and b0 column deliminators in the data.frame provided by table=")
   }
-  if(length(parameters) > ncol(table)-1 ){ # ignoring the first column (detections)
+  if(!is.null(p)){
+    det_parameters = p[1:(det_parameters+1)]
+    occ_parameters = p[(length(det_parameters)+1):length(p)]
+  }
+  if(length(det_parameters)+length(occ_parameters) > ncol(table)+2-1 ){ # accounting for intercept terms, but ignoring the first column (detections)
     stop("length of paramters is greater than the number of columns specified by table=")
   }
+
   # define the number of transects, number of stations per transect, and target variables we are considering for this iteration
            M <- nrow(table) # number of sites (IMBCR transects)
    nStations <- nchar(as.character(table[1,1])) # number of stations in each transect (should be 16)
@@ -319,7 +324,10 @@ singleSeasonOccupancy <- function(parameters,table=NULL,vars=NULL){
   coeffs <- rep(0,length(covarNames))
     names(coeffs) <- covarNames
   # assign proposed parameters for this optimization step, from nlm()
-  coeffs[vars] <- parameters
+  tryCatch(coeffs[vars] <- c(det_parameters,occ_parameters),
+           warning=function(w){
+             stop("caught a warning assigning detection + occurrence parameters + intercept terms. Did you remember to generate proposed paramter values for the intercept terms?")
+           })
   detection_coeffs <- 1:(which(grepl(vars,pattern="b0$"))-1)
   occupancy_coeffs <- which(grepl(vars,pattern="b0$")):length(vars)
   # parameters on detection
@@ -348,3 +356,7 @@ singleSeasonOccupancy <- function(parameters,table=NULL,vars=NULL){
 singleSeasonAbundance <- function(x){
 
 }
+
+
+- 
+

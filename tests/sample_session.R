@@ -36,8 +36,9 @@ M <- length(as.character(unique(s$transectnum))) # number of transects
 transect_habitat_covs <- OpenIMBCR:::parseHabitatMetadataByTransect(s) # transect-level habitat covariates
         detectionHist <- OpenIMBCR:::parseStationCountsAsOccupancy(OpenIMBCR:::parseStationLevelMetadata(s,spp=spp[1])) # covariates for probability of detection
 
-pairs(transect_habitat_covs,cex=0.7,pch=15,log=T)
-abs(cor(transect_habitat_covs[,2:ncol(transect_habitat_covs)])) > 0.25
+# testing input : do not run
+# pairs(transect_habitat_covs,cex=0.7,pch=15,log=T)
+# abs(cor(transect_habitat_covs[,2:ncol(transect_habitat_covs)])) > 0.25
 
 # Optimize with NLM
 inputTable <- cbind(transect_habitat_covs[,2:ncol(transect_habitat_covs)],detectionHist)
@@ -45,13 +46,19 @@ inputTable <- cbind(transect_habitat_covs[,2:ncol(transect_habitat_covs)],detect
 inputTable[,!grepl(names(inputTable),pattern="det|obs")] <- scale(inputTable[,!grepl(names(inputTable),pattern="det|obs")])
 # make it something that singleSeasonOccupancy can digest
 inputTable <- inputTable[,c('det',names(inputTable)[!grepl(names(inputTable),pattern="det")])]
-  inputTable <- cbind(inputTable[,'det'],a0=1,inputTable[,n[!grepl(n,pattern="perc_|det")]],b0=1,inputTable[,n[grepl(n,pattern="perc_")]])
+  inputTable <- cbind(det=inputTable[,'det'],inputTable[,n[!grepl(n,pattern="perc_|det")]],inputTable[,n[grepl(n,pattern="perc_")]])
     inputTable <- inputTable[,!grepl(names(inputTable),pattern="obs")]
 
 n <- names(inputTable)
 
 # fit a test model
-singleSeasonOccupancy(parameters=runif(n=length(n[!grepl(n,pattern="det|obs")])),table=inputTable)
+singleSeasonOccupancy(det_parameters=runif(n=1+length(n[!grepl(n,pattern="det|obs|perc_")])), occ_parameters=runif(n=1+length(n[grepl(n,pattern="perc_")])),table=inputTable)
+
+# use R's built-in optimization to fit an optimal likelihood
+m <- nlm(f=singleSeasonOccupancy,p=rep(0,13),
+         det_parameters=3,
+         occ_parameters=8,
+         table=inputTable, hessian=TRUE)
 
 # test combindations of input variables
 combinations <- list()
@@ -74,6 +81,3 @@ permuted_aics <- unlist(lapply(combinations,FUN=function(x) AIC(x[[1]])))
 
 which(permuted_aics ==min(permuted_aics))
 
-m <- nlm(f=singleSeasonOccupancy,p=rep(0,10),
-         vars=c("a0","tod","doy","intensity","b0","perc_ag","perc_grass", "perc_shrub", "perc_tree","perc_playa"),
-         table=inputTable,hessian=TRUE)
