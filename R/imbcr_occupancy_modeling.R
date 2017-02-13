@@ -291,12 +291,9 @@ singleSeasonOccupancy <- function(det_parameters=NULL, occ_parameters=NULL, p=NU
   if(is.null(p)){
     vars <- c("a0", colnames(table[,2:(length(det_parameters)+1)]), "b0", colnames(table[,(length(det_parameters)+2):ncol(table)]))
   } else {
-    vars <- c("a0",colnames(table[,2:(det_parameters+1)]), "b0", colnames(table[,(det_parameters+2):ncol(table)])) 
+    vars <- c("a0",colnames(table[,2:(det_parameters+1)]), "b0", colnames(table[,(det_parameters+2):ncol(table)]))
   }
-  # sanity-check our input table for a0/b0
-  if(sum(grepl(vars,pattern="a0|b0")) < 2){
-    stop("couldn't find our a0 and b0 column deliminators in the data.frame provided by table=")
-  }
+  # The p-parameter is typically assigned by nlm() and should include proposed values for our two intercept terms (in addition to our covariates)
   if(!is.null(p)){
     det_parameters = p[1:(det_parameters+1)]
     occ_parameters = p[(length(det_parameters)+1):length(p)]
@@ -304,10 +301,9 @@ singleSeasonOccupancy <- function(det_parameters=NULL, occ_parameters=NULL, p=NU
   if(length(det_parameters)+length(occ_parameters) > ncol(table)+2-1 ){ # accounting for intercept terms, but ignoring the first column (detections)
     stop("length of paramters is greater than the number of columns specified by table=")
   }
-
   # define the number of transects, number of stations per transect, and target variables we are considering for this iteration
-           M <- nrow(table) # number of sites (IMBCR transects)
-   nStations <- nchar(as.character(table[1,1])) # number of stations in each transect (should be 16)
+            M <- nrow(table) # number of sites (IMBCR transects)
+    nStations <- nchar(as.character(table[1,1])) # number of stations in each transect (should be 16)
    covarNames <- vars
   # re-build a consistent table (t) of detection histories, intercepts, and covariate data we can work with
   y <- table[,1] # assume our 'detection' field is always the first column
@@ -351,12 +347,83 @@ singleSeasonOccupancy <- function(det_parameters=NULL, occ_parameters=NULL, p=NU
   }
   sum(-1*likelihood)
 }
-#' Fit the single-season abundance model of Royle-Nichols (the "RN" model) to IMBCR data
+#' fit the single-season, two-state occupancy model of Royle-Nichols (the "RN" model) to IMBCR data. This model can account for abundance-induced heterogeneity of detection and capitalize
+#' on replicate observations of abundance within sampling units. Royle first implemented the algorithm for use with BBS data, but we can theoretically extend the model
+#' within-season repeat observations made at IMBCR stations. Requires the user specify an upper_bound parameter for density within each 1-km transect. Like the single-season occupancy model (model m0), the RN model
+#' does not allow for heterogeneity in detection within sites, which may result in biased estimates of detection in instances where an observer detects a species early in the sampling process.
+#' Can be accomodated with a removal design.
+#'
 #' @export
-singleSeasonAbundance <- function(x){
+singleSeasonRN <- function(det_parameters=NULL, occ_parameters=NULL, p=NULL, upper_bound=NULL, quasi_binom=FALSE, table=NULL){
+  if(is.null(table)){
+    stop("table= argument requires an input table containing covariates and a 'det' field defining detection histories for your sites.")
+  }
+  if(is.null(upper_bound)){
+    stop("upper_bound= parameter (e.g., a rational prediction of an absolute maximum bird density per IMBCR transect) must be defined")
+  }
+  # assign a vars vector containing a composite of our det_parameters and occ_parameters
+  if(is.null(p)){
+    vars <- c("a0", colnames(table[,2:(length(det_parameters)+1)]), "b0", colnames(table[,(length(det_parameters)+2):ncol(table)]))
+  } else {
+    vars <- c("a0",colnames(table[,2:(det_parameters+1)]), "b0", colnames(table[,(det_parameters+2):ncol(table)]))
+  }
+  # The p-parameter is typically assigned by nlm() and should include proposed values for our two intercept terms (in addition to our covariates)
+  if(!is.null(p)){
+    det_parameters = p[1:(det_parameters+1)]
+    occ_parameters = p[(length(det_parameters)+1):length(p)]
+  }
+  if(length(det_parameters)+length(occ_parameters) > ncol(table)+2-1 ){ # accounting for intercept terms, but ignoring the first column (detections)
+    stop("length of paramters is greater than the number of columns specified by table=")
+  }
+  # define the number of transects, number of stations per transect, and target variables we are considering for this iteration
+            M <- nrow(table) # number of sites (IMBCR transects)
+    nStations <- nchar(as.character(table[1,1])) # number of stations in each transect (should be 16)
+   covarNames <- vars
+  # re-build a consistent table (t) of detection histories, intercepts, and covariate data we can work with
+  y <- table[,1] # assume our 'detection' field is always the first column
+    y <- suppressWarnings(matrix(as.numeric(matrix(unlist(strsplit(as.character(y),split="")))),nrow=M,ncol=nStations))
+  t <- matrix(rep(0,M*length(covarNames)),ncol=length(covarNames)) # build a table of zeros for our covariate data
+    colnames(t) <- covarNames
+     t[,"a0"] <- rep(1,M) # fill our intercept columns
+     t[,"b0"] <- rep(1,M)
+  # assign values for our focal table from user-specific source table
+  t <- data.frame(t)
+  table <- data.frame(table)
+  t[,vars[!grepl(vars,pattern=0)]] <- table[,vars[!grepl(vars,pattern=0)]] # assign all covariate data (minus intercept data) from source table
+  # by default, set our coefficients = 0 for this run
+  coeffs <- rep(0,length(covarNames))
+    names(coeffs) <- covarNames
+  # assign proposed parameters for this optimization step, from nlm()
+  tryCatch(coeffs[vars] <- c(det_parameters,occ_parameters),
+           warning=function(w){
+             stop("caught a warning assigning detection + occurrence parameters + intercept terms. Did you remember to generate proposed paramter values for the intercept terms?")
+           })
+  detection_coeffs <- 1:(which(grepl(vars,pattern="b0$"))-1)
+  occupancy_coeffs <- which(grepl(vars,pattern="b0$")):length(vars)
+  # parameters on detection (the rate parameter of our poisson)
+  # matrix operation : prob <- expit(a0*t[,'a0'] + a1*t[,"tod"] + a2*t[,"doy"] + a3*t[,"intensity"])
+  r <- sweep(t[,vars[detection_coeffs]], MARGIN=2, coeffs[detection_coeffs],`*`)
+    r <- expit(rowSums(r))
+  # matrix operation : psi <- expit(b0*t[,'b0'] + b1*t[,"perc_ag"] + b2*t[,"perc_grass"] + b3*t[,"perc_shrub"] + b4*t[,"perc_tree"] + b5*t[,"perc_playa"])
+  lambda <- sweep(t[,vars[occupancy_coeffs]], MARGIN=2, coeffs[occupancy_coeffs],`*`)
+     psi <- exp(rowSums(lambda))
+  # solve for likelihood
+  likelihood <- rep(NA,M)
+  for(i in 1:M){
+    # determine a truncated (by upper_bound) probability for our Poisson count,
+    gN <- dpois(0:upper_bound, lambda[i])
+      gN <- gN/sum(gN)
+    # individual detections for our repeat visits at site i (e.g., [1,1,1,3,2,1])
+    detections <- y[i,]
+    na_det <- is.na(detections) # any NA values?
 
+    pmat <- 1 - outer((1-r[i,]),0:upper_bound,"^")
+
+    focal <- t((pmat^detections)*(1-pmat)^(1-detections))
+      focal[,na_det] <- 1
+        focal <- apply(focal,1,prod)
+
+    likelihood[i] <- sum(focal*gN)
+ }
+  sum(-1*likelihood)
 }
-
-
-- 
-
