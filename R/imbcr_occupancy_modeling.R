@@ -18,6 +18,13 @@ logit <- function(x) log(x/(1-x))
 #' calculate AIC from a likelihood function optimization procedure
 #' @export
 AIC <- function(m) (m$minimum*2) + (2*length(m$estimate))
+#' calculate AICc from a likelihood function optimization procedure
+#'
+AICc <- function(m) AIC(m) + ((2*length(m$estimate)*(length(m$estimate)+1))/(m$size-length(m$estimate)-1))
+#' calculated BIC from a likelihood function optimization procedure
+#'
+BIC <- function(m) (m$minimum*2) + (q*log(m$size))
+#'
 #' calculate SE from a likelihood function optimization procedure
 #' @export
 SE <- function(m) sqrt(diag(solve(m$hessian)))
@@ -426,4 +433,32 @@ singleSeasonRN <- function(det_parameters=NULL, occ_parameters=NULL, p=NULL, upp
     likelihood[i] <- sum(focal*gN)
  }
   sum(-1*likelihood)
+}
+#' fit a distance model to IMBCR station data (testing)
+#'
+#' @export
+singleSeasonDistance <- function(psi_params=NULL,sigma_params=NULL,in_radial_distance=T){
+  nz<-500
+  x<- sin( (impala[,5]/360)*(2*pi) ) *impala[,4]
+  x<-x/100
+  nind<-length(x)
+  y<-c(rep(1,nind),rep(0,nz))
+  x<-c(x,rep(NA,nz)) # NA fill for our 0 capture
+
+  lik <- function(parms){
+    psi<-expit(parms[1])
+    sigma2<-exp(parms[2])
+    picap<-integrate( function(u){ exp(-(u^2)/sigma2)/4  },0,4)$value
+    part1<- sum(log(psi*exp(-(x[1:nind]^2)/sigma2) ) )
+    part2<-  nz*log( 1-psi*picap)
+    -1*(part1+part2)
+  }
+
+  out<-nlm(lik,c(logit(175/(nz+nind)),log(1.2) ),hessian=TRUE)
+  print(out)
+
+  psihat<- expit(out$estimate[1])
+  N <-psihat*( nind+nz )
+  D<- N/48
+  cat("MLE Density: ",D,fill=TRUE)
 }
