@@ -9,6 +9,9 @@ Contact: Kyle Taylor <kyle.taylor@pljv.org>
 BugReports: <https://github.com/PLJV>
 Description: Open source tools for modeling breeding-season bird occupancy, density, and habitat relationships with IMBCR
 License: GPL-3
+Imports:
+    raster,
+    rgdal
 Date/Publication: 2016-02-07 09:00
 Packaged: 2016-02-07 21:35
 NeedsCompilation: no

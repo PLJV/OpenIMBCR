@@ -446,11 +446,11 @@ singleSeasonDistance <- function(psi_params=NULL,sigma_params=NULL,in_radial_dis
   x<-c(x,rep(NA,nz)) # NA fill for our 0 capture
 
   lik <- function(parms){
-    psi<-expit(parms[1])
-    sigma2<-exp(parms[2])
-    picap<-integrate( function(u){ exp(-(u^2)/sigma2)/4  },0,4)$value
-    part1<- sum(log(psi*exp(-(x[1:nind]^2)/sigma2) ) )
-    part2<-  nz*log( 1-psi*picap)
+    psi <- expit(parms[1])
+    sigma2 <- exp(parms[2])
+    picap <- integrate( function(u){ exp(-(u^2)/sigma2)/4  },0,4)$value # marginal probability of encounter
+    part1 <- sum(log(psi*exp(-(x[1:nind]^2)/sigma2) ) ) # half-normal distance function
+    part2 <-  nz*log( 1-psi*picap)
     -1*(part1+part2)
   }
 
