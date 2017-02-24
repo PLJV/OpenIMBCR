@@ -88,21 +88,21 @@ imbcrTableToShapefile <- function(filename=NULL,outfile=NULL,write=F){
     s <- list()
     for (zone in unique(na.omit(t$ptvisitzone))){
       s[[length(s) + 1]] <- na.omit(t[t$ptvisitzone == zone,])
-      s[[length(s)]] <- SpatialPointsDataFrame(
+      s[[length(s)]] <- sp::SpatialPointsDataFrame(
                                   coords = data.frame(x = s[[length(s)]]$ptvisiteasting,
                                   y = s[[length(s)]]$ptvisitnorthing),
                                   data = s[[length(s)]],
-                                  proj4string = CRS(projection(paste("+init=epsg:269", zone, sep = "")))
+                                  proj4string = sp::CRS(raster::projection(paste("+init=epsg:269", zone, sep = "")))
                         )
       row.names(s[[length(s)]]) <- paste(letters[length(s)],row.names(s[[length(s)]]),sep=".") # based on : http://gis.stackexchange.com/questions/155328/merging-multiple-spatialpolygondataframes-into-1-spdf-in-r
     }
 
-    s <- lapply(s,FUN=spTransform,CRS(projection(s[[1]])))
+    s <- lapply(s,FUN=sp::spTransform,sp::CRS(raster::projection(s[[1]])))
       s <- do.call(rbind,s)
         s$FID <- 1:nrow(s)
     # write to disk -- and allow some wiggle-room on filename conventions
     if(write){
-      writeOGR(s,".",ifelse(is.null(outfile),gsub(filename,pattern=".csv",replacement=""),outfile),driver="ESRI Shapefile",overwrite=T)
+      rgdal::writeOGR(s,".",ifelse(is.null(outfile),gsub(filename,pattern=".csv",replacement=""),outfile),driver="ESRI Shapefile",overwrite=T)
     }
   }
   return(s)
