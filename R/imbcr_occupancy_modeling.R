@@ -141,7 +141,6 @@ parseDetectionsBySpecies <- function(s,spp=NULL){
 #' @export
 parseStationLevelMetadata <- function(s,spp=NULL){
 
-
         s_spp <- parseDetectionsBySpecies(s,spp=spp) # parse our SpatialPointsDataFrame for focal species (spp)
 
   detectionHist <- list()
@@ -151,6 +150,7 @@ parseStationLevelMetadata <- function(s,spp=NULL){
            det <- as.numeric(counts > 0)
       station  <- s_spp[s_spp$transectnum == t,]$point
       interval <- s_spp[s_spp$transectnum == t,]$timeperiod
+          dist <- s_spp[s_spp$transectnum == t,]$radialdistance
            doy <- as.numeric(strftime(as.POSIXct(as.Date(as.character(s_spp[s_spp$transectnum == t,]$date), "%m/%d/%Y")),format="%j"))
            tod <- as.numeric(s_spp[s_spp$transectnum == t,]$starttime)
            obs <- as.character(s_spp[s_spp$transectnum == t,]$observer)
@@ -163,6 +163,7 @@ parseStationLevelMetadata <- function(s,spp=NULL){
                                                       detection=det,
                                                       station=station,
                                                       interval=interval,
+                                                      dist=dist,
                                                       doy=doy,
                                                       tod=tod,
                                                       obs=obs,
@@ -439,19 +440,23 @@ singleSeasonRN <- function(det_parameters=NULL, occ_parameters=NULL, p=NULL, upp
 #' @export
 singleSeasonDistance <- function(psi_params=NULL,sigma_params=NULL,in_radial_distance=T){
   nz<-500
-  x<- sin( (impala[,5]/360)*(2*pi) ) *impala[,4]
-  x<-x/100
+  sigma2 <- exp(sigma_params[2])
+  x <- sin( (impala[,5]/360)*(2*pi) ) *impala[,4]
+  x <- x/100
+  x_max <- ceiling(max(x))
   nind<-length(x)
   y<-c(rep(1,nind),rep(0,nz))
   x<-c(x,rep(NA,nz)) # NA fill for our 0 capture
-
+  half_normal <- function(u){ (2*pi*u)*(exp(-(u^2)/sigma2)) / (pi*x_max^2)  }
   lik <- function(parms){
     psi <- expit(parms[1])
-    sigma2 <- exp(parms[2])
-    picap <- integrate( function(u){ exp(-(u^2)/sigma2)/4  },0,4)$value # marginal probability of encounter
-    part1 <- sum(log(psi*exp(-(x[1:nind]^2)/sigma2) ) ) # half-normal distance function
-    part2 <-  nz*log( 1-psi*picap)
-    -1*(part1+part2)
+    picap <- integrate(half_normal,0,x_max)$value # marginal probability of encounter
+    #part1 <- sum(log(psi*exp(-(x[1:nind]^2)/sigma2) ) )
+    part1 <- sum(log(half_normal(x[1:nind]))) # half-normal distance detection function (modified for point count survey)
+    #part2 <-  nz*log( 1-psi*picap)
+    part2 <- nz*log(1-picap)
+    part3 <-
+    -1*(part1+part2) # log of a product is the sum of the log factors
   }
 
   out<-nlm(lik,c(logit(175/(nz+nind)),log(1.2) ),hessian=TRUE)

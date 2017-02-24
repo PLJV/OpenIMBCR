@@ -5,21 +5,26 @@
 \title{Fit a single-season occupancy model  assumes a constant probability of species
 detection across transects, which is probably inappropriate for IMBCR data and will
 lead to inaccurate predictions of occupancy. This is "model m0" from the literature
-and loosely follows Andy Royle's (2008) model specification.}
+and loosely follows Andy Royle's (2008) model specification. It is designed so that
+parameter estimates can be derived through an optimization procedure like nlm() and
+variables can be easily selected/de-selected, such as for calculating AIC.}
 \usage{
-singleSeasonOccupancy(parameters, table = NULL, vars = c("a0", "tod", "doy",
-  "intensity", "b0", "perc_ag", "perc_grass", "perc_shrub", "perc_tree",
-  "perc_playa"))
+singleSeasonOccupancy(det_parameters = NULL, occ_parameters = NULL,
+  p = NULL, table = NULL)
 }
 \arguments{
+\item{det_parameters}{proposed parameter values for detection, including 1 intercept (a0)}
+
+\item{occ_parameters}{proposed paramter values for occupancy, including 1 intercept (b0)}
+
 \item{table}{a data.frame of detection histories ('det') and covariates on
 occupancy ('b0') and probability of detection ('a0')}
-
-\item{vars}{a vector of strings specifying the covariates used for the analysis.}
 }
 \description{
 Fit a single-season occupancy model  assumes a constant probability of species
 detection across transects, which is probably inappropriate for IMBCR data and will
 lead to inaccurate predictions of occupancy. This is "model m0" from the literature
-and loosely follows Andy Royle's (2008) model specification.
+and loosely follows Andy Royle's (2008) model specification. It is designed so that
+parameter estimates can be derived through an optimization procedure like nlm() and
+variables can be easily selected/de-selected, such as for calculating AIC.
 }

@@ -24,7 +24,7 @@ c(
 )
 
 # data frame -> spatial points data frame
-s <- OpenIMBCR::imbcrTableToShapefile(filename=OpenIMBCR:::recursiveFindFile(name="RawData_PLJV_IMBCR_20161024.csv",root="/home/ktaylora/Incoming")[1])
+s <- OpenIMBCR::imbcrTableToShapefile(filename=OpenIMBCR:::recursiveFindFile(name="RawData_PLJV_IMBCR_20161201.csv",root="/home/ktaylora/Incoming")[1])
 # number of unique 1-km2 transects?
 M <- length(as.character(unique(s$transectnum))) # number of transects
 
@@ -80,4 +80,3 @@ for(i in 1:length(names(inputTable))){
 permuted_aics <- unlist(lapply(combinations,FUN=function(x) AIC(x[[1]])))
 
 which(permuted_aics ==min(permuted_aics))
-
