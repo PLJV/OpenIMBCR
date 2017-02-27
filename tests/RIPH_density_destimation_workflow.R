@@ -1,5 +1,7 @@
 #
-# Density (birds/km2) estimation for Ring-necked Pheasant using the 2016 IMBCR data
+# Workflow for Density (birds/km2) estimation for Ring-necked Pheasant using 2016 IMBCR data
+#
+# Author : Kyle Taylor (kyle.taylor@pljv.org) [2017]
 #
 
 require(OpenIMBCR)
@@ -83,9 +85,8 @@ for(i in 1:length(n)){
 if(sum(abs(models$AIC-min(models$AIC)) < 5)>1){
   cat(" -- warning: support for more than 1 optimal model\n")
 }
-
+# fit our "final" optimized model
 optimal <- models$formula[which(models$AIC == min(models$AIC))]
-m_final <- distsamp(as.formula("~1~tree_107x107+wetland_107x107"),umf,keyfun="hazard",output="density",unitsOut="kmsq")
- m_2 <- distsamp(as.formula(paste("~1~",paste(n,collapse="+"),collapse="")),umf,keyfun="hazard",output="density",unitsOut="kmsq")
-
+m_final <- distsamp(as.formula(optimal),umf,keyfun="hazard",output="density",unitsOut="kmsq")
+# finish-up
 save.image(paste("RIPH_density_estimation_workspace_",paste(strsplit(as.character(date()),split=" ")[[1]][c(2,3,5)],collapse="_"),".rdata",collapse=""))
