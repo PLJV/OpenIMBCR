@@ -10,7 +10,7 @@ require(rgdal)
 require(raster)
 
 # define our distance breaks through exploratory analysis
-d=c(0,100,200,300,400,500,600,700,800)
+d <- c(0,100,200,300,400,500,600,700,800)
 
 # read-in our IMBCR source data
 s <- imbcrTableToShapefile(recursiveFindFile(name="RawData_PLJV_IMBCR_20161201.csv", root="/home/ktaylora/Incoming"))
@@ -23,9 +23,7 @@ r <- list.files("/global_workspace/ring_necked_pheasant_imbcr_models/raster",pat
     names(r) <- n
 # merge the raster stack containing our state covariates with our IMBCR source table
 s <- suppressWarnings(raster::extract(r,s,sp=T))
-  s <- suppressWarnings(raster::extract(raster::raster("/global_workspace/aquifer_depletion/elevation.tif"),s,sp=T))
-    s$doy <- as.numeric(strftime(as.POSIXct(as.Date(as.character(s$date), "%m/%d/%Y")),format="%j")) # convert date -> doy
-      colnames(s@data) <- gsub(names(s@data),pattern="dem_",replacement="elev_")
+  s$doy <- as.numeric(strftime(as.POSIXct(as.Date(as.character(s$date), "%m/%d/%Y")),format="%j")) # convert date -> doy
 
 # kludging to select the covariates we will aggregate and use at the site level
 n <- names(s@data)
@@ -51,14 +49,13 @@ colnames(stateCovariates) <- n
 # format our training data as umf
 umf <- unmarkedFrameDS(y=as.matrix(y), siteCovs=stateCovariates, survey="point", dist.breaks=d, unitsIn="m")
 
-
 #
 # unmarked distance model fitting (~detection~abundance)
 #
 
 # find a decent null model (accounting for nusance detection parameters, if possible)
 #m <- distsamp(~1~1,umf,keyfun="hazard",output="density",unitsOut="kmsq")
-m <- distsamp(~doy+timeofday~1,umf,keyfun="hazard",output="density",unitsOut="kmsq")
+#m <- distsamp(~doy+starttime~1,umf,keyfun="hazard",output="density",unitsOut="kmsq")
 m <- distsamp(~doy~1,umf,keyfun="hazard",output="density",unitsOut="kmsq") # use AIC to determine an optimal detection function
 # clean-up our state variables so we don't use our det covs estimate density
 n <- n[!grepl(n,pattern="time|doy")]
@@ -78,8 +75,8 @@ for(i in 1:length(n)){
    models[k,1] <- paste("~doy~",paste(combinations[,j],collapse="+"),collapse="")
    models[k,2] <- m_2@AIC
    k <- k+1
-   cat(paste("[",round(k/nrow(models),2),"%]",sep=""))
- }; cat("\n")
+   cat(".")
+ }; cat(paste("[",round(k/nrow(models),2),"%]",sep="")); cat("\n")
 }
 # check for a range of AIC support in our combinations
 if(sum(abs(models$AIC-min(models$AIC)) < 5)>1){
