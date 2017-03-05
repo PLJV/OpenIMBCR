@@ -8,6 +8,10 @@ require(OpenIMBCR)
 require(unmarked)
 require(rgdal)
 require(raster)
+require(parallel)
+
+nCores <- parallel::detectCores()-1
+cl <- parallel::makeCluster(nCores)
 
 # define our distance breaks through exploratory analysis
 d <- c(0,100,200,300,400,500,600,700,800)
@@ -24,11 +28,10 @@ r <- list.files("/global_workspace/ring_necked_pheasant_imbcr_models/raster",pat
 # merge the raster stack containing our state covariates with our IMBCR source table
 s <- suppressWarnings(raster::extract(r,s,sp=T))
   s$doy <- as.numeric(strftime(as.POSIXct(as.Date(as.character(s$date), "%m/%d/%Y")),format="%j")) # convert date -> doy
+    s@data <- s@data[,!grepl(names(s@data),pattern="FID")]
 
 # kludging to select the covariates we will aggregate and use at the site level
-n <- names(s@data)
-  n <- n[(length(n)-(nlayers(r)+1)) : length(n) ]
-    n <- append(n,c("starttime")) # append our covariates on detection
+n <- c(names(r),"doy","starttime") # append our covariates on detection
 
 # parse our dataset for RNEP records
 t <- s[s$common.name == "Ring-necked Pheasant",]@data
@@ -68,16 +71,24 @@ k <- 1
 cat(" -- optimizing AIC:\n")
 for(i in 1:length(n)){
  combinations <- combn(n,m=i)
- cat(paste(" -- n=", i, " ways:", collapse=""))
  for(j in 1:ncol(combinations)){
-   f <- as.formula(paste("~doy~",paste(combinations[,j],collapse="+"),collapse=""))
-   m_2 <- distsamp(f,umf,keyfun="hazard",output="density",unitsOut="kmsq")
    models[k,1] <- paste("~doy~",paste(combinations[,j],collapse="+"),collapse="")
-   models[k,2] <- m_2@AIC
    k <- k+1
-   cat(".")
- }; cat(paste("[",round(k/nrow(models),2),"%]",sep="")); cat("\n")
-}
+ }; cat(".");
+}; cat("\n");
+
+# parallelize our runs across nCores processors (defined at top)
+runs <- lapply(as.list(models[,1]),FUN=as.formula)
+  runs <- parLapply(cl=cl, runs, fun=distsamp, data=umf,keyfun="hazard", output="density", unitsOut="kmsq")
+# assign our AIC results to our output table
+models[,2] <- unlist(lapply(runs,FUN=AIC))
+
+# f <- as.formula(paste("~doy~",paste(combinations[,j],collapse="+"),collapse=""))
+# m_2 <- distsamp(f,umf,keyfun="hazard",output="density",unitsOut="kmsq")
+# cat(paste("[",round(k/nrow(models),2),"%]",sep="")); cat("\n")
+# models[k,2] <- m_2@AIC
+
+
 # check for a range of AIC support in our combinations
 if(sum(abs(models$AIC-min(models$AIC)) < 5)>1){
   cat(" -- warning: support for more than 1 optimal model\n")
