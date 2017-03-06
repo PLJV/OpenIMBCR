@@ -65,10 +65,22 @@ n <- n[!grepl(n,pattern="time|doy")]
 # calculate : combinations w/o repetition (n!/(r!(n-r)!)
 m_len <- vector(); for(i in 1:length(n)) { m_len <- append(m_len,dim(combn(n,m=i))[2]) }
  m_len <- sum(m_len)
+
+# free-up some RAM
+rm(r,s,t)
+gc()
+
+#
+# check for a range of AIC support across all model combinations -- use best judgement on "optimal" variables selected here,
+# because this approach is really hackish and not at all canonical. This will produce a table of optimal models randomly
+# selected in blocks of 500. The smallest model from each block that beats our null (intercept) model (above) is included
+# in this table
+#
+
 # minimize AIC across m_len possible models
 models <- data.frame(formula=rep(NA,m_len),AIC=rep(NA,m_len))
 k <- 1
-cat(" -- optimizing AIC:\n")
+cat(" -- building a table of all possible models:")
 for(i in 1:length(n)){
  combinations <- combn(n,m=i)
  for(j in 1:ncol(combinations)){
@@ -78,21 +90,33 @@ for(i in 1:length(n)){
 }; cat("\n");
 
 # parallelize our runs across nCores processors (defined at top)
-runs <- lapply(as.list(models[,1]),FUN=as.formula)
+total_runs <- 1:nrow(models)
+focal_runs <- sample(total_runs,replace=F,size=500) # let's do our runs in blocks of 500
+# prime the pump
+runs <- lapply(as.list(models[focal_runs,1]),FUN=as.formula)
   runs <- parLapply(cl=cl, runs, fun=distsamp, data=umf,keyfun="hazard", output="density", unitsOut="kmsq")
-# assign our AIC results to our output table
-models[,2] <- unlist(lapply(runs,FUN=AIC))
+    runs <- unlist(lapply(runs,FUN=function(x){x@AIC}))
+# assign an AIC to beat (below)
+minimum <- models[focal_runs[which(runs == min(runs))[1]],]
+minimum$AIC <- runs[which(runs == min(runs))[1]]
+# trim our total runs
+total_runs <- total_runs[!(total_runs %in% focal_runs)]
+# iterate over total_runs and try and minimize AIC as you go
+while(length(total_runs)>1){
+  focal_runs <- sample(total_runs,replace=F,size=100)
+  runs <- lapply(as.list(models[focal_runs,1]),FUN=as.formula)
+    runs <- parLapply(cl=cl, runs, fun=distsamp, data=umf,keyfun="hazard", output="density", unitsOut="kmsq")
+      runs <- unlist(lapply(runs,FUN=function(x){x@AIC}))
+  if(runs[which(runs == min(runs))[1]] < minimum$AIC){
+    minimum <- rbind(minimum,
+                     data.frame(formula=models[focal_runs[which(runs == min(runs))[1]],],AIC=runs[which(runs == min(runs))[1]]))
+  }
+  total_runs <- total_runs[!(total_runs %in% focal_runs)]
+  cat(paste("[jobs remaining:",length(total_runs),"]",sep=""));
+}; cat("\n");
 
-# f <- as.formula(paste("~doy~",paste(combinations[,j],collapse="+"),collapse=""))
-# m_2 <- distsamp(f,umf,keyfun="hazard",output="density",unitsOut="kmsq")
-# cat(paste("[",round(k/nrow(models),2),"%]",sep="")); cat("\n")
-# models[k,2] <- m_2@AIC
+# take a peak at our models table
 
-
-# check for a range of AIC support in our combinations
-if(sum(abs(models$AIC-min(models$AIC)) < 5)>1){
-  cat(" -- warning: support for more than 1 optimal model\n")
-}
 # fit our "final" optimized model
 optimal <- models$formula[which(models$AIC == min(models$AIC))]
 m_final <- distsamp(as.formula(optimal),umf,keyfun="hazard",output="density",unitsOut="kmsq")
