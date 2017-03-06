@@ -109,7 +109,7 @@ while(length(total_runs)>1){
       runs <- unlist(lapply(runs,FUN=function(x){x@AIC}))
   if(runs[which(runs == min(runs))[1]] < minimum$AIC){
     minimum <- rbind(minimum,
-                     data.frame(formula=models[focal_runs[which(runs == min(runs))[1]],],AIC=runs[which(runs == min(runs))[1]]))
+                     data.frame(formula=models[focal_runs[which(runs == min(runs))[1]],1],AIC=runs[which(runs == min(runs))[1]]))
   }
   total_runs <- total_runs[!(total_runs %in% focal_runs)]
   cat(paste("[jobs remaining:",length(total_runs),"]",sep=""));
