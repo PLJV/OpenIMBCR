@@ -47,7 +47,7 @@ for(i in 1:length(n)){
 }
 # specify covariate names
 colnames(stateCovariates) <- n
-  stateCovariates <- data.frame(stateCovariates) # unmarked expects this as a data.frame
+  stateCovariates <- data.frame(stateCovariates) # unmarked expects this ahtos a data.frame
 
 # format our training data as umf
 umf <- unmarkedFrameDS(y=as.matrix(y), siteCovs=stateCovariates, survey="point", dist.breaks=d, unitsIn="m")
@@ -71,16 +71,16 @@ rm(r,s,t)
 gc()
 
 #
-# check for a range of AIC support across all model combinations -- use best judgement on "optimal" variables selected here,
-# because this approach is really hackish and not at all canonical. This will produce a table of optimal models randomly
-# selected in blocks of 500. The smallest model from each block that beats our null (intercept) model (above) is included
-# in this table
+# Define a random walk algorithm that seeks to minimize AIC against a randomized subset of
+# predictors, recording along a gradient as it goes. Don't just try to select covariates
+# from the minimum AIC. Actually consider the biological significance of covariates across
+# the full walk of models.
 #
 
-# minimize AIC across m_len possible models
+# define the model space of all possible combinations of predictors
 models <- data.frame(formula=rep(NA,m_len),AIC=rep(NA,m_len))
 k <- 1
-cat(" -- building a table of all possible models:")
+cat(" -- optimizing AIC:\n")
 for(i in 1:length(n)){
  combinations <- combn(n,m=i)
  for(j in 1:ncol(combinations)){
@@ -88,7 +88,6 @@ for(i in 1:length(n)){
    k <- k+1
  }; cat(".");
 }; cat("\n");
-
 # parallelize our runs across nCores processors (defined at top)
 total_runs <- 1:nrow(models)
 focal_runs <- sample(total_runs,replace=F,size=500) # let's do our runs in blocks of 500
@@ -103,22 +102,20 @@ minimum$AIC <- runs[which(runs == min(runs))[1]]
 total_runs <- total_runs[!(total_runs %in% focal_runs)]
 # iterate over total_runs and try and minimize AIC as you go
 while(length(total_runs)>1){
-  focal_runs <- sample(total_runs,replace=F,size=100)
+  focal_runs <- sample(total_runs,replace=F,size=500)
   runs <- lapply(as.list(models[focal_runs,1]),FUN=as.formula)
     runs <- parLapply(cl=cl, runs, fun=distsamp, data=umf,keyfun="hazard", output="density", unitsOut="kmsq")
-      runs <- unlist(lapply(runs,FUN=function(x){x@AIC}))
-  if(runs[which(runs == min(runs))[1]] < minimum$AIC){
-    minimum <- rbind(minimum,
-                     data.frame(formula=models[focal_runs[which(runs == min(runs))[1]],1],AIC=runs[which(runs == min(runs))[1]]))
+      runs <- unlist(lapply(runs,FUN=AIC))
+  if(runs[which(runs == min(runs))[1]] < min(minimum$AIC)){
+    minimum <- models[focal_runs[which(runs == min(runs))[1]],]
+    minimum$AIC <- runs[which(runs == min(runs))[1]]
   }
   total_runs <- total_runs[!(total_runs %in% focal_runs)]
   cat(paste("[jobs remaining:",length(total_runs),"]",sep=""));
 }; cat("\n");
-
-# take a peak at our models table
-
-# fit our "final" optimized model
-optimal <- models$formula[which(models$AIC == min(models$AIC))]
+# look over the random walk AICs and model, discuss with friends
+optimal <- minimum$formula[which(minimum$AIC == min(minimum$AIC))[1]]
 m_final <- distsamp(as.formula(optimal),umf,keyfun="hazard",output="density",unitsOut="kmsq")
 # finish-up
+write.csv(minimum,"riph_models_selected.csv",rownames=F)
 save.image(paste("RIPH_density_estimation_workspace_",paste(strsplit(as.character(date()),split=" ")[[1]][c(2,3,5)],collapse="_"),".rdata",collapse=""))
