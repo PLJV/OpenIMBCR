@@ -437,17 +437,23 @@ singleSeasonRN <- function(det_parameters=NULL, occ_parameters=NULL, p=NULL, upp
 }
 #' fit a distance model to IMBCR station data (testing)
 #'
-#' @export
-singleSeasonDistance <- function(psi_params=NULL,sigma_params=NULL,in_radial_distance=T){
-  nz<-500
+singleSeasonDistance <- function(x=NULL, psi_params=NULL, sigma_params=NULL, as_radial_distance=T, link=){
+  # detection functions
+      uniform <- function(u){ 1/u }
+  half_normal <- function(u){ (2*pi*u) * (exp(-(u^2)/sigma2)) / (pi*x_max^2)  }
+  hazard_rate <- function(u){ 1 - exp( -(u/a)^(-b) ) }
+  nz<-500 # transects where species was not observed
   sigma2 <- exp(sigma_params[2])
-  x <- sin( (impala[,5]/360)*(2*pi) ) *impala[,4]
-  x <- x/100
+  if(as_radial_distance){
+    # x = r*sin(theta)
+    x <- x * sin( (angle/360)*(2*pi) )
+    x <- x/100 # format units as meters/100 for our detection function
+  }
   x_max <- ceiling(max(x))
   nind<-length(x)
   y<-c(rep(1,nind),rep(0,nz))
   x<-c(x,rep(NA,nz)) # NA fill for our 0 capture
-  half_normal <- function(u){ (2*pi*u)*(exp(-(u^2)/sigma2)) / (pi*x_max^2)  }
+
   lik <- function(parms){
     psi <- expit(parms[1])
     picap <- integrate(half_normal,0,x_max)$value # marginal probability of encounter
@@ -455,8 +461,8 @@ singleSeasonDistance <- function(psi_params=NULL,sigma_params=NULL,in_radial_dis
     part1 <- sum(log(half_normal(x[1:nind]))) # half-normal distance detection function (modified for point count survey)
     #part2 <-  nz*log( 1-psi*picap)
     part2 <- nz*log(1-picap)
-    part3 <-
-    -1*(part1+part2) # log of a product is the sum of the log factors
+    part3 <- 0
+    -1*(part1+part2+part3) # log of a product is the sum of the log factors
   }
 
   out<-nlm(lik,c(logit(175/(nz+nind)),log(1.2) ),hessian=TRUE)
