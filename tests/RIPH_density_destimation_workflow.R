@@ -34,7 +34,7 @@ s <- suppressWarnings(raster::extract(r,s,sp=T))
 n <- c(names(r),"doy","starttime") # append our covariates on detection
 
 # parse our dataset for RNEP records
-t <- s[s$common.name == "Ring-necked Pheasant",]@data
+#t <- s[s$common.name == "Ring-necked Pheasant",]@data
 t <- s[s$common.name == "Scissor-tailed Flycatcher",]@data
 # build a distance table
 distances <- data.frame(distance=t$radialdistance,transect=t$transectnum)
@@ -107,7 +107,7 @@ while(length(total_runs)>1){
   focal_runs <- sample(total_runs,replace=F,size=ifelse(length(total_runs)>step,step,total_runs))
   runs <- lapply(as.list(models[focal_runs,1]),FUN=as.formula)
     runs <- parLapply(cl=cl, runs, fun=distsamp, data=umf,keyfun="hazard", output="density", unitsOut="kmsq")
-      runs <- unlist(lapply(runs,FUN=AIC))
+      runs <- unlist(lapply(runs,FUN=function(x){x@AIC}))
   if(runs[which(runs == min(runs))[1]] < min(minimum$AIC)){
     minimum <- models[focal_runs[which(runs == min(runs))[1]],]
     minimum$AIC <- runs[which(runs == min(runs))[1]]
