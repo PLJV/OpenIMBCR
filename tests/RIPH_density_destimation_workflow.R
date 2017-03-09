@@ -35,6 +35,7 @@ n <- c(names(r),"doy","starttime") # append our covariates on detection
 
 # parse our dataset for RNEP records
 t <- s[s$common.name == "Ring-necked Pheasant",]@data
+t <- s[s$common.name == "Scissor-tailed Flycatcher",]@data
 # build a distance table
 distances <- data.frame(distance=t$radialdistance,transect=t$transectnum)
 y <- unmarked::formatDistData(distances, distCol="distance",transectNameCol="transect",dist.breaks=d)
@@ -80,7 +81,7 @@ gc()
 # define the model space of all possible combinations of predictors
 models <- data.frame(formula=rep(NA,m_len),AIC=rep(NA,m_len))
 k <- 1
-cat(" -- optimizing AIC:\n")
+cat(" -- deriving model combinations:\n")
 for(i in 1:length(n)){
  combinations <- combn(n,m=i)
  for(j in 1:ncol(combinations)){
@@ -89,8 +90,9 @@ for(i in 1:length(n)){
  }; cat(".");
 }; cat("\n");
 # parallelize our runs across nCores processors (defined at top)
+step <- 1000
 total_runs <- 1:nrow(models)
-focal_runs <- sample(total_runs,replace=F,size=500) # let's do our runs in blocks of 500
+focal_runs <- sample(total_runs,replace=F,size=step) # let's do our runs in blocks of 500
 # prime the pump
 runs <- lapply(as.list(models[focal_runs,1]),FUN=as.formula)
   runs <- parLapply(cl=cl, runs, fun=distsamp, data=umf,keyfun="hazard", output="density", unitsOut="kmsq")
@@ -102,7 +104,7 @@ minimum$AIC <- runs[which(runs == min(runs))[1]]
 total_runs <- total_runs[!(total_runs %in% focal_runs)]
 # iterate over total_runs and try and minimize AIC as you go
 while(length(total_runs)>1){
-  focal_runs <- sample(total_runs,replace=F,size=500)
+  focal_runs <- sample(total_runs,replace=F,size=ifelse(length(total_runs)>step,step,total_runs))
   runs <- lapply(as.list(models[focal_runs,1]),FUN=as.formula)
     runs <- parLapply(cl=cl, runs, fun=distsamp, data=umf,keyfun="hazard", output="density", unitsOut="kmsq")
       runs <- unlist(lapply(runs,FUN=AIC))
