@@ -74,7 +74,7 @@ gc()
 #
 # Define a random walk algorithm that seeks to minimize AIC against a randomized subset of
 # predictors, recording along a gradient as it goes. Don't just try to select covariates
-# from the minimum AIC. Actually consider the biological significance of covariates across
+# based on minimum AIC. Actually consider the biological significance of covariates across
 # the full walk of models.
 #
 
@@ -104,10 +104,16 @@ minimum$AIC <- runs[which(runs == min(runs))[1]]
 total_runs <- total_runs[!(total_runs %in% focal_runs)]
 # iterate over total_runs and try and minimize AIC as you go
 while(length(total_runs)>1){
-  focal_runs <- sample(total_runs,replace=F,size=ifelse(length(total_runs)>step,step,total_runs))
+  # randomly sample total_runs that the cluster will consider for this run
+  focal_runs <- sample(total_runs,
+                       replace=F,
+                       size=ifelse(length(total_runs) > step, step, length(total_runs))
+                       )
+  # build models for this run
   runs <- lapply(as.list(models[focal_runs,1]),FUN=as.formula)
     runs <- parLapply(cl=cl, runs, fun=distsamp, data=umf,keyfun="hazard", output="density", unitsOut="kmsq")
       runs <- unlist(lapply(runs,FUN=function(x){x@AIC}))
+  # if we beat the running lowest AIC, append it to the random walk table
   if(runs[which(runs == min(runs))[1]] < min(minimum$AIC)){
     minimum <- models[focal_runs[which(runs == min(runs))[1]],]
     minimum$AIC <- runs[which(runs == min(runs))[1]]
@@ -119,5 +125,9 @@ while(length(total_runs)>1){
 optimal <- minimum$formula[which(minimum$AIC == min(minimum$AIC))[1]]
 m_final <- distsamp(as.formula(optimal),umf,keyfun="hazard",output="density",unitsOut="kmsq")
 # finish-up
-write.csv(minimum,"riph_models_selected.csv",rownames=F)
-save.image(paste("RIPH_density_estimation_workspace_",paste(strsplit(as.character(date()),split=" ")[[1]][c(2,3,5)],collapse="_"),".rdata",collapse=""))
+parallel::stopCluster(cl)
+write.csv(minimum, "riph_models_selected.csv", rownames=F)
+save.image(gsub(paste("RIPH_density_estimation_workspace_",paste(strsplit(as.character(date()),split=" ")[[1]][c(2,3,5)],collapse="_"),".rdata",collapse=""),
+                pattern=" ",
+                replacement="")
+          )

@@ -437,7 +437,7 @@ singleSeasonRN <- function(det_parameters=NULL, occ_parameters=NULL, p=NULL, upp
 }
 #' fit a distance model to IMBCR station data (testing)
 #'
-singleSeasonDistance <- function(x=NULL, psi_params=NULL, sigma_params=NULL, as_radial_distance=T, link=){
+singleSeasonDistance <- function(x=NULL, psi_params=NULL, sigma_params=NULL, as_radial_distance=T, link="half_normal"){
   # detection functions
       uniform <- function(u){ 1/u }
   half_normal <- function(u){ (2*pi*u) * (exp(-(u^2)/sigma2)) / (pi*x_max^2)  }

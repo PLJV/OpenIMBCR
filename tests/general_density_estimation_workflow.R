@@ -13,6 +13,7 @@ require(parallel)
 nCores <- parallel::detectCores()-1
 cl <- parallel::makeCluster(nCores)
 
+
 cat(" -- species density estimation workflow")
 
 argv <- commandArgs(trailingOnly=T)
@@ -29,7 +30,7 @@ for(i in 1:(length(argv)-1)){
   }
 }
 
-if(is.null(four_letter_code)|is.na(four_letter_code)){
+if( grepl(class(four_letter_code),pattern="NULL") | is.na(four_letter_code) ){
   code <- unlist(strsplit(spp_common_name,split=" "))
   if(length(code) == 1){
     four_letter_code <- toupper(substr(code,1,4))
