@@ -10,11 +10,13 @@ require(rgdal)
 require(raster)
 require(parallel)
 
+system("clear")
+
 nCores <- parallel::detectCores()-1
 cl <- parallel::makeCluster(nCores)
 
 
-cat(" -- species density estimation workflow")
+cat(" -- species density estimation workflow\n")
 
 argv <- commandArgs(trailingOnly=T)
 
@@ -40,7 +42,7 @@ if( grepl(class(four_letter_code),pattern="NULL") | is.na(four_letter_code) ){
   cat(" -- guessing species four-letter code as (use -c to force specificaiton):", four_letter_code, "\n")
 }
 
-cat(" -- parsing explantory (raster) variables")
+cat(" -- parsing explantory (raster) variables\n")
 # define our distance breaks through exploratory analysis
 d <- c(0,100,200,300,400,500,600,700,800)
 
