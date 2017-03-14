@@ -4,7 +4,7 @@
 # Author : Kyle Taylor (kyle.taylor@pljv.org) [2017]
 #
 
-require(OpenIMBCR)
+rrequire(OpenIMBCR)
 require(unmarked)
 require(rgdal)
 require(raster)
@@ -12,16 +12,18 @@ require(parallel)
 
 system("clear")
 
-nCores <- parallel::detectCores()-1
-cl <- parallel::makeCluster(nCores)
+# RUNTIME arguments
 
+four_letter_code <- NULL
+ spp_common_name <- NULL
+          nCores <- parallel::detectCores()-1
+              cl <- parallel::makeCluster(nCores)
 
 cat(" -- species density estimation workflow\n")
 
-argv <- commandArgs(trailingOnly=T)
+# process any arguments passed by user
 
-   four_letter_code <- NULL
-    spp_common_name <- NULL
+argv <- commandArgs(trailingOnly=T)
 
 for(i in 1:(length(argv)-1)){
   if( grepl(tolower(argv[i]),pattern="-s|--spp") ){
@@ -37,7 +39,7 @@ if( grepl(class(four_letter_code),pattern="NULL") | is.na(four_letter_code) ){
   if(length(code) == 1){
     four_letter_code <- toupper(substr(code,1,4))
   } else if(length(code) == 2){
-    four_letter_code <- paste(toupper(substr(code[1],1,2)), toupper(substr(code[2],1,2)), sep="")
+    four_letter_code <- paste(toupper(substr(code[1],1,2)), toupper(substr(code[2],1,2)), collapse="")
   }
   cat(" -- guessing species four-letter code as (use -c to force specificaiton):", four_letter_code, "\n")
 }
@@ -124,17 +126,10 @@ for(i in 1:length(n)){
 # parallelize our runs across nCores processors (defined at top)
 step <- 1000
 total_runs <- 1:nrow(models)
-focal_runs <- sample(total_runs,replace=F,size=step) # let's do our runs in blocks of 500
 # prime the pump
 cat(" -- starting a random walk:\n")
-runs <- lapply(as.list(models[focal_runs,1]),FUN=as.formula)
-  runs <- parLapply(cl=cl, runs, fun=distsamp, data=umf,keyfun="hazard", output="density", unitsOut="kmsq")
-    runs <- unlist(lapply(runs,FUN=function(x){x@AIC}))
 # assign an AIC to beat (below)
-minimum <- models[focal_runs[which(runs == min(runs))[1]],]
-minimum$AIC <- runs[which(runs == min(runs))[1]]
-# trim our total runs
-total_runs <- total_runs[!(total_runs %in% focal_runs)]
+minimum <- data.frame(formula="~doy~1",AIC=m$AIC) # begin with our null (intercept) model
 # iterate over total_runs and try and minimize AIC as you go
 while(length(total_runs)>1){
   # randomly sample total_runs that the cluster will consider for this run
@@ -148,8 +143,10 @@ while(length(total_runs)>1){
       runs <- unlist(lapply(runs,FUN=function(x){x@AIC}))
   # if we beat the running lowest AIC, append it to the random walk table
   if(runs[which(runs == min(runs))[1]] < min(minimum$AIC)){
-    minimum <- models[focal_runs[which(runs == min(runs))[1]],]
-    minimum$AIC <- runs[which(runs == min(runs))[1]]
+    minimum <- rbind( minimum,
+                      data.frame( formula=models[focal_runs[which(runs == min(runs))[1]],],
+                                      AIC=runs[which(runs == min(runs))[1]] )
+                    )
   }
   total_runs <- total_runs[!(total_runs %in% focal_runs)]
   cat(paste("[jobs remaining:",length(total_runs),"]",sep=""));
