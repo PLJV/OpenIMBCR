@@ -4,7 +4,7 @@
 # Author : Kyle Taylor (kyle.taylor@pljv.org) [2017]
 #
 
-rrequire(OpenIMBCR)
+require(OpenIMBCR)
 require(unmarked)
 require(rgdal)
 require(raster)
@@ -128,8 +128,8 @@ step <- 1000
 total_runs <- 1:nrow(models)
 # prime the pump
 cat(" -- starting a random walk:\n")
-# assign an AIC to beat (below)
-minimum <- data.frame(formula="~doy~1",AIC=m$AIC) # begin with our null (intercept) model
+# assign a null model AIC to beat (below)
+minimum <- data.frame(formula="~doy~1",AIC=m@AIC) # begin with our null (intercept) model
 # iterate over total_runs and try and minimize AIC as you go
 while(length(total_runs)>1){
   # randomly sample total_runs that the cluster will consider for this run
@@ -144,7 +144,7 @@ while(length(total_runs)>1){
   # if we beat the running lowest AIC, append it to the random walk table
   if(runs[which(runs == min(runs))[1]] < min(minimum$AIC)){
     minimum <- rbind( minimum,
-                      data.frame( formula=models[focal_runs[which(runs == min(runs))[1]],],
+                      data.frame( formula=models[focal_runs[which(runs == min(runs))[1]],'formula'],
                                       AIC=runs[which(runs == min(runs))[1]] )
                     )
   }
@@ -157,7 +157,7 @@ m_final <- distsamp(as.formula(optimal),umf,keyfun="hazard",output="density",uni
 # finish-up
 cat(" -- cleaning-up and writing to disk\n")
 parallel::stopCluster(cl)
-write.csv(minimum, paste(four_letter_code,"_models_selected.csv", sep=""), rownames=F)
+write.csv(minimum, paste(four_letter_code,"_models_selected.csv", sep=""), row.names=F)
 save.image(gsub(paste(four_letter_code,"_density_estimation_workspace_",paste(strsplit(as.character(date()),split=" ")[[1]][c(2,3,5)],collapse="_"),".rdata",collapse=""),
                 pattern=" ",
                 replacement="")
