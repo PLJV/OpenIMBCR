@@ -126,7 +126,6 @@ for(i in 1:length(n)){
 # parallelize our runs across nCores processors (defined at top)
 step <- 1000
 total_runs <- 1:nrow(models)
-# prime the pump
 cat(" -- starting a random walk:\n")
 # assign a null model AIC to beat (below)
 minimum <- data.frame(formula="~doy~1",AIC=m@AIC) # begin with our null (intercept) model
@@ -144,7 +143,7 @@ while(length(total_runs)>1){
   # if we beat the running lowest AIC, append it to the random walk table
   if(runs[which(runs == min(runs))[1]] < min(minimum$AIC)){
     minimum <- rbind( minimum,
-                      data.frame( formula=models[focal_runs[which(runs == min(runs))[1]],'formula'],
+                      data.frame( formula=models[focal_runs[which(runs == min(runs))[1]],1],
                                       AIC=runs[which(runs == min(runs))[1]] )
                     )
   }
@@ -152,7 +151,7 @@ while(length(total_runs)>1){
   cat(paste("[jobs remaining:",length(total_runs),"]",sep=""));
 }; cat("\n");
 # look over the random walk AICs and model, discuss with friends
-optimal <- minimum$formula[which(minimum$AIC == min(minimum$AIC))[1]]
+optimal <- as.character(minimum$formula[which(minimum$AIC == min(minimum$AIC))[1]])
 m_final <- distsamp(as.formula(optimal),umf,keyfun="hazard",output="density",unitsOut="kmsq")
 # finish-up
 cat(" -- cleaning-up and writing to disk\n")
