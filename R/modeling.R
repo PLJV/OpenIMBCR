@@ -17,12 +17,18 @@ expit <- function(x) 1/(1+exp(-x))
 logit <- function(x) log(x/(1-x))
 #' calculate AIC from a likelihood function optimization procedure
 #' @export
-AIC <- function(m) (m$minimum*2) + (2*length(m$estimate))
+AIC <- function(m){
+  if(as.character(class(m))=="unmarkedFitDS"){
+    return(m@AIC)
+  }
+  # if it isn't an unmarked dataframe, assume we rolled our own optimization with nlm()
+  return((m$minimum*2) + (2*length(m$estimate)))
+}
 #' calculate AICc from a likelihood function optimization procedure
-#'
+#' @export
 AICc <- function(m) AIC(m) + ((2*length(m$estimate)*(length(m$estimate)+1))/(m$size-length(m$estimate)-1))
 #' calculated BIC from a likelihood function optimization procedure
-#'
+#' @export
 BIC <- function(m) (m$minimum*2) + (q*log(m$size))
 #'
 #' calculate SE from a likelihood function optimization procedure
