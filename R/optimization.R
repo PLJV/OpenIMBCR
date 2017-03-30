@@ -1,7 +1,6 @@
-#' stump code that will perform a random walk on an unmarked model object.
-#' Needs to be clean-up and validated.
+#' perform a random walk on an unmarked model object.
 #' @export'
-randomWalkUnmarked <- function(m){
+randomWalk_dAIC <- function(m){
   if(!require(unmarked)){ stop("function requires the unmarked package is installed") }
   # calculate : combinations w/o repetition (n!/(r!(n-r)!)... or 2^n
   m_len <- vector(); for(i in 1:length(n)) { m_len <- append(m_len,dim(combn(n,m=i))[2]) }
@@ -45,4 +44,9 @@ randomWalkUnmarked <- function(m){
     total_runs <- total_runs[!(total_runs %in% focal_runs)]
     cat(paste("[jobs remaining:",length(total_runs),"]",sep=""));
   }; cat("\n");
+}
+#' use a globally-sensitive numerical optimization procedure to select covariates for
+#' inclusion in our model. This should be considerably faster than randomWalk_dAIC()
+simulatedAnnealing_dAIC <- function(m){
+  return(NA)
 }
