@@ -154,8 +154,9 @@ parseStationCountsAsOccupancy <- function(detectionHist,na.rm=F){
   do.call(rbind,detectionHist)
 }
 #' generate plant community composition data from the associated IMBCR metadata
-#'@export
-parseHabitatMetadataByTransect <- function(s){
+#' @param attribute_all boolean flag indicating whether to take transect-wide metadata and attribute to points  
+#' @export
+parseHabitatMetadataByTransect <- function(s, attribute_all=T){
   # fetch our source table of habitat associations
   t <- fetchImbcrToLandfireMetadata()
   # aggregate by IMBCR habitat codes
@@ -191,7 +192,17 @@ parseHabitatMetadataByTransect <- function(s){
                round(sum(habitat[[i]][1,2:ncol(habitat[[i]])])),sep=""))
      }
   }
-  do.call(rbind,habitat)
+  # bind our summary statistics by transect identifier
+  t_habitat_metadata <- do.call(rbind,habitat)
+    n <- gsub(names(t_habitat_metadata),pattern="transect",replacement="transectnum")
+      names(t_habitat_metadata) <- n
+  if(attribute_all){
+    # generalize our summary statistics across all point observations
+    s@data <- merge(s@data,t_habitat_metadata,by="transectnum")
+    return(s)
+  } else {
+    return(t_habitat_metadata)
+  }
 }
 #' extract (and optionally, summarize using the fun= argument) raster data across IMBCR transects
 #' @export
