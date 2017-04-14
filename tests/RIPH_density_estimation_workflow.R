@@ -80,14 +80,20 @@ gc()
 
 # define the model space of all possible combinations of predictors
 models <- data.frame(formula=rep(NA,m_len),AIC=rep(NA,m_len))
-k <- 1
+k <- 1 # row of our models data.frame
 cat(" -- deriving model combinations:\n")
 for(i in 1:length(n)){
  combinations <- combn(n,m=i)
- for(j in 1:ncol(combinations)){
-   models[k,1] <- paste("~doy~",paste(combinations[,j],collapse="+"),collapse="")
-   k <- k+1
- }; cat(".");
+ # build a formula string with lapply comprehension
+ f <- function(j){
+   paste("~doy~",paste(combinations[,j],collapse="+"),collapse="")
+ }
+ # lapply over all combinations of our current n covariates
+ # (avoiding a slow, nested for-loop)
+ models[k:(k+ncol(combinations)-1),1] <-
+   unlist(lapply(1:ncol(combinations),FUN=f))
+ k <- k+ncol(combinations)
+ cat(".");
 }; cat("\n");
 # parallelize our runs across nCores processors (defined at top)
 step <- 1000
@@ -95,7 +101,7 @@ total_runs <- 1:nrow(models)
 focal_runs <- sample(total_runs,replace=F,size=step) # let's do our runs in blocks of 500
 # prime the pump
 runs <- lapply(as.list(models[focal_runs,1]),FUN=as.formula)
-  runs <- parLapply(cl=cl, runs, fun=distsamp, data=umf,keyfun="hazard", output="density", unitsOut="kmsq")
+  runs <- parLapply(cl=cl, runs, fun=unmarked::distsamp, data=umf,keyfun="hazard", output="density", unitsOut="kmsq")
     runs <- unlist(lapply(runs,FUN=function(x){x@AIC}))
 # assign an AIC to beat (below)
 minimum <- models[focal_runs[which(runs == min(runs))[1]],]
