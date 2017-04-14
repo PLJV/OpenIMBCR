@@ -1,23 +1,39 @@
-#' perform a random walk on an unmarked model object.
-#' @export'
-randomWalk_dAIC <- function(m){
-  if(!require(unmarked)){ stop("function requires the unmarked package is installed") }
+#' derive a data.frame of all possible combinations of vars=
+#' @export
+mCombinations <- function(vars=NULL,verbose=T){
+  if(verbose) cat(" -- deriving model combinations:\n")
   # calculate : combinations w/o repetition (n!/(r!(n-r)!)... or 2^n
-  m_len <- vector(); for(i in 1:length(n)) { m_len <- append(m_len,dim(combn(n,m=i))[2]) }
-   m_len <- sum(m_len)
+  m_len <- vector(); for(i in 1:length(vars)) { m_len <- append(m_len,dim(combn(vars,m=i))[2]) }
+    m_len <- sum(m_len)
   # define the model space of all possible combinations of predictors
   models <- data.frame(formula=rep(NA,m_len),AIC=rep(NA,m_len))
-  k <- 1
+  k <- 1 # row of our models data.frame
+  for(i in 1:length(vars)){
+   combinations <- combn(vars,m=i)
+   # build a formula string with lapply comprehension
+   f <- function(j){
+     paste("~doy~",paste(combinations[,j],collapse="+"),collapse="")
+   }
+   # lapply over all combinations of our current n covariates
+   # (avoiding a slow, nested for-loop)
+   models[k:(k+ncol(combinations)-1),1] <-
+     unlist(lapply(1:ncol(combinations),FUN=f))
+   k <- k+ncol(combinations)
+   if(verbose) cat(".");
+  };
+  if(verbose) cat("\n");
+  return(models)
+}
+#' perform a random walk on an unmarked model object.
+#' @export'
+randomWalk_dAIC <- function(vars=NULL, m=NULL, step=1000, nCores=NULL){
+  require(parallel)
+  if(!require(unmarked)){ stop("function requires the unmarked package is installed") }
+  nCores <- ifelse(is.null(nCores), parallel::detectCores()-1, nCores)
+      cl <- parallel::makeCluster(nCores)
   cat(" -- deriving model combinations:")
-  for(i in 1:length(n)){
-   combinations <- combn(n,m=i)
-   for(j in 1:ncol(combinations)){
-     models[k,1] <- paste("~doy~",paste(combinations[,j],collapse="+"),collapse="")
-     k <- k+1
-   }; cat(".");
-  }; cat("\n");
+  models <- mCombinations(vars)
   # parallelize our runs across nCores processors (defined at top)
-  step <- 1000
   total_runs <- 1:nrow(models)
   # prime the pump
   cat(" -- starting a random walk:\n")
@@ -43,7 +59,9 @@ randomWalk_dAIC <- function(m){
     }
     total_runs <- total_runs[!(total_runs %in% focal_runs)]
     cat(paste("[jobs remaining:",length(total_runs),"]",sep=""));
-  }; cat("\n");
+  };
+  cat("\n");
+  return(minimum)
 }
 #' use a globally-sensitive numerical optimization procedure to select covariates for
 #' inclusion in our model. This should be considerably faster than randomWalk_dAIC()
