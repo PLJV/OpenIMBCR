@@ -1,7 +1,6 @@
 #' derive a data.frame of all possible combinations of vars=
-#' @export
 mCombinations <- function(vars=NULL,verbose=T){
-  if(verbose) cat(" -- deriving model combinations:\n")
+  if(verbose) cat(" -- deriving model combinations:")
   # calculate : combinations w/o repetition (n!/(r!(n-r)!)... or 2^n
   m_len <- vector(); for(i in 1:length(vars)) { m_len <- append(m_len,dim(combn(vars,m=i))[2]) }
     m_len <- sum(m_len)
@@ -24,20 +23,21 @@ mCombinations <- function(vars=NULL,verbose=T){
   if(verbose) cat("\n");
   return(models)
 }
-#' perform a random walk on an unmarked model object.
+#' perform a random walk on an unmarked dataframe with a user-specified unmakred funtion
 #' @export'
-randomWalk_dAIC <- function(vars=NULL, m=NULL, step=1000, nCores=NULL){
+randomWalk_dAIC <- function(vars=NULL, step=1000, umdf=NULL,
+                            umFunction=unmarked::distsamp, nCores=NULL){
   require(parallel)
   if(!require(unmarked)){ stop("function requires the unmarked package is installed") }
   nCores <- ifelse(is.null(nCores), parallel::detectCores()-1, nCores)
       cl <- parallel::makeCluster(nCores)
-  cat(" -- deriving model combinations:")
-  models <- mCombinations(vars)
+  models <- OpenIMBCR:::mCombinations(vars)
   # parallelize our runs across nCores processors (defined at top)
   total_runs <- 1:nrow(models)
   # prime the pump
   cat(" -- starting a random walk:\n")
   # assign a null model AIC to beat (below)
+  m <- distsamp(~doy~1, umdf,keyfun="hazard",output="density",unitsOut="kmsq") # use AIC to determine an optimal detection function
   minimum <- data.frame(formula="~doy~1",AIC=m@AIC) # begin with our null (intercept) model
   # iterate over total_runs and try and minimize AIC as you go
   while(length(total_runs)>1){
@@ -48,7 +48,7 @@ randomWalk_dAIC <- function(vars=NULL, m=NULL, step=1000, nCores=NULL){
                          )
     # build models for this run
     runs <- lapply(as.list(models[focal_runs,1]),FUN=as.formula)
-      runs <- parLapply(cl=cl, runs, fun=distsamp, data=umf,keyfun="hazard", output="density", unitsOut="kmsq")
+      runs <- parLapply(cl=cl, runs, fun=umFunction, data=umdf,keyfun="hazard", output="density", unitsOut="kmsq") # this should change based on user-specified function
         runs <- unlist(lapply(runs,FUN=function(x){x@AIC}))
     # if we beat the running lowest AIC, append it to the random walk table
     if(runs[which(runs == min(runs))[1]] < min(minimum$AIC)){
@@ -61,6 +61,7 @@ randomWalk_dAIC <- function(vars=NULL, m=NULL, step=1000, nCores=NULL){
     cat(paste("[jobs remaining:",length(total_runs),"]",sep=""));
   };
   cat("\n");
+  parallel::stopCluster(cl)
   return(minimum)
 }
 #' use a globally-sensitive numerical optimization procedure to select covariates for
