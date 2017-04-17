@@ -26,7 +26,7 @@ mCombinations <- function(vars=NULL,verbose=T){
 #' perform a random walk on an unmarked dataframe with a user-specified unmakred funtion
 #' @export'
 randomWalk_dAIC <- function(vars=NULL, step=1000, umdf=NULL,
-                            umFunction=unmarked::distsamp, nCores=NULL){
+                            umFunction=unmarked::distsamp, nCores=NULL,retAll=FALSE){
   require(parallel)
   if(!require(unmarked)){ stop("function requires the unmarked package is installed") }
   nCores <- ifelse(is.null(nCores), parallel::detectCores()-1, nCores)
@@ -62,7 +62,14 @@ randomWalk_dAIC <- function(vars=NULL, step=1000, umdf=NULL,
   };
   cat("\n");
   parallel::stopCluster(cl)
-  return(minimum)
+  if(retAll){
+    return(
+        data.frame( formula=models[focal_runs,'formula'],
+                    AIC=runs )
+          )
+  } else {
+    return(minimum)
+  }
 }
 #' use a globally-sensitive numerical optimization procedure to select covariates for
 #' inclusion in our model. This should be considerably faster than randomWalk_dAIC()
