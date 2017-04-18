@@ -1,12 +1,12 @@
 #' build a series of response plots for a fitted model and input table
+#' @export
 partialPredict <- function(m=NULL, var=NULL, type='state', plot=T, nCores=NULL,
-                           xlab=NULL, ylab=NULL, main=NULL, xTransform=NULL){
+                           xlab=NULL, ylab=NULL, main=NULL, xlim=NULL,
+                           ylim=NULL, xTransform=NULL){
   require(parallel)
   nCores <- ifelse(is.null(nCores), parallel::detectCores()-1, nCores)
       cl <- parallel::makeCluster(nCores)
   # fetch our site-level covariates from the training data
-  xlab <- ifelse(is.null(xlab), var, xlab)
-  ylab <- ifelse(is.null(ylab), "Density (birds/km2)", ylab)
   t <- m@data@siteCovs
   # run our model for each unique value of x, averaging the predictions across all non-focal variables as we go
   x <- seq((min(t[,var])-sd(t[,var])),(max(t[,var])+sd(t[,var])),length.out=100)
@@ -19,14 +19,19 @@ partialPredict <- function(m=NULL, var=NULL, type='state', plot=T, nCores=NULL,
       y <- colMeans(p)
   }
   y <- do.call(rbind, parLapply(cl, x, fun=partial))
-  colnames(y) <- colnames(p)
   parallel::stopCluster(cl)
   if(!is.null(xTransform)){
     x <- eval(parse(text = xTransform))
   }
+  # define our plot parameters, if asked
   if(plot){
+    xlab <- if (is.null(xlab)) var else xlab
+    ylab <- if (is.null(ylab)) "Density (birds/km2)" else ylab
+    xlim <- if (is.null(xlim)) range(x) else xlim
+    ylim <- if (is.null(ylim)) range(y) else ylim
     dev.new()
-    plot(y=y[,1], x=x, xlab=xlab, ylab=ylab, main=main, col="white")
+    plot(y=y[,1], x=x, xlab=xlab, ylab=ylab, xlim=xlim, ylim=ylim,
+         main=main, col="white")
     grid(lwd=1.4)
     lines(y=y[,1], x=x, col="black")
       lines(y=y[,4], x=x, col="grey")

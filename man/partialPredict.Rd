@@ -5,8 +5,8 @@
 \title{build a series of response plots for a fitted model and input table}
 \usage{
 partialPredict(m = NULL, var = NULL, type = "state", plot = T,
-  nCores = NULL, xlab = NULL, ylab = NULL, main = NULL,
-  xTransform = NULL)
+  nCores = NULL, xlab = NULL, ylab = NULL, main = NULL, xlim = NULL,
+  ylim = NULL, xTransform = NULL)
 }
 \description{
 build a series of response plots for a fitted model and input table
