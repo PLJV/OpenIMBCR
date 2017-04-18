@@ -20,7 +20,7 @@ r <- list.files("/global_workspace/ring_necked_pheasant_imbcr_models/raster",pat
     names(r) <- vars
 
 # parse our dataset for RNEP records as an unmarked data.frame (distance)
-umdf <- buildUnmarkedDistanceDf(r=r,s=s,spp="Ring-necked Pheasant")
+umdf <- OpenIMBCR:::buildUnmarkedDistanceDf(r=r,s=s,spp="Ring-necked Pheasant")
 
 #
 # unmarked distance model fitting (~detection~abundance)
@@ -28,7 +28,7 @@ umdf <- buildUnmarkedDistanceDf(r=r,s=s,spp="Ring-necked Pheasant")
 
 # find a decent null model (accounting for nusance detection parameters, if possible)
 #m <- distsamp(~1~1,umf,keyfun="hazard",output="density",unitsOut="kmsq")
-#m <- distsamp(~doy+starttime~1,umf,keyfun="hazard",output="density",unitsOut="kmsq")
+m <- distsamp(~doy+starttime~1,umdf,keyfun="hazard",output="density",unitsOut="kmsq")
 
 #
 # Define a random walk algorithm that seeks to minimize AIC against a randomized subset of
@@ -39,42 +39,36 @@ umdf <- buildUnmarkedDistanceDf(r=r,s=s,spp="Ring-necked Pheasant")
 
 # define the model space of all possible combinations of predictors
 # parallelize our runs across nCores processors (defined at top)
-minimum <- randomWalk_dAIC(vars=vars, umdf=umdf,
+vars_11x11 <- vars[grepl(vars,pattern="11x11")]
+minimum_11x11 <- OpenIMBCR:::randomWalk_dAIC(vars=vars_11x11, umdf=umdf,
                            umFunction=unmarked::distsamp)
+m_11x11_optimal <-
+  distsamp(as.formula(as.character(minimum_11x11$formula[2])),umdf,keyfun="hazard",output="density",unitsOut="kmsq")
 
-# step <- 1000
-# total_runs <- 1:nrow(models)
-# cat(" -- starting a random walk:\n")
-# # assign a null model AIC to beat (below)
-# minimum <- data.frame(formula="~doy~1",AIC=m@AIC) # begin with our null (intercept) model
-# # iterate over total_runs and try and minimize AIC as you go
-# while(length(total_runs)>1){
-#   # randomly sample total_runs that the cluster will consider for this run
-#   focal_runs <- sample(total_runs,
-#                        replace=F,
-#                        size=ifelse(length(total_runs) > step, step, length(total_runs))
-#                        )
-#   # build models for this run
-#   runs <- lapply(as.list(models[focal_runs,1]),FUN=as.formula)
-#     runs <- parLapply(cl=cl, runs, fun=distsamp, data=umf,keyfun="hazard", output="density", unitsOut="kmsq")
-#       runs <- unlist(lapply(runs,FUN=function(x){x@AIC}))
-#   # if we beat the running lowest AIC, append it to the random walk table
-#   if(runs[which(runs == min(runs))[1]] < min(minimum$AIC)){
-#     minimum <- rbind( minimum,
-#                       data.frame( formula=models[focal_runs[which(runs == min(runs))[1]],1],
-#                                       AIC=runs[which(runs == min(runs))[1]] )
-#                     )
-#   }
-#   total_runs <- total_runs[!(total_runs %in% focal_runs)]
-#   cat(paste("[jobs remaining:",length(total_runs),"]",sep=""));
-# }; cat("\n");
 
+vars_33x33 <- vars[grepl(vars,pattern="33x33")]
+minimum_33x33 <- OpenIMBCR:::randomWalk_dAIC(vars=vars_33x33, umdf=umdf,
+                          umFunction=unmarked::distsamp)
+m_33x33_optimal <-
+  distsamp(as.formula(as.character(minimum_33x33$formula[2])),umdf,keyfun="hazard",output="density",unitsOut="kmsq")
+
+vars_107x107 <- vars[grepl(vars,pattern="107x107")]
+minimum_107x107 <- OpenIMBCR:::randomWalk_dAIC(vars=vars_107x107, umdf=umdf,
+                          umFunction=unmarked::distsamp)
+m_107x10_optimal <-
+  distsamp(as.formula(as.character(minimum_107x107$formula[2])),umdf,keyfun="hazard",output="density",unitsOut="kmsq")
+
+model_11x11_first <-
+distsamp(as.formula("~doy~ crp_11x11+hay_11x11+hay_alfalfa_11x11+pasture_11x11+row_crop_11x11+small_grains_11x11+topographic_roughness_11x11")
+         ,umdf,keyfun="hazard",output="density",unitsOut="kmsq")
+
+model_11x11_second <-
+distsamp(as.formula("~doy~ crp_11x11+hay_11x11+pasture_11x11+row_crop_11x11+small_grains_11x11+topographic_roughness_11x11")
+         ,umdf,keyfun="hazard",output="density",unitsOut="kmsq")
 # look over the random walk AICs and model, discuss with friends
-optimal <- as.character(minimum$formula[which(minimum$AIC == min(minimum$AIC))[1]])
-m_final <- distsamp(as.formula(optimal),umdf,keyfun="hazard",output="density",unitsOut="kmsq")
+# optimal <- as.character(minimum$formula[which(minimum$AIC == min(minimum$AIC))[1]])
+m_final <- distsamp(as.formula("~doy~crp_11x11+row_crop_33x33+topographic_roughness_11x11+small_grains_33x33+hay_alfalfa_33x33+pasture_11x11")
+                    ,umdf,keyfun="hazard",output="density",unitsOut="kmsq")
+# m_final <- distsamp(as.formula(optimal),umdf,keyfun="hazard",output="density",unitsOut="kmsq")
 # finish-up
-write.csv(minimum, "riph_models_selected.csv", rownames=F)
-save.image(gsub(paste("RIPH_density_estimation_workspace_",paste(strsplit(as.character(date()),split=" ")[[1]][c(2,3,5)],collapse="_"),".rdata",collapse=""),
-                pattern=" ",
-                replacement="")
-          )
+#write.csv(minimum, "riph_models_selected.csv", rownames=F)

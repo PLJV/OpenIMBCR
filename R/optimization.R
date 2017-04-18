@@ -23,8 +23,8 @@ mCombinations <- function(vars=NULL,verbose=T){
   if(verbose) cat("\n");
   return(models)
 }
-#' perform a random walk on an unmarked dataframe with a user-specified unmakred funtion
-#' @export'
+#' perform a random walk on an unmarked dataframe with a user-specified unmarked funtion
+#' @export
 randomWalk_dAIC <- function(vars=NULL, step=1000, umdf=NULL,
                             umFunction=unmarked::distsamp, nCores=NULL,retAll=FALSE){
   require(parallel)
@@ -37,16 +37,17 @@ randomWalk_dAIC <- function(vars=NULL, step=1000, umdf=NULL,
   # prime the pump
   cat(" -- starting a random walk:\n")
   # assign a null model AIC to beat (below)
-  m <- distsamp(~doy~1, umdf,keyfun="hazard",output="density",unitsOut="kmsq") # use AIC to determine an optimal detection function
-  minimum <- data.frame(formula="~doy~1",AIC=m@AIC) # begin with our null (intercept) model
+  m <- distsamp(~doy~1, umdf,keyfun="hazard",output="density",unitsOut="kmsq")
+  # begin with our null (intercept) model
+  minimum <- data.frame(formula="~doy~1",AIC=m@AIC)
   # iterate over total_runs and try and minimize AIC as you go
-  while(length(total_runs)>1){
+  while ( length(total_runs) > 1 ){
     # randomly sample total_runs that the cluster will consider for this run
     focal_runs <- sample(total_runs,
                          replace=F,
                          size=ifelse(length(total_runs) > step, step, length(total_runs))
                          )
-    # build models for this run
+    # build models for this run across our cluster
     runs <- lapply(as.list(models[focal_runs,1]),FUN=as.formula)
       runs <- parLapply(cl=cl, runs, fun=umFunction, data=umdf,keyfun="hazard", output="density", unitsOut="kmsq") # this should change based on user-specified function
         runs <- unlist(lapply(runs,FUN=function(x){x@AIC}))
