@@ -1,4 +1,4 @@
-#' build a series of response plots for a fitted model and input table
+#' build a response plot for a given variable using a fitted unmarked model
 #' @export
 partialPredict <- function(m=NULL, var=NULL, type='state', plot=T, nCores=NULL,
                            xlab=NULL, ylab=NULL, main=NULL, xlim=NULL,
@@ -9,7 +9,7 @@ partialPredict <- function(m=NULL, var=NULL, type='state', plot=T, nCores=NULL,
   # fetch our site-level covariates from the training data
   t <- m@data@siteCovs
   # run our model for each unique value of x, averaging the predictions across all non-focal variables as we go
-  x <- seq((min(t[,var])-sd(t[,var])),(max(t[,var])+sd(t[,var])),length.out=100)
+  x <- seq((min(t[,var])-sd(t[,var])),(max(t[,var])+sd(t[,var])),length.out=300)
   y <- matrix(NA, nrow=length(x), ncol=4)
   partial <- function(x){
     require(unmarked)
@@ -19,6 +19,7 @@ partialPredict <- function(m=NULL, var=NULL, type='state', plot=T, nCores=NULL,
       y <- colMeans(p)
   }
   y <- do.call(rbind, parLapply(cl, x, fun=partial))
+    colnames(y) <- c("predicted", "se", "lower", "upper")
   parallel::stopCluster(cl)
   if(!is.null(xTransform)){
     x <- eval(parse(text = xTransform))
