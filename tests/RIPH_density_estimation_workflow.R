@@ -70,8 +70,39 @@ m_107x10_optimal <-
 
 # look over the random walk AICs and model, discuss with friends
 # optimal <- as.character(minimum$formula[which(minimum$AIC == min(minimum$AIC))[1]])
-m_final <- distsamp(as.formula("~doy~crp_11x11+row_crop_33x33+topographic_roughness_11x11+small_grains_33x33+hay_alfalfa_33x33+pasture_11x11")
-                    ,umdf,keyfun="hazard",output="density",unitsOut="kmsq")
+final_vars <- c("crp_years_remaining","row_crop_11x11","small_grains_11x11",
+                "topographic_roughness_11x11","row_crop_33x33","crp_11x11",
+                "crp_33x33","small_grains_33x33","hay_107x107","hay_alfalfa_107x107"
+                )
+
+cat(" -- fitting a first-iteration of our 'final' variable series\n")
+minimum_final <- OpenIMBCR:::randomWalk_dAIC(vars=final_vars, umdf=umdf,
+                          umFunction=unmarked::distsamp, step=50)
+
+final_vars <- as.character(minimum_final$formula)
+  final_vars <- final_vars[length(final_vars)]
+    final_vars <- unlist(strsplit(final_vars,split="[~]"))
+      final_vars <- gsub(unlist(strsplit(final_vars[length(final_vars)], split="[+]")), pattern=" ", replacement="")
+
+m_final <- distsamp(as.formula(as.character(minimum_final$formula[nrow(minimum_final)])),
+                    umdf,keyfun="hazard",output="density",unitsOut="kmsq")
+print(m_final)
+
+cat(" -- intercept test:")
+keep <- as.vector(bartuszevige_intercept_test(m_final))
+  keep <- keep[2:length(keep)] # lose the intercept
+    final_vars <- final_vars[keep]
+
+cat(final_vars,"\n")
+cat(" -- fitting a final model\n")
+
+minimum_final <- OpenIMBCR:::randomWalk_dAIC(vars=final_vars, umdf=umdf,
+                          umFunction=unmarked::distsamp, step=50)
+
+# re-fit by dropping any lurking variables that failed the intercept test
+m_final <- distsamp(as.formula(as.character(minimum_final$formula[nrow(minimum_final)])),
+                    umdf,keyfun="hazard",output="density",unitsOut="kmsq")
+
 # m_final <- distsamp(as.formula(optimal),umdf,keyfun="hazard",output="density",unitsOut="kmsq")
 # finish-up
 #write.csv(minimum, "riph_models_selected.csv", rownames=F)

@@ -73,7 +73,36 @@ randomWalk_dAIC <- function(vars=NULL, step=1000, umdf=NULL,
   }
 }
 #' use a globally-sensitive numerical optimization procedure to select covariates for
-#' inclusion in our model. This should be considerably faster than randomWalk_dAIC()
+#' inclusion in our model. This should be considerably faster for walking large variable
+#' space than randomWalk_dAIC()
 simulatedAnnealing_dAIC <- function(m){
   return(NA)
+}
+#' Frequentist slope intercept test first described by Bartuszevige. Does the
+#' confidence interval of a given variable cross the intercept (i.e., x_n=0)?
+#' returns pass/fail by default.
+#' @param alpha alpha value for our test (default is 0.975)
+#' @export
+bartuszevige_intercept_test <- function(m=NULL, var=NULL, alpha=0.975){
+  se <- OpenIMBCR::SE(m@opt)
+    se <- se[1:max(which(grepl(rownames(m@opt$hessian),pattern="ntercept")))-1] # state covs
+      se <- se * qnorm(alpha)
+        se <- if(!is.null(var)) se[var] else se
+  if(is.null(var)){
+    crosses_zero <-
+      matrix(
+        c(
+          m@estimates@estimates$state@estimates + se,
+          m@estimates@estimates$state@estimates - se
+        ),
+        ncol=2)
+    crosses_zero <- apply(crosses_zero,MARGIN=1,FUN=prod) < 0
+      names(crosses_zero) <- rownames(m@opt$hessian)[1:max(which(grepl(rownames(m@opt$hessian),pattern="ntercept")))-1]
+  } else {
+    crosses_zero <-
+    prod(range(m@estimates@estimates$state@estimates[var] + se,
+         m@estimates@estimates$state@estimates[var] - se)
+        ) < 0
+  }
+  return(!crosses_zero)
 }
