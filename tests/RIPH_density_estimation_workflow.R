@@ -40,31 +40,34 @@ m <- distsamp(~doy+starttime~1,umdf,keyfun="hazard",output="density",unitsOut="k
 # define the model space of all possible combinations of predictors
 # parallelize our runs across nCores processors (defined at top)
 vars_11x11 <- vars[grepl(vars,pattern="11x11")]
+  vars_11x11 <- append(vars_11x11,"crp_years_remaining") # let's test crp time-series here
+
 minimum_11x11 <- OpenIMBCR:::randomWalk_dAIC(vars=vars_11x11, umdf=umdf,
-                           umFunction=unmarked::distsamp)
+                           umFunction=unmarked::distsamp, step=10)
 m_11x11_optimal <-
-  distsamp(as.formula(as.character(minimum_11x11$formula[2])),umdf,keyfun="hazard",output="density",unitsOut="kmsq")
+  distsamp(as.formula(as.character(minimum_11x11$formula[nrow(minimum_11x11)])),umdf,keyfun="hazard",output="density",unitsOut="kmsq")
 
 
 vars_33x33 <- vars[grepl(vars,pattern="33x33")]
 minimum_33x33 <- OpenIMBCR:::randomWalk_dAIC(vars=vars_33x33, umdf=umdf,
-                          umFunction=unmarked::distsamp)
+                          umFunction=unmarked::distsamp, step=10)
 m_33x33_optimal <-
-  distsamp(as.formula(as.character(minimum_33x33$formula[2])),umdf,keyfun="hazard",output="density",unitsOut="kmsq")
+  distsamp(as.formula(as.character(minimum_33x33$formula[nrow(minimum_33x33)])),umdf,keyfun="hazard",output="density",unitsOut="kmsq")
 
 vars_107x107 <- vars[grepl(vars,pattern="107x107")]
 minimum_107x107 <- OpenIMBCR:::randomWalk_dAIC(vars=vars_107x107, umdf=umdf,
-                          umFunction=unmarked::distsamp)
+                          umFunction=unmarked::distsamp, step=10)
 m_107x10_optimal <-
-  distsamp(as.formula(as.character(minimum_107x107$formula[2])),umdf,keyfun="hazard",output="density",unitsOut="kmsq")
+  distsamp(as.formula(as.character(minimum_107x107$formula[nrow(minimum_107x107)])),umdf,keyfun="hazard",output="density",unitsOut="kmsq")
 
-model_11x11_first <-
-distsamp(as.formula("~doy~ crp_11x11+hay_11x11+hay_alfalfa_11x11+pasture_11x11+row_crop_11x11+small_grains_11x11+topographic_roughness_11x11")
-         ,umdf,keyfun="hazard",output="density",unitsOut="kmsq")
+# model_11x11_first <-
+# distsamp(as.formula("~doy~ crp_11x11+hay_11x11+hay_alfalfa_11x11+pasture_11x11+row_crop_11x11+small_grains_11x11+topographic_roughness_11x11")
+#          ,umdf,keyfun="hazard",output="density",unitsOut="kmsq")
+#
+# model_11x11_second <-
+# distsamp(as.formula("~doy~ crp_11x11+hay_11x11+pasture_11x11+row_crop_11x11+small_grains_11x11+topographic_roughness_11x11")
+#          ,umdf,keyfun="hazard",output="density",unitsOut="kmsq")
 
-model_11x11_second <-
-distsamp(as.formula("~doy~ crp_11x11+hay_11x11+pasture_11x11+row_crop_11x11+small_grains_11x11+topographic_roughness_11x11")
-         ,umdf,keyfun="hazard",output="density",unitsOut="kmsq")
 # look over the random walk AICs and model, discuss with friends
 # optimal <- as.character(minimum$formula[which(minimum$AIC == min(minimum$AIC))[1]])
 m_final <- distsamp(as.formula("~doy~crp_11x11+row_crop_33x33+topographic_roughness_11x11+small_grains_33x33+hay_alfalfa_33x33+pasture_11x11")

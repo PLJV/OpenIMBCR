@@ -7,7 +7,7 @@ partialPredict <- function(m=NULL, var=NULL, type='state', plot=T, nCores=NULL,
   nCores <- ifelse(is.null(nCores), parallel::detectCores()-1, nCores)
       cl <- parallel::makeCluster(nCores)
   # fetch our site-level covariates from the training data
-  t <- m@data@siteCovs
+  t <- na.omit(m@data@siteCovs)
   # run our model for each unique value of x, averaging the predictions across all non-focal variables as we go
   x <- seq((min(t[,var])-sd(t[,var])),(max(t[,var])+sd(t[,var])),length.out=300)
   y <- matrix(NA, nrow=length(x), ncol=4)
