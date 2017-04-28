@@ -12,6 +12,7 @@ require(unmarked)
 require(rgdal)
 require(raster)
 
+
 formulaToCovariates <- function(formula){
   vars <- as.character(formula)
   vars <- vars[length(vars)]
@@ -22,6 +23,11 @@ formulaToCovariates <- function(formula){
 
 # read-in our IMBCR source data
 s <- imbcrTableToShapefile(recursiveFindFile(name="RawData_PLJV_IMBCR_20161201.csv", root="/home/ktaylora/Incoming"))
+# append spatial covariates to our data.frame
+long_lat <- data.frame(spTransform(s,CRS(projection("+init=epsg:4326")))@coords)
+  names(long_lat) <- c("lon","lat")
+    s@data <- cbind(s@data,long_lat)
+
 # determine our state covariates
 vars <- list.files("/global_workspace/ring_necked_pheasant_imbcr_models/raster",pattern="tif$",full.name=F)
   vars <- gsub(vars,pattern="2016_|.tif",replacement="")
@@ -31,7 +37,7 @@ r <- list.files("/global_workspace/ring_necked_pheasant_imbcr_models/raster",pat
     names(r) <- vars
 
 # parse our dataset for RNEP records as an unmarked data.frame (distance)
-umdf <- OpenIMBCR:::buildUnmarkedDistanceDf(r=r,s=s,spp="Ring-necked Pheasant")
+umdf <- OpenIMBCR:::buildUnmarkedDistanceDf(r=r,s=s,spp="Ring-necked Pheasant",vars=c("doy","starttime","lon","lat"))
 
 #
 # unmarked distance model fitting (~detection~abundance)
