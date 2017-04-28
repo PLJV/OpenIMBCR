@@ -1,6 +1,9 @@
 #
 # Workflow for Density (birds/km2) estimation for Ring-necked Pheasant using 2016 IMBCR data
 #
+# We are going to take a really large variable pool and slowly step-down variable selection
+# using AIC to select variables for inclusion in a final model.
+#
 # Author : Kyle Taylor (kyle.taylor@pljv.org) [2017]
 #
 
@@ -8,6 +11,14 @@ require(OpenIMBCR)
 require(unmarked)
 require(rgdal)
 require(raster)
+
+formulaToCovariates <- function(formula){
+  vars <- as.character(formula)
+  vars <- vars[length(vars)]
+  vars <- unlist(strsplit(vars,split="[~]"))
+  vars <- gsub(unlist(strsplit(vars[length(vars)], split="[+]")), pattern=" ", replacement="")
+  return(vars)
+}
 
 # read-in our IMBCR source data
 s <- imbcrTableToShapefile(recursiveFindFile(name="RawData_PLJV_IMBCR_20161201.csv", root="/home/ktaylora/Incoming"))
@@ -40,7 +51,7 @@ m <- distsamp(~doy+starttime~1,umdf,keyfun="hazard",output="density",unitsOut="k
 # define the model space of all possible combinations of predictors
 # parallelize our runs across nCores processors (defined at top)
 vars_11x11 <- vars[grepl(vars,pattern="11x11")]
-  vars_11x11 <- append(vars_11x11,"crp_years_remaining") # let's test crp time-series here
+  vars_11x11 <- append(vars_11x11,"crp_age") # let's test crp time-series here
 
 minimum_11x11 <- OpenIMBCR:::randomWalk_dAIC(vars=vars_11x11, umdf=umdf,
                            umFunction=unmarked::distsamp, step=10)
@@ -57,7 +68,7 @@ m_33x33_optimal <-
 vars_107x107 <- vars[grepl(vars,pattern="107x107")]
 minimum_107x107 <- OpenIMBCR:::randomWalk_dAIC(vars=vars_107x107, umdf=umdf,
                           umFunction=unmarked::distsamp, step=10)
-m_107x10_optimal <-
+m_107x107_optimal <-
   distsamp(as.formula(as.character(minimum_107x107$formula[nrow(minimum_107x107)])),umdf,keyfun="hazard",output="density",unitsOut="kmsq")
 
 # model_11x11_first <-
@@ -70,7 +81,7 @@ m_107x10_optimal <-
 
 # look over the random walk AICs and model, discuss with friends
 # optimal <- as.character(minimum$formula[which(minimum$AIC == min(minimum$AIC))[1]])
-final_vars <- c("crp_years_remaining","row_crop_11x11","small_grains_11x11",
+final_vars <- c("crp_age","row_crop_11x11","small_grains_11x11",
                 "topographic_roughness_11x11","row_crop_33x33","crp_11x11",
                 "crp_33x33","small_grains_33x33","hay_107x107","hay_alfalfa_107x107"
                 )
@@ -79,17 +90,24 @@ cat(" -- fitting a first-iteration of our 'final' variable series\n")
 minimum_final <- OpenIMBCR:::randomWalk_dAIC(vars=final_vars, umdf=umdf,
                           umFunction=unmarked::distsamp, step=50)
 
-final_vars <- as.character(minimum_final$formula)
-  final_vars <- final_vars[length(final_vars)]
-    final_vars <- unlist(strsplit(final_vars,split="[~]"))
-      final_vars <- gsub(unlist(strsplit(final_vars[length(final_vars)], split="[+]")), pattern=" ", replacement="")
+final_vars <- formulaToCovariates(minimum_final$formula)
+
+# keep our crp covariates in
+if (sum(grepl(final_vars,pattern="crp")) == 0){
+  warning("we need at least one CRP covariate; manually adding")
+  minimum_final[,1] <- as.character(minimum_final[,1])
+  minimum_final[nrow(minimum_final), 1] <-
+    paste(as.character(minimum_final$formula[nrow(minimum_final)]),
+                                  "+crp_age",sep="")
+  final_vars <- formulaToCovariates(minimum_final$formula)
+}
 
 m_final <- distsamp(as.formula(as.character(minimum_final$formula[nrow(minimum_final)])),
                     umdf,keyfun="hazard",output="density",unitsOut="kmsq")
 print(m_final)
 
 cat(" -- intercept test:")
-keep <- as.vector(bartuszevige_intercept_test(m_final))
+keep <- as.vector(OpenIMBCR:::bartuszevige_intercept_test(m_final))
   keep <- keep[2:length(keep)] # lose the intercept
     final_vars <- final_vars[keep]
 
@@ -97,12 +115,12 @@ cat(final_vars,"\n")
 cat(" -- fitting a final model\n")
 
 minimum_final <- OpenIMBCR:::randomWalk_dAIC(vars=final_vars, umdf=umdf,
-                          umFunction=unmarked::distsamp, step=50)
+                          umFunction=unmarked::distsamp, step=5)
 
 # re-fit by dropping any lurking variables that failed the intercept test
 m_final <- distsamp(as.formula(as.character(minimum_final$formula[nrow(minimum_final)])),
                     umdf,keyfun="hazard",output="density",unitsOut="kmsq")
 
-# m_final <- distsamp(as.formula(optimal),umdf,keyfun="hazard",output="density",unitsOut="kmsq")
 # finish-up
-#write.csv(minimum, "riph_models_selected.csv", rownames=F)
+write.csv(minimum_final, "riph_models_selected.csv", row.names=F)
+save.image(paste("riph_final_model_",paste(unlist(strsplit(date()," "))[c(2,3,5)],collapse="_"),".rdata",sep=""))
