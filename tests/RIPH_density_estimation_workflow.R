@@ -98,9 +98,9 @@ minimum_final <- OpenIMBCR:::randomWalk_dAIC(vars=final_vars, umdf=umdf,
 
 final_vars <- formulaToCovariates(minimum_final$formula)
 
-# keep our crp covariates in
-if (sum(grepl(final_vars,pattern="crp")) == 0){
-  warning("we need at least one CRP covariate; manually adding")
+# keep our crp covariates in for our last round of testing
+if (sum(grepl(final_vars,pattern="crp_age")) == 0){
+  warning("we need our CRP covariate; manually adding for our last round of variable selection")
   minimum_final[,1] <- as.character(minimum_final[,1])
   minimum_final[nrow(minimum_final), 1] <-
     paste(as.character(minimum_final$formula[nrow(minimum_final)]),
@@ -127,6 +127,16 @@ minimum_final <- OpenIMBCR:::randomWalk_dAIC(vars=final_vars, umdf=umdf,
 m_final <- distsamp(as.formula(as.character(minimum_final$formula[nrow(minimum_final)])),
                     umdf,keyfun="hazard",output="density",unitsOut="kmsq")
 
+# tag some non-linear spatial covariates onto our model for mapping purposes
+# this will be overfit and this model won't be used for gleaning information about
+# habitat relationships, that's m_final's job. The spatial model's purpose is just
+# to "show where birds are at in 2016" with as little error as possible.
+spatial_model <- as.character(minimum_final[nrow(minimum_final), 1])
+  spatial_model <- paste(spatial_model,"+poly(lon,3)+poly(lat,3)",sep="")
+
+m_final_for_mapping <-
+  distsamp(as.formula(spatial_model),
+           umdf,keyfun="hazard",output="density",unitsOut="kmsq")
 # finish-up
 write.csv(minimum_final, "riph_models_selected.csv", row.names=F)
 save.image(paste("riph_final_model_",paste(unlist(strsplit(date()," "))[c(2,3,5)],collapse="_"),".rdata",sep=""))
