@@ -27,8 +27,10 @@ s <- imbcrTableToShapefile(recursiveFindFile(name="RawData_PLJV_IMBCR_20161201.c
 long_lat <- data.frame(spTransform(s,CRS(projection("+init=epsg:4326")))@coords)
   names(long_lat) <- c("lon","lat")
 
-lon <- poly(long_lat$lon, 3); colnames(lon) <- c("lon_1","lon_2","lon_3")
-lat <- poly(long_lat$lat, 3); colnames(lat) <- c("lat_1","lat_2","lat_3")
+lon <- poly(long_lat$lon, 3);
+  colnames(lon) <- c("lon_1","lon_2","lon_3")
+lat <- poly(long_lat$lat, 3);
+  colnames(lat) <- c("lat_1","lat_2","lat_3")
 
 s@data <- cbind(s@data, lon, lat)
 

@@ -2,12 +2,12 @@
 % Please edit documentation in R/reporting.R
 \name{partialPredict}
 \alias{partialPredict}
-\title{build a series of response plots for a fitted model and input table}
+\title{build a response plot for a given variable using a fitted unmarked model}
 \usage{
 partialPredict(m = NULL, var = NULL, type = "state", plot = T,
   nCores = NULL, xlab = NULL, ylab = NULL, main = NULL, xlim = NULL,
   ylim = NULL, xTransform = NULL)
 }
 \description{
-build a series of response plots for a fitted model and input table
+build a response plot for a given variable using a fitted unmarked model
 }

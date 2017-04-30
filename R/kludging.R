@@ -249,15 +249,22 @@ validateTransectMetadata <- function(s){
 #' and returns a formatted unmarked distance data.frame that can be used for
 #' model fitting with unmarked.
 #' @export
-buildUnmarkedDistanceDf <- function(r=NULL, s=NULL, spp=NULL, d=c(0,100,200,300,400,500,600,700,800)){
+buildUnmarkedDistanceDf <- function(r=NULL, s=NULL, spp=NULL,
+                                    vars=c("doy","starttime"), #
+                                    d=c(0,100,200,300,400,500,600,700,800)){
   # do our covariates in r=raster stack occur in our IMBCR data.frame object?
   if(sum(names(r) %in% names(s@data))<raster::nlayers(r)){
     s <- suppressWarnings(raster::extract(r,s,sp=T))
       s$doy <- as.numeric(strftime(as.POSIXct(as.Date(as.character(s$date), "%m/%d/%Y")),format="%j")) # convert date -> doy
         s@data <- s@data[,!grepl(names(s@data),pattern="FID")]
   }
-  # kludging to select the covariates we will aggregate and use at the site level
-  vars <- c(names(r),"doy","starttime") # append our covariates on detection
+  # kludging to select the covariates specified in s= that we will aggregate
+  # and use at the site level
+  if(!is.null(vars)){
+    vars <- append(names(r), vars)
+  } else {
+    vars <- names(r)
+  }
   # parse our dataset for RNEP records
   t <- s[s$common.name == spp,]@data
   # build a distance table

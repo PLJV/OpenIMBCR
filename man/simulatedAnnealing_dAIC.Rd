@@ -3,11 +3,13 @@
 \name{simulatedAnnealing_dAIC}
 \alias{simulatedAnnealing_dAIC}
 \title{use a globally-sensitive numerical optimization procedure to select covariates for
-inclusion in our model. This should be considerably faster than randomWalk_dAIC()}
+inclusion in our model. This should be considerably faster for walking large variable
+space than randomWalk_dAIC()}
 \usage{
 simulatedAnnealing_dAIC(m)
 }
 \description{
 use a globally-sensitive numerical optimization procedure to select covariates for
-inclusion in our model. This should be considerably faster than randomWalk_dAIC()
+inclusion in our model. This should be considerably faster for walking large variable
+space than randomWalk_dAIC()
 }
