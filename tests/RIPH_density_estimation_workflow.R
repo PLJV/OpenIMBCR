@@ -12,7 +12,6 @@ require(unmarked)
 require(rgdal)
 require(raster)
 
-
 formulaToCovariates <- function(formula){
   vars <- as.character(formula)
   vars <- vars[length(vars)]
@@ -23,7 +22,9 @@ formulaToCovariates <- function(formula){
 
 # read-in our IMBCR source data
 s <- imbcrTableToShapefile(recursiveFindFile(name="RawData_PLJV_IMBCR_20161201.csv", root="/home/ktaylora/Incoming"))
-# append spatial covariates to our data.frame
+
+# append the othogonal transforms latitude and longitude as
+# spatial covariates to our data.frame
 long_lat <- data.frame(spTransform(s,CRS(projection("+init=epsg:4326")))@coords)
   names(long_lat) <- c("lon","lat")
 
@@ -44,8 +45,8 @@ r <- list.files("/global_workspace/ring_necked_pheasant_imbcr_models/raster",pat
 
 # parse our dataset for RNEP records as an unmarked data.frame (distance)
 umdf <- OpenIMBCR:::buildUnmarkedDistanceDf(r=r,s=s,spp="Ring-necked Pheasant",
-                                            vars=c("doy","starttime","lon","lon_1","lon_2","lon_3",
-                                                    "lat","lat_1","lat_2","lat_3"))
+                                            vars=c("doy","starttime","lon_1","lon_2","lon_3",
+                                                    "lat_1","lat_2","lat_3"))
 
 #
 # unmarked distance model fitting (~detection~abundance)
@@ -56,14 +57,9 @@ umdf <- OpenIMBCR:::buildUnmarkedDistanceDf(r=r,s=s,spp="Ring-necked Pheasant",
 m <- distsamp(~doy+starttime~1,umdf,keyfun="hazard",output="density",unitsOut="kmsq")
 
 #
-# Define a random walk algorithm that seeks to minimize AIC against a randomized subset of
-# predictors, recording along a gradient as it goes. Don't just try to select covariates
-# based on minimum AIC. Actually consider the biological significance of covariates across
-# the full walk of models.
+# break-out our covariates into their various scales -- random walk each scale
 #
 
-# define the model space of all possible combinations of predictors
-# parallelize our runs across nCores processors (defined at top)
 vars_11x11 <- vars[grepl(vars,pattern="11x11")]
   vars_11x11 <- append(vars_11x11,"crp_age") # let's test crp time-series here
 
@@ -85,16 +81,14 @@ minimum_107x107 <- OpenIMBCR:::randomWalk_dAIC(vars=vars_107x107, umdf=umdf,
 m_107x107_optimal <-
   distsamp(as.formula(as.character(minimum_107x107$formula[nrow(minimum_107x107)])),umdf,keyfun="hazard",output="density",unitsOut="kmsq")
 
-# model_11x11_first <-
-# distsamp(as.formula("~doy~ crp_11x11+hay_11x11+hay_alfalfa_11x11+pasture_11x11+row_crop_11x11+small_grains_11x11+topographic_roughness_11x11")
-#          ,umdf,keyfun="hazard",output="density",unitsOut="kmsq")
-#
-# model_11x11_second <-
-# distsamp(as.formula("~doy~ crp_11x11+hay_11x11+pasture_11x11+row_crop_11x11+small_grains_11x11+topographic_roughness_11x11")
-#          ,umdf,keyfun="hazard",output="density",unitsOut="kmsq")
-
 # look over the random walk AICs and model, discuss with friends
-# optimal <- as.character(minimum$formula[which(minimum$AIC == min(minimum$AIC))[1]])
+# we are going to define a set of candidate variables below that best capture
+# habitat selection across our 1-km2 transects. We are going to use the same
+# stepwise AIC procedure used above to pair down our variables to something parsimonious.
+# We will build two models. One for inference about habitat, and another spatial models
+# that contains polynomial terms that capture some of the residual error
+# of our habtitat-only model that we will use for mapping
+
 final_vars <- c("crp_age","row_crop_11x11","small_grains_11x11",
                 "topographic_roughness_11x11","row_crop_33x33","crp_11x11",
                 "crp_33x33","small_grains_33x33","hay_107x107","hay_alfalfa_107x107"
@@ -140,7 +134,10 @@ m_final <- distsamp(as.formula(as.character(minimum_final$formula[nrow(minimum_f
 # habitat relationships, that's m_final's job. The spatial model's purpose is just
 # to "show where birds are at in 2016" with as little error as possible.
 spatial_model <- as.character(minimum_final[nrow(minimum_final), 1])
-  spatial_model <- paste(spatial_model,"+lon+lat",sep="")
+  spatial_model <- paste(spatial_model,
+                         "+lon_1+lon_2+lon_3",
+                         "+lat_1+lat_2+lat_3",
+                         sep="")
 
 m_final_for_mapping <-
   distsamp(as.formula(spatial_model),

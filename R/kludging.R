@@ -245,12 +245,13 @@ extractByTransect <- function(s=NULL,r=NULL,fun=NULL){
 validateTransectMetadata <- function(s){
   focal <- s[s$transectnum == transect_habitat_covs$transect[1],][!duplicated(s[s$transectnum == transect_habitat_covs$transect[1],]$point),]
 }
-#' accepts a named raster stack, an IMBCR SpatialPointsDataFrame, and a species named
-#' and returns a formatted unmarked distance data.frame that can be used for
-#' model fitting with unmarked.
+#' accepts a named raster stack of covariates, an IMBCR SpatialPointsDataFrame,
+#' and a species common name and returns a formatted unmarked distance data.frame
+#' that can be used for model fitting with unmarked.
 #' @export
 buildUnmarkedDistanceDf <- function(r=NULL, s=NULL, spp=NULL,
                                     vars=c("doy","starttime"), #
+                                    fun=mean,
                                     d=c(0,100,200,300,400,500,600,700,800)){
   # do our covariates in r=raster stack occur in our IMBCR data.frame object?
   if(sum(names(r) %in% names(s@data))<raster::nlayers(r)){
@@ -259,7 +260,7 @@ buildUnmarkedDistanceDf <- function(r=NULL, s=NULL, spp=NULL,
         s@data <- s@data[,!grepl(names(s@data),pattern="FID")]
   }
   # kludging to select the covariates specified in s= that we will aggregate
-  # and use at the site level
+  # and use at the transect level
   if(!is.null(vars)){
     vars <- append(names(r), vars)
   } else {
@@ -275,7 +276,7 @@ buildUnmarkedDistanceDf <- function(r=NULL, s=NULL, spp=NULL,
     rownames(stateCovariates) <- levels(t$transectnum)
   # aggregate by field
   for(i in 1:length(vars)){
-    stateCovariates[,i] <- aggregate(s@data[,vars[i]], by=list(Category=s@data$transectnum), FUN=mean, na.rm=T)[,2]
+    stateCovariates[,i] <- aggregate(s@data[,vars[i]], by=list(Category=s@data$transectnum), FUN=fun, na.rm=T)[,2]
   }
   # specify covariate names
   colnames(stateCovariates) <- vars
