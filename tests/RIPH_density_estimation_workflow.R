@@ -26,7 +26,11 @@ s <- imbcrTableToShapefile(recursiveFindFile(name="RawData_PLJV_IMBCR_20161201.c
 # append spatial covariates to our data.frame
 long_lat <- data.frame(spTransform(s,CRS(projection("+init=epsg:4326")))@coords)
   names(long_lat) <- c("lon","lat")
-    s@data <- cbind(s@data,long_lat)
+
+lon <- poly(long_lat$lon, 3); colnames(lon) <- c("lon_1","lon_2","lon_3")
+lat <- poly(long_lat$lat, 3); colnames(lat) <- c("lat_1","lat_2","lat_3")
+
+s@data <- cbind(s@data, lon, lat)
 
 # determine our state covariates
 vars <- list.files("/global_workspace/ring_necked_pheasant_imbcr_models/raster",pattern="tif$",full.name=F)
@@ -37,7 +41,9 @@ r <- list.files("/global_workspace/ring_necked_pheasant_imbcr_models/raster",pat
     names(r) <- vars
 
 # parse our dataset for RNEP records as an unmarked data.frame (distance)
-umdf <- OpenIMBCR:::buildUnmarkedDistanceDf(r=r,s=s,spp="Ring-necked Pheasant",vars=c("doy","starttime","lon","lat"))
+umdf <- OpenIMBCR:::buildUnmarkedDistanceDf(r=r,s=s,spp="Ring-necked Pheasant",
+                                            vars=c("doy","starttime","lon","lon_1","lon_2","lon_3",
+                                                    "lat","lat_1","lat_2","lat_3"))
 
 #
 # unmarked distance model fitting (~detection~abundance)
@@ -132,7 +138,7 @@ m_final <- distsamp(as.formula(as.character(minimum_final$formula[nrow(minimum_f
 # habitat relationships, that's m_final's job. The spatial model's purpose is just
 # to "show where birds are at in 2016" with as little error as possible.
 spatial_model <- as.character(minimum_final[nrow(minimum_final), 1])
-  spatial_model <- paste(spatial_model,"+poly(lon,3)+poly(lat,3)",sep="")
+  spatial_model <- paste(spatial_model,"+lon+lat",sep="")
 
 m_final_for_mapping <-
   distsamp(as.formula(spatial_model),
