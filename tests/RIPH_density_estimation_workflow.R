@@ -142,6 +142,66 @@ spatial_model <- as.character(minimum_final[nrow(minimum_final), 1])
 m_final_for_mapping <-
   distsamp(as.formula(spatial_model),
            umdf,keyfun="hazard",output="density",unitsOut="kmsq")
+
+# last hack-in of covariates that are taken from the national pheasant plan model
+final_vars_ammended <- append(final_vars,"crp_11x11")
+minimum_final_ammended <- as.formula(paste("~doy~",paste(final_vars_ammended,collapse="+")))
+
+m_final_ammended <- unmarked::distsamp(minimum_final_ammended,
+                    umdf,keyfun="hazard",output="density",unitsOut="kmsq")
+
+# make some variable response plots
+OpenIMBCR::partialPredict(m_final_ammended,
+                          nCores=6,
+                          var="crp_11x11",
+                          xlim=c(5,21),
+                          ylim=c(0,20),
+                          xlab="Total Area of CRP (@26 [acres])",
+                          xTransform="(x*(30^2))*0.000247105" # meters2 -> acres
+                          )
+
+OpenIMBCR::partialPredict(m_final,
+                          nCores=6,
+                          var="hay_107x107",
+                          ylim=c(0,20),
+                          xlab="Total Area of Hay (Non-Alfalfa) (@2,546 [acres])",
+                          xTransform="(x*(30^2))*0.000247105" # meters2 -> acres
+                          )
+
+OpenIMBCR::partialPredict(m_final,
+                          nCores=6,
+                          var="small_grains_11x11",
+                          xlim=c(5,21),
+                          ylim=c(0,20),
+                          xlab="Total Area of Small Grains (@26 [acres])",
+                          xTransform="(x*(30^2))*0.000247105" # meters2 -> acres
+                          )
+
+OpenIMBCR::partialPredict(m_final,
+                          nCores=6,
+                          var="crp_age",
+                          xlim=c(0,15),
+                          xlab="Age of CRP Field [years]",
+                          )
+
+OpenIMBCR::partialPredict(m_final,
+                          nCores=6,
+                          var="playas_33x33",
+                          xlim=c(0,210),
+                          ylim=c(0,100),
+                          xlab="Total Area of Playa Wetlands (@242 [acres])",
+                          xTransform="(x*(30^2))*0.000247105" # meters2 -> acres
+                          )
+
+OpenIMBCR::partialPredict(m_final,
+                          nCores=6,
+                          var="row_crop_33x33",
+                          xlim=c(0,210),
+                          xlab="Total Area of Row Crop Production (@242 [acres])",
+                          xTransform="(x*(30^2))*0.000247105" # meters2 -> acres
+                          )
+
+
 # finish-up
 write.csv(minimum_final, "riph_models_selected.csv", row.names=F)
 save.image(paste("riph_final_model_",paste(unlist(strsplit(date()," "))[c(2,3,5)],collapse="_"),".rdata",sep=""))
