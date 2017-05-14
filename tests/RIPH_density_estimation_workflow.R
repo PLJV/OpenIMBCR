@@ -170,10 +170,10 @@ OpenIMBCR::partialPredict(m_final,
 
 OpenIMBCR::partialPredict(m_final,
                           nCores=6,
-                          var="small_grains_11x11",
-                          xlim=c(5,21),
-                          ylim=c(0,20),
-                          xlab="Total Area of Small Grains (@26 [acres])",
+                          var="small_grains_33x33",
+                          ylim=c(0,75),
+                          xlim=c(0,110),
+                          xlab="Total Area of Small Grains (@242 [acres])",
                           xTransform="(x*(30^2))*0.000247105" # meters2 -> acres
                           )
 
