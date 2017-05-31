@@ -54,7 +54,7 @@ imbcrTableToShapefile <- function(filename=NULL,outfile=NULL,write=F){
     }
 
     s <- lapply(s,FUN=sp::spTransform,sp::CRS(raster::projection(s[[1]])))
-      s <- do.call(rbind,s)
+      s <- do.call(sp::rbind.SpatialPointsDataFrame,s)
         s$FID <- 1:nrow(s)
     # write to disk -- and allow some wiggle-room on filename conventions
     if(write){
