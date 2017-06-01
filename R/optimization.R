@@ -1,4 +1,37 @@
-#' derive a data.frame of all possible combinations of vars=
+#' downsample records in a continuous 'distances' distribution using a
+#' truncated normal function. Distances can be literal, or the output of
+#' a Mahalanobis or Euclidean distance function (see: the 'FNN' package).
+#' @param constrain_variance multiplier applied to the sd of the distances
+#' vector. Multipliers from 1 -> 0 will increase the shoulder character of
+#' our output.
+#' @export
+post_strat_truncated_normal <- function(distances=NULL, bins=11,
+                                        constrain_variance=1){
+  counts <- hist(distances,breaks=bins,plot=F)$counts
+  breaks <- hist(distances,breaks=bins,plot=F)$breaks
+
+  probs <- sapply(breaks, FUN=function(x){
+      dnorm(x=x,mean=breaks[1],sd=sd(distances)*constrain_variance)
+  })
+  # min/max normalize our probabilities to sampling densities --
+  # ignore warnings about size of counts. The last count is often
+  # junk (0).
+  strata_densities <- suppressWarnings(ceiling(
+    round(probs-min(probs),20)/diff(range(probs))*counts ))
+
+  # iterate over our breaks, downsampling accordingly
+  keep <- vector()
+  for(i in 1:(length(breaks)-1)){
+    keep <- append(keep,
+      which(distances %in%
+        sample(distances[distances < breaks[i+1] & distances >= breaks[i]] ,
+          size=strata_densities[i])
+      )
+    )
+  }
+  return(distances[unique(keep)])
+}
+#' hidden function to derive a data.frame of all possible combinations of vars=
 mCombinations <- function(vars=NULL,verbose=T){
   if(verbose) cat(" -- deriving model combinations:")
   # calculate : combinations w/o repetition (n!/(r!(n-r)!)... or 2^n
