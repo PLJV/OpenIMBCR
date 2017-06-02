@@ -7,6 +7,7 @@
 #' @export
 gauss_post_stratification <- function(distances=NULL, bins=11,
                                       shape=1,
+                                      byid=F,
                                       use_median=F){
   counts <- hist(distances,breaks=bins,plot=F)$counts
   breaks <- hist(distances,breaks=bins,plot=F)$breaks
@@ -28,7 +29,7 @@ gauss_post_stratification <- function(distances=NULL, bins=11,
         sd=sd(distances)*constrain_variance
       )
   })
-  
+
   # min/max normalize our probabilities to sampling densities --
   # ignore warnings about size of counts. The last count is often
   # junk (0).
@@ -45,7 +46,12 @@ gauss_post_stratification <- function(distances=NULL, bins=11,
       )[1:strata_densities[i]]
     )
   }
-  return(distances[unique(keep)])
+  if(byid){
+    ret <- unique(keep)
+  } else {
+    ret <- distances[unique(keep)]
+  }
+  return(ret)
 }
 #' hidden function to derive a data.frame of all possible combinations of vars=
 mCombinations <- function(vars=NULL,verbose=T){
