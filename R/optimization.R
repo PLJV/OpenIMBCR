@@ -1,17 +1,31 @@
 #' downsample records in a continuous 'distances' distribution using a
-#' truncated normal function. Distances can be literal, or the output of
+#' normal function (can be truncated). Distances can be literal, or the output of
 #' a Mahalanobis or Euclidean distance function (see: the 'FNN' package).
 #' @param constrain_variance multiplier applied to the sd of the distances
 #' vector. Multipliers from 1 -> 0 will increase the shoulder character of
 #' our output.
 #' @export
-post_strat_truncated_normal <- function(distances=NULL, bins=11,
-                                        constrain_variance=1){
+gauss_post_stratification <- function(distances=NULL, bins=11,
+                                        constrain_variance=1,
+                                        use_median=F){
   counts <- hist(distances,breaks=bins,plot=F)$counts
   breaks <- hist(distances,breaks=bins,plot=F)$breaks
+  # should we calculate the CT or assume a shoulder
+  if(use_median){
+    central_tendency <- hist(distances,
+        breaks=10,plot=F)$density
+    central_tendency <- which(central_tendency ==
+         max(central_tendency)
+       )
+  # by default, assume the shoulder is the central tendency
+  } else {
+    central_tendency <- 1
+  }
 
   probs <- sapply(breaks, FUN=function(x){
-      dnorm(x=x,mean=breaks[1],sd=sd(distances)*constrain_variance)
+      dnorm(x=x,mean=breaks[central_tendency],
+        sd=sd(distances)*constrain_variance
+      )
   })
   # min/max normalize our probabilities to sampling densities --
   # ignore warnings about size of counts. The last count is often
@@ -26,7 +40,7 @@ post_strat_truncated_normal <- function(distances=NULL, bins=11,
       which(distances %in%
         sample(distances[distances < breaks[i+1] & distances >= breaks[i]] ,
           size=strata_densities[i])
-      )
+      )[1:strata_densities[i]]
     )
   }
   return(distances[unique(keep)])
