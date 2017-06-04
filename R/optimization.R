@@ -1,16 +1,20 @@
 #' downsample records in a continuous 'distances' distribution using a
-#' normal function (can be truncated). Distances can be literal, or the output of
-#' a Mahalanobis or Euclidean distance function (see: the 'FNN' package).
-#' @param shape is multiplier applied to the sd of the distances
-#' vector. Multipliers from 1 -> 0 will increase the shoulder character of
-#' our output.
+#' normal distribution function (can be truncated). Distances can be literal,
+#' or the output of a Mahalanobis or Euclidean distance function (see: the 'FNN'
+#' package).
+#' @param shape is multiplier applied to the SD of the distances
+#' vector. Multipliers from 1 -> 0 will restrict the variance (increase the
+#' shoulder character of our output).
 #' @export
 gauss_post_stratification <- function(distances=NULL, bins=11,
                                       shape=1,
                                       byid=F,
                                       use_median=F){
   counts <- hist(distances,breaks=bins,plot=F)$counts
+  # pad our counts by one class so they agree with the length of counts
+  counts <- append(counts,0)
   breaks <- hist(distances,breaks=bins,plot=F)$breaks
+
 
   # should we calculate the CT or assume a shoulder
   if(use_median){
@@ -26,30 +30,40 @@ gauss_post_stratification <- function(distances=NULL, bins=11,
 
   probs <- sapply(breaks, FUN=function(x){
       dnorm(x=x,mean=breaks[central_tendency],
-        sd=sd(distances)*constrain_variance
+        sd=sd(distances)*shape
       )
   })
 
   # min/max normalize our probabilities to sampling densities --
   # ignore warnings about size of counts. The last count is often
   # junk (0).
-  strata_densities <- suppressWarnings(ceiling(
-      round(probs-min(probs),20)/diff(range(probs))*counts )
-    )
+  strata_densities <- ceiling(round(
+        probs - min(probs),20) / diff(range(probs)
+      ) * counts )
   # iterate over our breaks, downsampling accordingly
   keep <- vector()
   for(i in 1:(length(breaks)-1)){
-    keep <- append(keep,
-      which(distances %in%
-        sample(distances[distances < breaks[i+1] & distances >= breaks[i]] ,
-          size=strata_densities[i])
-      )[1:strata_densities[i]]
-    )
+    if(strata_densities[i] != 0){
+      sample_bin <- distances[distances < breaks[i+1] &
+        distances >= breaks[i]]
+      miss <- length(sample_bin)-strata_densities[i]
+      if(miss < 0){
+        warning(paste(miss,"fewer samples in bin",
+          "than requested for this strata -- this",
+          "shouldn't happen. Adjusting..."))
+        strata_densities[i] = length(sample_bin)
+      }
+      keep <- append(keep,
+        which(distances %in%
+          sample(sample_bin, size=strata_densities[i])
+        )[1:strata_densities[i]]
+      )
+    }
   }
   if(byid){
-    ret <- unique(keep)
+    ret <- unique(na.omit(keep))
   } else {
-    ret <- distances[unique(keep)]
+    ret <- distances[unique(na.omit(keep))]
   }
   return(ret)
 }
