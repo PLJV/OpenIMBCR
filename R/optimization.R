@@ -1,39 +1,61 @@
 #' downsample records in a continuous 'distances' distribution using a
+#' quantile cut-off. Distances can be literal, or the output of a Mahalanobis or Euclidean distance function (see: the 'FNN'
+#' package). This function is in testing.
+#' @export
+downsample_by_quantile <- function(distances=NULL,
+                                   p=0.1,
+                                   lte=F,
+                                   gte=F,
+                                   byid=F){
+
+  if(lte)
+    ret <- distances < quantile(distances,p=p)
+  if(gte)
+    ret <- distances > quantile(distances,p=p)
+  if(byid){
+    return(which(ret))
+  }
+  return( distances[ ret ] )
+}
+#' downsample records in a continuous 'distances' distribution using a
 #' normal distribution function (can be truncated). Distances can be literal,
 #' or the output of a Mahalanobis or Euclidean distance function (see: the 'FNN'
-#' package).
+#' package). This function is in testing. It behaves oddly sometimes and needs to be refactored.
+#' Use with caution.
+#'
 #' @param shape is multiplier applied to the SD of the distances
 #' vector. Multipliers from 1 -> 0 will restrict the variance (increase the
 #' shoulder character of our output).
 #' @export
-gauss_post_stratification <- function(distances=NULL, bins=11,
+downsample_by_normal_dist <- function(distances=NULL, bins=11,
                                       shape=1,
                                       byid=F,
-                                      use_median=F){
+                                      calc_median_bin=F,
+                                      use_mean=F){
   counts <- hist(distances,breaks=bins,plot=F)$counts
   # pad our counts by one class so they agree with the length of counts
   counts <- append(counts,0)
   breaks <- hist(distances,breaks=bins,plot=F)$breaks
 
-
-  # should we calculate the CT or assume a shoulder
-  if(use_median){
+  # should we calculate a CT consistent with our bins?
+  if(calc_median_bin){
     central_tendency <- hist(distances,
         breaks=10,plot=F)$density
-    central_tendency <- which(central_tendency ==
-         max(central_tendency)
-       )
+    central_tendency <- breaks[ which(central_tendency ==
+        max(central_tendency)) ]
+  # or just calculate the mean?
+  } else if(use_mean){
+    central_tendency <- mean(distances)
   # by default, assume the shoulder is the central tendency
   } else {
-    central_tendency <- 1
+    central_tendency <- breaks[1]
   }
 
   probs <- sapply(breaks, FUN=function(x){
-      dnorm(x=x,mean=breaks[central_tendency],
+      dnorm(x=x,mean=central_tendency,
         sd=sd(distances)*shape
       )
   })
-
   # min/max normalize our probabilities to sampling densities --
   # ignore warnings about size of counts. The last count is often
   # junk (0).
