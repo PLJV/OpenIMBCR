@@ -2,10 +2,10 @@
 % Please edit documentation in R/optimization.R
 \name{mCombinations}
 \alias{mCombinations}
-\title{derive a data.frame of all possible combinations of vars=}
+\title{hidden function to derive a data.frame of all possible combinations of vars=}
 \usage{
 mCombinations(vars = NULL, verbose = T)
 }
 \description{
-derive a data.frame of all possible combinations of vars=
+hidden function to derive a data.frame of all possible combinations of vars=
 }

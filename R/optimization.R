@@ -60,6 +60,14 @@ gauss_post_stratification <- function(distances=NULL, bins=11,
       )
     }
   }
+  # sanity-check
+  if( (1 - length(unique(na.omit(keep)))/sum(counts)) > 0.4){
+    warning(paste(
+        "we lost",
+        100*( 1 - length(unique(na.omit(keep))) / sum(counts) ),
+        "% of the records in downsampling"
+      ))
+  }
   if(byid){
     ret <- unique(na.omit(keep))
   } else {
