@@ -5,7 +5,8 @@
 \title{downsample records in a continuous 'distances' distribution using a
 normal distribution function (can be truncated). Distances can be literal,
 or the output of a Mahalanobis or Euclidean distance function (see: the 'FNN'
-package).}
+package). This function is in testing. It behaves oddly sometimes and needs to be refactored.
+Use with caution.}
 \usage{
 downsample_by_normal_dist(distances = NULL, bins = 11, shape = 1,
   byid = F, calc_median_bin = F, use_mean = F)
@@ -19,5 +20,6 @@ shoulder character of our output).}
 downsample records in a continuous 'distances' distribution using a
 normal distribution function (can be truncated). Distances can be literal,
 or the output of a Mahalanobis or Euclidean distance function (see: the 'FNN'
-package).
+package). This function is in testing. It behaves oddly sometimes and needs to be refactored.
+Use with caution.
 }
