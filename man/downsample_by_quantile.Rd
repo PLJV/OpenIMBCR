@@ -4,13 +4,13 @@
 \alias{downsample_by_quantile}
 \title{downsample records in a continuous 'distances' distribution using a
 quantile cut-off. Distances can be literal, or the output of a Mahalanobis or Euclidean distance function (see: the 'FNN'
-package).}
+package). This function is in testing.}
 \usage{
-downsample_by_quantile(distances = NULL, p = 0.1, lte = TRUE,
-  gte = FALSE, byid = F)
+downsample_by_quantile(distances = NULL, p = 0.1, lte = F, gte = F,
+  byid = F)
 }
 \description{
 downsample records in a continuous 'distances' distribution using a
 quantile cut-off. Distances can be literal, or the output of a Mahalanobis or Euclidean distance function (see: the 'FNN'
-package).
+package). This function is in testing.
 }
