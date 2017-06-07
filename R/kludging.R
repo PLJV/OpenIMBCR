@@ -242,74 +242,30 @@ extractByTransect <- function(s=NULL,r=NULL,fun=NULL){
   s <- sp::spTransform(s,orig_crs)
   return(s)
 }
-# THIS FUNCTION'S LOGIC IS HIDEOUS
 #' Re-build an IMBCR dataframe for a focal species so that all transect / stations
 #' are represented with their distances or NA values so that the observations
 #' are comprehensible by unmarked. This function is currently in testing.
 #' @export
-rebuildImbcrTable <- function(t=NULL, spp=NULL){
-      colnames(t) <- tolower(colnames(t))
-        transects <- as.character(unique(t$transectnum))
-            years <- unique(t$year)
-  processed_table <- data.frame()
-
-  for(transect in transects){
-    for(y in years){
-      # should contain 16 stations with 6 minute counts
-      focal_transect_year <- data.frame(
-          common.name=spp,
-          transectnum=transect,
-          radialdistance=rep(NA,6*16),
-          point=unlist(lapply(1:16,FUN=function(x) rep(x,6))),
-          timeperiod=rep(1:6,16),
-          year=y
-        )
-      for(i in 1:16){
-        for(j in 1:6){
-          f <- t[t$transectnum == transect & t$year == y & t$point ==i & t$timeperiod==j,]
-          if( nrow(f) > 0 ){
-            # do we detect our focal species?
-            detections <- grepl(tolower(f$common.name),pattern=tolower(spp))
-            if(sum(detections)>0){
-              # pop
-              focal_transect_year <- focal_transect_year[!(
-                focal_transect_year$transectnum == transect &
-                focal_transect_year$year == y &
-                focal_transect_year$point ==i &
-                focal_transect_year$timeperiod==j),]
-              focal_transect_year <- merge(
-                  focal_transect_year,
-                  f[detections,],
-                  all=T,
-                  sort=T
-                )
-            }
-          }
-        }
-      }
-      # drop stations for this transect that were literally unsampled this year
-      focal_transect_year <- focal_transect_year[focal_transect_year$point %in% unique(t[t$transectnum == transect & t$year == y,]$point),]
-      # post-process
-      focal_transect_year <- focal_transect_year[!is.na(focal_transect_year$point),]
-      if(sum(is.na(focal_transect_year$radialdistance)) == nrow(focal_transect_year)){ # did completely not observe the species at this transect?
-        focal_transect_year <- merge(focal_transect_year,f,all=T) # NA-fill all observations
-      } else {
-        # back-fill NA columns
-        cols <- which(
-            !grepl(colnames(focal_transect_year),pattern="radial|ptvisit.*.ing$|fid|cl_count|cl_id|how|sex|rank|visual|migrant")
-          )
-        for(k in cols){
-          last_valid <- which(!is.na(focal_transect_year[,k]))
-            last_valid <- last_valid[length(last_valid)]
-          to_replace <- which(is.na(focal_transect_year[,k]))
-          if(sum(to_replace)>0){
-            focal_transect_year[to_replace,k] <- focal_transect_year[last_valid,k]
-          }
-        }
-      }
-      processed_table <- rbind(processed_table,focal_transect_year)
-    }
-  }
+rebuildImbcrTable <- function(s=NULL, spp=NULL){
+  colnames(s@data) <- tolower(colnames(s@data))
+  target_table <- do.call(
+    rbind,
+    lapply(
+        as.character(unique(s$transectnum)),
+        FUN=make_transect_template,spp=spp,years=unique(s$year)
+      )
+  )
+  # merge produces x/y duplicates here, with x occuring first
+  target_table <- merge(
+    x=s@data[tolower(s@data$common.name) == tolower(spp),],
+    y=target_table,
+    by=c("transectnum","point","timeperiod","year","common.name","radialdistance"),
+    all=T
+  )
+  target_table <- target_table[!duplicated(
+    target_table[,c("transectnum","point","timeperiod","year")]),]
+  return(target_table)
+}
 #' validate transect-level habitat metadata vs. LANDFIRE
 #'
 #' @export
