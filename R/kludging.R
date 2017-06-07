@@ -247,6 +247,18 @@ extractByTransect <- function(s=NULL,r=NULL,fun=NULL){
 #' are comprehensible by unmarked. This function is currently in testing.
 #' @export
 rebuildImbcrTable <- function(s=NULL, spp=NULL){
+  # local function builds an NA-filled template of what a full
+  # transect should look like
+  make_transect_template <- function(x=NULL,spp=NULL,years=NULL){
+    return(data.frame(
+      common.name=spp,
+      transectnum=x,
+      radialdistance=rep(NA,6*16),
+      point=unlist(lapply(1:16,FUN=function(x) rep(x,6))),
+      timeperiod=rep(1:6,16),
+      year=unlist(lapply(years,function(x){rep(x,6*16)}))
+    ))
+  }
   colnames(s@data) <- tolower(colnames(s@data))
   target_table <- do.call(
     rbind,
