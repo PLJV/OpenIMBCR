@@ -242,11 +242,15 @@ extractByTransect <- function(s=NULL,r=NULL,fun=NULL){
   s <- sp::spTransform(s,orig_crs)
   return(s)
 }
+<<<<<<< HEAD
 # THIS FUNCTION'S LOGIC IS HIDEOUS
+=======
+>>>>>>> 3a57549fdb22711dfbc9457ed1bdbbf839ad4850
 #' Re-build an IMBCR dataframe for a focal species so that all transect / stations
 #' are represented with their distances or NA values so that the observations
 #' are comprehensible by unmarked. This function is currently in testing.
 #' @export
+<<<<<<< HEAD
 rebuildImbcrTable <- function(t=NULL, spp=NULL){
       colnames(t) <- tolower(colnames(t))
         transects <- as.character(unique(t$transectnum))
@@ -344,6 +348,39 @@ rebuildImbcrTable <- function(t=NULL, spp=NULL){
       ))
   }
   cat("\n")
+=======
+rebuildImbcrTable <- function(s=NULL, spp=NULL){
+  # local function builds an NA-filled template of what a full
+  # transect should look like
+  make_transect_template <- function(x=NULL,spp=NULL,years=NULL){
+    return(data.frame(
+      common.name=spp,
+      transectnum=x,
+      radialdistance=rep(NA,6*16),
+      point=unlist(lapply(1:16,FUN=function(x) rep(x,6))),
+      timeperiod=rep(1:6,16),
+      year=unlist(lapply(years,function(x){rep(x,6*16)}))
+    ))
+  }
+  colnames(s@data) <- tolower(colnames(s@data))
+  target_table <- do.call(
+    rbind,
+    lapply(
+        as.character(unique(s$transectnum)),
+        FUN=make_transect_template,spp=spp,years=unique(s$year)
+      )
+  )
+  # merge produces x/y duplicates here, with x occuring first
+  target_table <- merge(
+    x=s@data[tolower(s@data$common.name) == tolower(spp),],
+    y=target_table,
+    by=c("transectnum","point","timeperiod","year","common.name","radialdistance"),
+    all=T
+  )
+  target_table <- target_table[!duplicated(
+    target_table[,c("transectnum","point","timeperiod","year")]),]
+  return(target_table)
+>>>>>>> 3a57549fdb22711dfbc9457ed1bdbbf839ad4850
 }
 #' validate transect-level habitat metadata vs. LANDFIRE
 #'
