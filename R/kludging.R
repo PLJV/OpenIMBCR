@@ -114,7 +114,7 @@ parseStationLevelMetadata <- function(s,spp=NULL){
            obs <- as.character(s_spp[s_spp$transectnum == t,]$observer)
 
       distance_disqualifier <- s_spp[s_spp$transectnum == t,]$radialdistance
-        distance_disqualifier <- (distance_disqualifier < 0 | distance_disqualifier > 400)
+        distance_disqualifier <- (distance_disqualifier < 0 | distance_disqualifier > 800)
 
         detectionHist[[length(detectionHist)+1]] <- data.frame(
                                                       counts=counts,
@@ -275,8 +275,12 @@ rebuildImbcrTable <- function(s=NULL, spp=NULL){
     by=c("transectnum","point","timeperiod","year","common.name","radialdistance"),
     all=T
   )
-  target_table <- target_table[!duplicated(
-    target_table[,c("transectnum","point","timeperiod","year")]),]
+  # allow duplicated station/timeperiod/year entries, but drop
+  # NA values from the table if we have actual observations to work with
+  duplicated_na_values <- duplicated(
+      target_table[,c("transectnum","point","timeperiod","year")]
+    ) & is.na(target_table$radialdistance)
+  target_table <- target_table[!duplicated_na_values,]
   return(target_table)
 }
 #' validate transect-level habitat metadata vs. LANDFIRE
