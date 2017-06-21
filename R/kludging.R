@@ -336,7 +336,56 @@ validateTransectsForSpecies <- function(s=NULL, spp=NULL){
 }
 #' use Monte Carlo randomization to test for heterogeneity in detection across
 #' within-transect temporal replicates
-monteCarloTemporalHeterogeneity <- function(s=NULL){
+monteCarloTemporalHeterogeneity <- function(s=NULL, plot=F, main=NA, ...){
+  t <- s@data
+  calc_detection_density_by_transect_year <- function(x=NULL,year=NULL){
+    focal  <- t$transectnum == x & t$year == year
+    points <- t[focal, "timeperiod"]
+    density <- !is.na(
+        t[focal,'radialdistance']
+      )
+    if(sum(density)==0){
+      return(list(density=0,mids=0))
+    } else {
+      return(hist(
+        points[density],breaks=0:7,plot=F)[c("density","mids")]
+      )
+    }
+  }
+  likelihood_outlier_detection <- function(slopes=NULL, alpha=0.95){
+    # likelihood-based outlier detection
+    mean_slope <- mean(na.omit(slopes))
+      sd_slope <- sd(na.omit(slopes))
+
+    outliers <- pnorm(slopes,mean=mean_slope,sd=sd_slope)
+      outliers <- outliers > (alpha + ((1-alpha)/2)) |
+                  outliers < (1-alpha)/2
+    return(outliers)
+  }
+  monte_carlo_outlier_detection <- function(slopes=NULL){
+    return(NA)
+  }
+  # calculate per-transect detection density for a given year
+  detection_densities <- lapply(
+      X=unique(t$transectnum), FUN=calc_detection_density_by_transect_year,
+      year=2011
+    )
+  # slope of the line for our detection density vs. time
+  detection_densities <- lapply(X=detection_densities, FUN=function(x){return(
+      coefficients(lm("density~mids",data=as.data.frame(x)))[2]
+    )})
+  # slope of detections vs. time
+  detection_density_slopes <- as.vector(unlist(detection_densities))
+  # plot
+  if(plot){
+    dev.new()
+    hist(detection_density_slopes,
+         breaks=20, col="DarkGrey", border="DarkGray",
+         main=main, xlab="slope (detection density~minute period [1-6])")
+    grid()
+    abline(v=na.omit(detection_density_slopes[likelihood_outlier_detection(detection_density_slopes)]), col="red")
+  }
+
   return(NA)
 }
 #' use Monte Carlo randomization to test for heterogeneity in detection across
