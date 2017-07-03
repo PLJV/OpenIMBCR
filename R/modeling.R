@@ -242,7 +242,27 @@ singleSeasonDistance <- function(x=NULL, psi_params=NULL, sigma_params=NULL, as_
   D<- N/48
   cat("MLE Density: ",D,fill=TRUE)
 }
-#' fit a regression-based random forest with a weight parameter   
+#' Fit the single-season, count-based abundance model of Royle (2004)
+#' to IMBCR data
+generalizedSingleSeasonAbundance <- function(t=NULL,spp=NULL){
+  return(NA)
+}
+#' Fit the hierarchical abundance model of Chandler et al. (2011)
+#'
+singleSeasonTemporaryEmigrationModel <- function(t=NULL,spp=NULL){
+
+}
+#' Fit the hierarchical abundance model with robust non-detection
+#' estimators for perception vs. detection from Amundson et al. (2014)
+singleSeasonRobustDetectionModel <- function(t=NULL, spp=NULL){
+
+}
+#'
+#'
+singleSeasonDistancePoolingModel <- function(t=NULL, spp=NULL){
+
+}
+#' fit a regression-based random forest with a weight parameter
 #'
 singleSeasonRandomForest <- function(){
   return(NA)
