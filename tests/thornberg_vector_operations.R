@@ -28,7 +28,7 @@ buffer_grid_unit_by <- function(row=NULL, units=NULL, radius=1500){
         ),
         hole=F
     )
-    # return as a SpatialPolygons object that raster can comprehend
+    # return as a SpatialPolygons object that Raster can comprehend
     return(sp::SpatialPolygons(
         Srl=list(
           sp::Polygons(list(square),
@@ -59,7 +59,7 @@ extract_by <- function(polygon=NULL, r=NULL){
       sp::CRS(raster::projection(r))
     )
   e_cl <- parallel::makeCluster(11)
-  clusterExport(cl=e_cl, varlist=c("r","x"))
+  clusterExport(cl=e_cl, varlist=c("r"))
   return(parLapply(
       e_cl,
       X=polygon,
@@ -106,41 +106,49 @@ system.time(usng_extractions <- lapply(
   ))
 
 # calculate total area composition metric over a 3x3 matrix (in vector space)
-steps <- seq(0, nrow(units), by=300)
+steps <- round(seq(0, nrow(units), length.out=30))
 steps <- lapply(
     1:(length(steps)-1),
     FUN=function(x){ units[(steps[x]+1):(steps[x+1]),] }
   )
 
-# buffer all grid units so that our area extractions are consistent with
-# a 3x3 matrix -- need to do this in parallel to be efficient
-cl           <- parallel::makeCluster(6)
-usng_buffers <- list()
-
-for(step in steps){
-  clusterExport(
-      cl=cl,
-      varlist=c("buffer_grid_unit_by","l_buffer_grid_unit_by","step")
-    )
-  system.time(usng_buffers <- append(
-      usng_buffers,
-      parallel::parLapply(
-        cl,
-        X=steps,
-        fun=l_buffer_grid_unit_by,
-        simplify=T
-      )))
-}
-
-parallel::stopCluster(cl=cl)
-
-system.time(test <- extract_by(usng_extractions, r))
-
-parallel::parLapply(
-    cl,
-    X=binary_reclassify(usng_extractions, from=1:100)
-    fun=function(x) raster::cellStats(x, stat=sum) * prod(res(x))
+# this takes ~55.194 seconds for 10,000 units
+system.time(
+    usng_buffers <- unlist(lapply(steps, FUN=l_buffer_grid_unit_by))
   )
+rm(steps)
+
+# buffer all grid units so that our area extractions are consistent with
+# a 3x3 matrix -- try to do this in parallel to be efficient
+# cl           <- parallel::makeCluster(6)
+# usng_buffers <- list()
+#
+# for(step in steps){
+#   clusterExport(
+#       cl=cl,
+#       varlist=c("buffer_grid_unit_by","l_buffer_grid_unit_by","step")
+#     )
+#   system.time(usng_buffers <- append(
+#       usng_buffers,
+#       parallel::parLapply(
+#         cl,
+#         X=steps,
+#         fun=l_buffer_grid_unit_by,
+#         simplify=T
+#       )))
+# }
+#
+# parallel::stopCluster(cl=cl)
+
+# 284.368 seconds for 10,000 units
+system.time(usng_extractions <- extract_by(usng_buffers, r))
+
+# 63.180 seconds for 10,000 units
+system.time(test <- parallel::parLapply(
+    cl,
+    X=binary_reclassify(usng_extractions, from=1:100),
+    fun=function(x) raster::cellStats(x, stat=sum) * prod(raster::res(x))
+  ))
 
 
 # calculate a within-unit patch count
