@@ -47,10 +47,16 @@ writeRaster(uniform_1km_grid, "/home/ktaylora/uniform_imbcr_grid_test.tif", over
 #
 # main
 #
-
 master_table <- imbcrTableToShapefile(list.files(
   "/global_workspace/imbcr_number_crunching/",
   pattern="RawData_PLJV_IMBCR_20161201.csv",
   recursive=T,
   full.names=T
   ))
+
+# 1.) calculate our detection parameters at the 1km transect scale
+
+# 2.) build a data.frame from our station points and their respective
+# USNG attributed grid cell
+
+# 3.)

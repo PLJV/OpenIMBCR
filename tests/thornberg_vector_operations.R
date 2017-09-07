@@ -1,3 +1,13 @@
+#
+# IMBCR Thornberg Modeling Precursor Work
+#
+# This project workspace is kludging for vector-based roving windows analyses
+# and habitat fragmentation metric calculations. All pre-cursors to fitting
+# an HDS model (Royle, 2004) from 1-km IMBCR transect data.
+#
+# Authors: KT (kyle.taylor@pljv.org) [2017], DP, LG, AB, RS, AG, Ferris Bueller
+#
+
 require(raster)
 require(rgdal)
 require(rgeos)
@@ -92,13 +102,15 @@ binary_reclassify <- function(x=NULL, from=NULL, nomatch=NA){
 
 # read-in US national grid
 cat(" -- reading input raster/vector datasets\n")
-r <- raster("/gis_data/Landcover/PLJV_Landcover/LD_Landcover/PLJV_TX_MORAP_2016_CRP.img")
+r <- raster(paste("/gis_data/Landcover/PLJV_Landcover/LD_Landcover/",
+    "PLJV_TX_MORAP_2016_CRP.img"
+  )
 units <- readOGR("/home/ktaylora/","1km_usng_pljv_region_v1.0", verbose=F)
 
 # testing
 units <- units[1:10000,]
 
-# will take ~1.35 hours without threading
+# will take ~1.35 hours for 600,000 without threading
 system.time(usng_extractions <- lapply(
     X=1:nrow(units),
     FUN=buffer_grid_unit_by,
@@ -112,7 +124,7 @@ steps <- lapply(
     FUN=function(x){ units[(steps[x]+1):(steps[x+1]),] }
   )
 
-# this takes ~55.194 seconds for 10,000 units
+# this takes ~55.194 seconds for 10,000 units; ~ 0.9199 hours for 600,000
 system.time(
     usng_buffers <- unlist(lapply(steps, FUN=l_buffer_grid_unit_by))
   )
@@ -140,16 +152,64 @@ rm(steps)
 #
 # parallel::stopCluster(cl=cl)
 
-# 284.368 seconds for 10,000 units
+# 284.368 seconds for 10,000 units; ~4.739 hours for 600,000
 system.time(usng_extractions <- extract_by(usng_buffers, r))
 
-# 63.180 seconds for 10,000 units
-system.time(test <- parallel::parLapply(
+# 63.180 seconds for 10,000 units; ~1.053 hours for 600,000 units
+system.time(units$sgp_total_area <- unlist(parallel::parLapply(
     cl,
-    X=binary_reclassify(usng_extractions, from=1:100),
-    fun=function(x) raster::cellStats(x, stat=sum) * prod(raster::res(x))
-  ))
+    X=binary_reclassify(usng_extractions, from=331),
+    fun=function(x){
+      # units of total area are in square-kilometers
+      raster::cellStats(x, stat=sum) * prod(raster::res(x)) * 10^-6
+    }
+  )))
+system.time(units$mgp_total_area <- unlist(parallel::parLapply(
+    cl,
+    X=binary_reclassify(usng_extractions, from=332),
+    fun=function(x){
+      # units of total area are in square-kilometers
+      raster::cellStats(x, stat=sum) * prod(raster::res(x)) * 10^-6
+    }
+  )))
+system.time(units$oak_sage_total_area <- unlist(parallel::parLapply(
+    cl,
+    X=binary_reclassify(usng_extractions, from=342:343),
+    fun=function(x){
+      # units of total area are in square-kilometers
+      raster::cellStats(x, stat=sum) * prod(raster::res(x)) * 10^-6
+    }
+  )))
+system.time(units$playas_total_area <- unlist(parallel::parLapply(
+    cl,
+    X=binary_reclassify(usng_extractions, from=121),
+    fun=function(x){
+      # units of total area are in square-kilometers
+      raster::cellStats(x, stat=sum) * prod(raster::res(x)) * 10^-6
+    }
+  )))
+system.time(units$crp_total_area <- unlist(parallel::parLapply(
+    cl,
+    X=binary_reclassify(usng_extractions, from=211),
+    fun=function(x){
+      # units of total area are in square-kilometers
+      raster::cellStats(x, stat=sum) * prod(raster::res(x)) * 10^-6
+    }
+  )))
+system.time(units$road_total_area <- unlist(parallel::parLapply(
+    cl,
+    X=binary_reclassify(usng_extractions, from=221:222),
+    fun=function(x){
+      # units of total area are in square-kilometers
+      raster::cellStats(x, stat=sum) * prod(raster::res(x)) * 10^-6
+    }
+  )))
 
-
+# within-unit patch metric calculations [Short, Mixed,
+# shin oak/sand sage, CRP(?)]
+habitat <- binary_reclassify(r, from=221:222)
 # calculate a within-unit patch count
-# calculate
+# calculate inter-patch distance
+# calculate mean patch area
+# do a PCA of our fragmentation metrics
+# save to disk
