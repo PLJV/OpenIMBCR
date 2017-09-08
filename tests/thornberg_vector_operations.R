@@ -103,12 +103,13 @@ binary_reclassify <- function(x=NULL, from=NULL, nomatch=NA){
 # read-in US national grid
 cat(" -- reading input raster/vector datasets\n")
 r <- raster(paste("/gis_data/Landcover/PLJV_Landcover/LD_Landcover/",
-    "PLJV_TX_MORAP_2016_CRP.img"
-  )
-units <- readOGR("/home/ktaylora/","1km_usng_pljv_region_v1.0", verbose=F)
+    "PLJV_TX_MORAP_2016_CRP.img", sep=""
+  ))
+
+units <- readOGR("/gis_data/Grids/","1km_usng_pljv_region_v1.0", verbose=F)
 
 # testing
-units <- units[1:10000,]
+# units <- units[1:200000,]
 
 # will take ~1.35 hours for 600,000 without threading
 system.time(usng_extractions <- lapply(
