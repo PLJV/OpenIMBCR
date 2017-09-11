@@ -10,10 +10,20 @@
 # Authors: KT (kyle.taylor@pljv.org) [2017], DP, LG, AB, RS, AG
 #
 
+# We require clean POSIX threading and runtime argument
+# comprehension to run -- I haven't tested any of this on
+# MS Windows so let's stop by default on non-unix platforms
+
+stopifnot(grepl(
+    tolower(.Platform$OS.type), pattern = "unix"
+  ))
+
 require(raster)
 require(rgdal)
 require(rgeos)
 require(parallel)
+
+system("/usr/bin/clear")
 
 #' generate a square buffer around a single input feature
 buffer_grid_unit_by <- function(row=NULL, units=NULL, radius=1500){
@@ -50,7 +60,7 @@ buffer_grid_unit_by <- function(row=NULL, units=NULL, radius=1500){
         proj4string=sp::CRS(raster::projection(units))
       ))
 }
-#' generalization of the buffer_grid_unit_by function that uses
+#' testing: generalization of the buffer_grid_unit_by function that uses
 #' lapply to buffer across all grid features in an input units
 #' data.frame
 l_buffer_grid_unit_by <- function(units=NULL, radius=1500){
@@ -141,18 +151,21 @@ parLapply_calc_stat <- function(x, fun=NULL, from=NULL){
 l_calc_stat <- function(x, fun=NULL, from=NULL){
   return(lapply(
     X=if(is.null(from)) x else binary_reclassify(x, from=from),
-    FUN=function(x) fun(x)
+    FUN=function(y) fun(y)
   ))
 }
 #
 # MAIN
 #
 
+cat(" -- reading input raster/vector datasets\n")
+
 # read-in US national grid and our source landcover data
 # subset our input units by a user-defined range, if possible
 argv <- na.omit(as.numeric(commandArgs(trailingOnly = T)))
 
 if(length(argv)>1){
+  cat(" -- processing units chunkwise", paste(argv, collapse = ":"), "\n")
   units <-
     readOGR(
       "/gis_data/Grids/",
@@ -168,16 +181,21 @@ if(length(argv)>1){
     )
 }
 
-cat(" -- reading input raster/vector datasets\n")
 r <- raster(paste("/gis_data/Landcover/PLJV_Landcover/LD_Landcover/",
     "PLJV_TX_MORAP_2016_CRP.img", sep=""
   ))
 
+cat(" -- building 3x3 buffered grid units across project area\n")
 system.time(usng_buffers <- l_buffer_grid_unit_by(units))
+gc();
 
 # basic implementation for extracting that will use parallel by default,
 # but fails if the grid units are large
+cat(" -- extracting 3x3 buffered grid units across landcover raster\n")
 system.time(usng_extractions <- extract_by(usng_buffers, r))
+gc();
+
+cat(" -- calculating habitat composition metrics\n")
 
 area_statistics <-
   data.frame(
@@ -216,6 +234,22 @@ for(i in 1:nrow(area_statistics)){
     )
 }
 
+cat("-- caching area metric results to disk\n")
+
+writeOGR(
+    units,
+    dsn=".",
+    layer=paste(
+        "units_attributed_",
+        argv[1],"-",argv[2],
+        sep=""
+      ),
+    overwrite=T,
+    driver="ESRI Shapefile"
+  )
+
+gc();
+
 # benchmarking lapply implementation
 # start <- Sys.time()
 # for(i in 1:nrow(area_statistics)){
@@ -236,7 +270,12 @@ for(i in 1:nrow(area_statistics)){
 
 # within-unit patch metric calculations [Short, Mixed,
 # shin oak/sand sage, CRP(?)]
-habitat <- binary_reclassify(r, from=221:222)
+habitat <- binary_reclassify(
+    r,
+    from = eval(parse(text=paste("c(",paste(area_statistics$src_raster_value[
+        !grepl(area_statistics$field_name, pattern="rd_area")
+      ], collapse = ","), ")", sep="")))
+  )
 # calculate a within-unit patch count
 # calculate inter-patch distance
 # calculate mean patch area
