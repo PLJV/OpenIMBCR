@@ -70,7 +70,8 @@ extract_by <- function(polygon=NULL, r=NULL){
         y=spTransform(polygon, sp::CRS(raster::projection(r)))
       ))
   }
-  # default list comprehension
+  # default list comprehension: reproject to a consistent CRS
+  # and then crop our input raster using a local cluster instance
   polygon <- lapply(
       polygon,
       sp::spTransform,
@@ -83,7 +84,7 @@ extract_by <- function(polygon=NULL, r=NULL){
       X=polygon,
       fun=function(x){ raster::crop(x=r, y=x) }
     )
-  parallel::stopCluster(e_cl)
+  parallel::stopCluster(cl=e_cl); rm(e_cl); gc();
   return(ret)
 }
 #' testing: chunk out the task of extracting buffers from a raster surface
@@ -119,155 +120,120 @@ binary_reclassify <- function(x=NULL, from=NULL, nomatch=NA){
         fun=function(x,na.rm=F){x>=1}
       ))
 }
-
+#' shorthand function that applies an arbitrary, user-supplied summary
+#' statistic function across an input list of raster objects. Will optionally
+#' reclassify each input raster to a binary using binary_reclassify() if a
+#' non-null value is passed to from=
+parLapply_calc_stat <- function(x, fun=NULL, from=NULL){
+  cl <- parallel::makeCluster(parallel::detectCores()-1)
+  ret <- unlist(parallel::parLapply(
+      cl,
+      # assume x is already a binary if from is NULL
+      X=if(is.null(from)) x else binary_reclassify(x, from=from),
+      fun=function(x) fun(x)
+    ))
+  # clean-up cluster and return FUN result to user as a vector
+  parallel::stopCluster(cl=cl); rm(cl); gc();
+  return(ret)
+}
+#' testing: std lapply implementation to benchmark against parLapply
+#' this doesn't work -- currently returns the same value for every raster
+l_calc_stat <- function(x, fun=NULL, from=NULL){
+  return(lapply(
+    X=if(is.null(from)) x else binary_reclassify(x, from=from),
+    FUN=function(x) fun(x)
+  ))
+}
 #
 # MAIN
 #
 
-# read-in US national grid
+# read-in US national grid and our source landcover data
+# subset our input units by a user-defined range, if possible
+argv <- na.omit(as.numeric(commandArgs(trailingOnly = T)))
+
+if(length(argv)>1){
+  units <-
+    readOGR(
+      "/gis_data/Grids/",
+      "1km_usng_pljv_region_v1.0",
+      verbose=F
+    )[(argv[1]+1):argv[2], ]
+} else {
+  units <-
+    readOGR(
+      "/gis_data/Grids/",
+      "1km_usng_pljv_region_v1.0",
+      verbose=F
+    )
+}
+
 cat(" -- reading input raster/vector datasets\n")
 r <- raster(paste("/gis_data/Landcover/PLJV_Landcover/LD_Landcover/",
     "PLJV_TX_MORAP_2016_CRP.img", sep=""
   ))
 
-units <- readOGR("/gis_data/Grids/","1km_usng_pljv_region_v1.0", verbose=F)
-
-# subset our input units by a user-defined range, if possible
-argv <- na.omit(as.numeric(commandArgs(trailingOnly=T)))
-if(length(argv)>1){
-  units <- units[(argv[1]+1):argv[2],]
-}
-
-# will take ~1.35 hours for 600,000 without threading
-# system.time(usng_extractions <- lapply(
-#     X=1:nrow(units),
-#     FUN=buffer_grid_unit_by,
-#     units=units
-#   ))
-
-# calculate total area composition metric over a 3x3 matrix (in vector space)
-# step-wise implementation
-# steps <- round(seq(0, nrow(units), length.out=30))
-# steps <- lapply(
-#     1:(length(steps)-1),
-#     FUN=function(x){ units[(steps[x]+1):(steps[x+1]),] }
-#   )
-
-# this takes ~55.194 seconds for 10,000 units; ~ 0.9199 hours for 600,000
-# steps <- round(seq(0, nrow(units), length.out=30))
-# system.time(
-#     usng_buffers <- unlist(lapply(steps, FUN=l_buffer_grid_unit_by))
-#   )
-
 system.time(usng_buffers <- l_buffer_grid_unit_by(units))
-
-# buffer all grid units so that our area extractions are consistent with
-# a 3x3 matrix -- try to do this in parallel to be efficient
-# cl           <- parallel::makeCluster(6)
-# usng_buffers <- list()
-#
-# for(step in steps){
-#   clusterExport(
-#       cl=cl,
-#       varlist=c("buffer_grid_unit_by","l_buffer_grid_unit_by","step")
-#     )
-#   system.time(usng_buffers <- append(
-#       usng_buffers,
-#       parallel::parLapply(
-#         cl,
-#         X=steps,
-#         fun=l_buffer_grid_unit_by,
-#         simplify=T
-#       )))
-# }
-#
-# parallel::stopCluster(cl=cl)
-
-# this parsing and for-looping is needed to deal with memory problems
-# it's difficult to parallelize this task across a really big selection
-# of grid units
-  # usng_extractions <- list();
-  # steps            <- round(seq(0, nrow(units), length.out=30));
-  # for(i in 1:(length(steps)-1)){
-  #   usng_extractions <- append(
-  #     usng_extractions,
-  #     extract_by(usng_buffers[(steps[i]+1):(steps[i+1])], r)
-  #   )
-  # }
-  # rm(usng_buffers); gc();
-
-# test a function wrapper
-# usng_extractions <- extract_by_large_df(usng_buffers, units, r)
 
 # basic implementation for extracting that will use parallel by default,
 # but fails if the grid units are large
 system.time(usng_extractions <- extract_by(usng_buffers, r))
 
-# lapply equivalent -- not much faster
-# steps <- lapply(
-#     1:(length(steps)-1),
-#     FUN=function(x){
-#       usng_extractions <- append(usng_extractions, extract_by(
-#         usng_buffers[(steps[x]+1):(steps[x+1])],
-#         r
-#       ))
-#     }
-#   )
+area_statistics <-
+  data.frame(
+      field_name=c(
+        'sgp_area',
+        'mgp_area',
+        'ok_sg_area',
+        'pl_area',
+        'crp_area',
+        'rd_area'
+      ),
+      src_raster_value=c(
+        '75',
+        '71',
+        'c(85,87)',
+        '12',
+        '39',
+        'c(44,41)'
+      )
+    )
 
-# 284.368 seconds for 10,000 units; ~4.739 hours for 600,000
-# system.time(usng_extractions <- extract_by(usng_buffers, r))
+# benchmarking parlapply implementation
+# takes four minutes longer than lapply and won't use
+# multiple cores on machines that are memory limited
+for(i in 1:nrow(area_statistics)){
+  units@data[, as.character(area_statistics[i, 1])] <-
+    parLapply_calc_stat(
+      # using our 3x3 buffered unit raster extractions
+      usng_extractions,
+      fun = function(x){
+         # calculate units of total area in square-kilometers
+         raster::cellStats(x, stat=sum) * prod(raster::res(x)) * 10^-6
+      },
+      # using these PLJV landcover cell values in the reclassification
+      from = eval(parse(text=as.character(area_statistics[i, 2])))
+    )
+}
 
-# 63.180 seconds for 10,000 units; ~1.053 hours for 600,000 units
-cl <- parallel::makeCluster(parallel::detectCores()-1)
-system.time(units$sgp_total_area <- unlist(parallel::parLapply(
-    cl,
-    X=binary_reclassify(usng_extractions, from=331),
-    fun=function(x){
-      # units of total area are in square-kilometers
-      raster::cellStats(x, stat=sum) * prod(raster::res(x)) * 10^-6
-    }
-  )))
-system.time(units$mgp_total_area <- unlist(parallel::parLapply(
-    cl,
-    X=binary_reclassify(usng_extractions, from=332),
-    fun=function(x){
-      # units of total area are in square-kilometers
-      raster::cellStats(x, stat=sum) * prod(raster::res(x)) * 10^-6
-    }
-  )))
-system.time(units$oak_sage_total_area <- unlist(parallel::parLapply(
-    cl,
-    X=binary_reclassify(usng_extractions, from=342:343),
-    fun=function(x){
-      # units of total area are in square-kilometers
-      raster::cellStats(x, stat=sum) * prod(raster::res(x)) * 10^-6
-    }
-  )))
-system.time(units$playas_total_area <- unlist(parallel::parLapply(
-    cl,
-    X=binary_reclassify(usng_extractions, from=121),
-    fun=function(x){
-      # units of total area are in square-kilometers
-      raster::cellStats(x, stat=sum) * prod(raster::res(x)) * 10^-6
-    }
-  )))
-system.time(units$crp_total_area <- unlist(parallel::parLapply(
-    cl,
-    X=binary_reclassify(usng_extractions, from=211),
-    fun=function(x){
-      # units of total area are in square-kilometers
-      raster::cellStats(x, stat=sum) * prod(raster::res(x)) * 10^-6
-    }
-  )))
-system.time(units$road_total_area <- unlist(parallel::parLapply(
-    cl,
-    X=binary_reclassify(usng_extractions, from=221:222),
-    fun=function(x){
-      # units of total area are in square-kilometers
-      raster::cellStats(x, stat=sum) * prod(raster::res(x)) * 10^-6
-    }
-  )))
-parallel::stopCluster(cl)
+# benchmarking lapply implementation
+# start <- Sys.time()
+# for(i in 1:nrow(area_statistics)){
+#   units@data[, as.character(area_statistics[i, 1])] <-
+#     l_calc_stat(
+#       # using our 3x3 buffered unit raster extractions
+#       usng_extractions,
+#       fun = function(x){
+#          # calculate units of total area in square-kilometers
+#          raster::cellStats(x, stat=sum) * prod(raster::res(x)) * 10^-6
+#       },
+#       # using these PLJV landcover cell values in the reclassification
+#       from = eval(parse(text=as.character(area_statistics[i, 2])))
+#     )
+# }
+# finish <- Sys.time()
+# l_time <- finish-start
+
 # within-unit patch metric calculations [Short, Mixed,
 # shin oak/sand sage, CRP(?)]
 habitat <- binary_reclassify(r, from=221:222)
