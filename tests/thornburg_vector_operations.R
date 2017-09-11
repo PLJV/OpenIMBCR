@@ -82,10 +82,11 @@ extract_by <- function(polygon=NULL, r=NULL){
   }
   # default list comprehension: reproject to a consistent CRS
   # and then crop our input raster using a local cluster instance
+  # -- this eats up a lot of ram
   polygon <- lapply(
       polygon,
-      sp::spTransform,
-      sp::CRS(raster::projection(r))
+      FUN=sp::spTransform,
+      CRSobj=sp::CRS(raster::projection(r))
     )
   e_cl <- parallel::makeCluster(parallel::detectCores()-1)
   clusterExport(cl=e_cl, varlist=c("r"))
@@ -100,16 +101,16 @@ extract_by <- function(polygon=NULL, r=NULL){
 #' testing: chunk out the task of extracting buffers from a raster surface
 #' using parallel in the most memory efficient way possible. Useful
 #' for very large (>100,000) list of buffer polygons.
-extract_by_large_df <- function(usng_buffers=NULL, units=NULL, r=NULL){
+extract_by_large_df <- function(polygon=NULL, r=NULL){
   usng_extractions <- list();
-  steps            <- round(seq(0, nrow(units), length.out=30));
+  steps            <- round(seq(0, nrow(polygon), length.out=30));
   for(i in 1:(length(steps)-1)){
     usng_extractions <- append(
       usng_extractions,
-      extract_by(usng_buffers[(steps[i]+1):(steps[i+1])], r)
+      extract_by(polygon[(steps[i]+1):(steps[i+1]), ], r=r)
     )
   }
-  rm(usng_buffers, r, units, steps); gc();
+  rm(r, polygon, steps); gc();
   return(usng_extractions)
 }
 #' preform a binary reclassification on an input raster, with matching from
@@ -147,10 +148,13 @@ parLapply_calc_stat <- function(x, fun=NULL, from=NULL){
   return(ret)
 }
 #' testing: std lapply implementation to benchmark against parLapply
-#' this doesn't work -- currently returns the same value for every raster
 l_calc_stat <- function(x, fun=NULL, from=NULL){
   return(lapply(
-    X=if(is.null(from)) x else binary_reclassify(x, from=from),
+    X=if(!is.null(from)){
+        lapply(x, FUN=binary_reclassify, from=from)
+      } else {
+        x
+      },
     FUN=function(y) fun(y)
   ))
 }
@@ -165,7 +169,11 @@ cat(" -- reading input raster/vector datasets\n")
 argv <- na.omit(as.numeric(commandArgs(trailingOnly = T)))
 
 if(length(argv)>1){
-  cat(" -- processing units chunkwise", paste(argv, collapse = ":"), "\n")
+  cat(
+      " -- processing units chunkwise (",
+      paste(argv, collapse = ":"),
+      ")\n", sep = ""
+    )
   units <-
     readOGR(
       "/gis_data/Grids/",
@@ -268,16 +276,64 @@ gc();
 # finish <- Sys.time()
 # l_time <- finish-start
 
+configuration_statistics <-
+  data.frame(
+      field_name=c(
+        'patch_count',
+        'mean_patch_area',
+        'inter-patch distance'
+      ),
+      cmd=c(
+        'function(x) SDMTools::ClassStats(x)$n.patches',
+        'function(x) SDMTools::ClassStats(x)$mean.patch.area',
+        'function(x) mean(raster::distance(x))'
+      )
+    )
+
+cat(" -- extracting across our unbuffered grid units\n")
+
+system.time(
+  usng_extractions <- extract_by(
+    polygon=unlist(split(units,1:nrow(units))),
+    r=r
+  )
+)
+
+rm(r); gc();
+
 # within-unit patch metric calculations [Short, Mixed,
 # shin oak/sand sage, CRP(?)]
-habitat <- binary_reclassify(
-    r,
+cat(" -- building a habitat/not-habitat raster surface\n")
+
+valid_habitat_values <- eval(parse(
+    text=paste("c(",paste(area_statistics$src_raster_value[
+      !grepl(area_statistics$field_name, pattern="rd_area")
+    ], collapse = ","), ")", sep="")
+  ))
+
+system.time(habitat <- binary_reclassify(
+    usng_extractions,
     from = eval(parse(text=paste("c(",paste(area_statistics$src_raster_value[
         !grepl(area_statistics$field_name, pattern="rd_area")
       ], collapse = ","), ")", sep="")))
-  )
-# calculate a within-unit patch count
-# calculate inter-patch distance
-# calculate mean patch area
+  ))
+
+cat(" -- calculating patch configuration metrics\n")
+
+for(i in 1:nrow(configuration_statistics)){
+  units@data[, as.character(configuration_statistics[i, 1])] <-
+    parLapply_calc_stat(
+      # using our 3x3 buffered unit raster extractions
+      usng_extractions,
+      fun = eval(parse(text=as.character(configuration_statistics[i, 2]))),
+      # using these PLJV landcover cell values in the reclassification
+      from = valid_habitat_values
+    )
+  # calculate a within-unit patch count
+
+  # calculate inter-patch distance
+  # calculate mean patch area
+}
+
 # do a PCA of our fragmentation metrics
 # save to disk
