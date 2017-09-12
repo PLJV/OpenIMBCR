@@ -24,16 +24,18 @@ require(rgeos)
 require(parallel)
 require(SDMTools)
 
-system("/usr/bin/clear")
+system("clear")
 
 #' generate a square buffer around a single input feature
-buffer_grid_unit <- function(row=NULL, units=NULL, radius=1500){
+buffer_grid_unit <- function(x=NULL, row=NULL, radius=1500){
   if (!is.null(row)){
-    units <- units[row, ]
+    x <- x[row, ]
+  } else {
+    x <- unlist(x)[1, ]
   }
   # bogart a centroid for the enclosing grid square
   centroid <- rgeos::gCentroid(
-      units,
+      x,
       byid = F
     )@coords
   # build a single square polygon
@@ -58,21 +60,21 @@ buffer_grid_unit <- function(row=NULL, units=NULL, radius=1500){
           sp::Polygons(list(square),
           ID=ifelse(is.null(row), 1, row)
         )),
-        proj4string=sp::CRS(raster::projection(units))
+        proj4string=sp::CRS(raster::projection(x))
       ))
 }
 #' testing: generalization of the buffer_grid_units function that uses
 #' lapply to buffer across all grid features in an input units
 #' data.frame. Parallel implementations for this function are difficult,
 #' because you have to push a copy of units onto each node
-buffer_grid_units <- function(units=NULL, radius=1500){
+l_buffer_grid_units <- function(units=NULL, radius=1500){
   return(lapply(
       X=1:nrow(units),
-      FUN=function(x) buffer_grid_unit(row=x, units=units, radius=radius)
+      FUN=function(x) buffer_grid_unit(row=x, x=units, radius=radius)
     ))
 }
 #' testing: generalization of buffer_grid_unit with parallel comprehension
-par_buffer_grid_units <- function(units, radius=1500){
+par_buffer_grid_units <- function(units=NULL, radius=1500){
   if (!inherits(units, 'list')){
     units <- lapply(
         X=split(units, 1:nrow(units)),
@@ -91,6 +93,7 @@ par_buffer_grid_units <- function(units, radius=1500){
       }
     )
   return(parallel::parLapply(
+    cl=e_cl,
     X=units,
     fun=buffer_grid_unit,
     radius=radius
@@ -264,7 +267,7 @@ if(length(argv)>1){
 
 
 cat(" -- building 3x3 buffered grid units across project area\n")
-system.time(usng_buffers <- buffer_grid_units(units))
+system.time(usng_buffers <- par_buffer_grid_units(units))
 
 # basic implementation for extracting that will use parallel by default,
 # but fails if the grid units are large
