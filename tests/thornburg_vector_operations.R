@@ -358,9 +358,9 @@ for(i in 1:nrow(area_statistics)){
 # l_time <- finish-start
 
 configuration_statistics <- c(
-    'pat_cnt',
-    'mn_pat_ar',
-    'in_pat_dist'
+    'p_cnt',
+    'mn_p_area',
+    'in_p_dist'
   )
 
 cat(" -- extracting across our unbuffered grid units\n")
