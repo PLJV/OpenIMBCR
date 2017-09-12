@@ -173,7 +173,7 @@ binary_reclassify <- function(x=NULL, from=NULL, nomatch=NA){
 #' scalar value attributable to each grid unit. Will optionally
 #' reclassify each input raster to a binary using binary_reclassify() if a
 #' non-null value is passed to from=
-par_calc_stat <- function(x, fun=NULL, from=NULL, backfill_missing_w=0){
+par_calc_stat <- function(X=NULL, fun=NULL, from=NULL, backfill_missing_w=0){
   stopifnot(!inherits(fun, 'function'))
   e_cl <- parallel::makeCluster(parallel::detectCores()-1)
   # assume our nodes will always need 'raster' and kick-in our
@@ -187,12 +187,12 @@ par_calc_stat <- function(x, fun=NULL, from=NULL, backfill_missing_w=0){
       e_cl,
       # assume x is already a binary if from is NULL
       X = if(is.null(from)){
-        x
+        X
       } else {
         # nested parallel call to reclassify our input list, if needed
         parallel::parLapply(
             cl=e_cl,
-            X=x,
+            X=X,
             fun=binary_reclassify,
             from=from
           )
@@ -222,6 +222,17 @@ l_calc_stat <- function(x, fun=NULL, from=NULL){
       },
     FUN=fun
   ))
+}
+#' shorthand total area calculation function
+calc_total_area <- function(x=NULL, area_of_cell = 10^-6){
+   # calculate units of total area in square-kilometers
+   res <- raster::cellStats(x, stat=sum, na.rm=T) *
+          prod(raster::res(x)) * area_of_cell
+   if (is.na(res) | is.null(res)){
+     return(0)
+   } else {
+     return(ret)
+   }
 }
 #' shorthand interpatch distance calculation function that arbitrarily
 #' applies a user-specified summary statistic to observed distances in
@@ -286,8 +297,6 @@ if(length(argv)>1){
     )
 }
 
-
-
 cat(" -- building 3x3 buffered grid units across project area\n")
 system.time(usng_buffers <- par_buffer_grid_units(units))
 
@@ -318,17 +327,20 @@ area_statistics <-
       )
     )
 
-# benchmarking parlapply implementation
-# takes four minutes longer than lapply and won't use
-# multiple cores on machines that are memory limited
 for(i in 1:nrow(area_statistics)){
   units@data[, as.character(area_statistics[i, 1])] <-
     par_calc_stat(
       # using our 3x3 buffered unit raster extractions
-      usng_extractions,
+      X=usng_extractions,
       fun = function(x){
          # calculate units of total area in square-kilometers
-         raster::cellStats(x, stat=sum) * prod(raster::res(x)) * 10^-6
+         res <- raster::cellStats(x, stat=sum, na.rm=T) *
+                prod(raster::res(x)) * 10^-6
+         if(is.na(res) | is.null(res)){
+           return(0)
+         } else {
+           return(ret)
+         }
       },
       # using these PLJV landcover cell values in the reclassification
       from = eval(parse(text=as.character(area_statistics[i, 2])))
