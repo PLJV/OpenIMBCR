@@ -22,6 +22,7 @@ require(raster)
 require(rgdal)
 require(rgeos)
 require(parallel)
+require(SDMTools)
 
 system("/usr/bin/clear")
 
@@ -62,12 +63,38 @@ buffer_grid_unit <- function(row=NULL, units=NULL, radius=1500){
 }
 #' testing: generalization of the buffer_grid_units function that uses
 #' lapply to buffer across all grid features in an input units
-#' data.frame
+#' data.frame. Parallel implementations for this function are difficult,
+#' because you have to push a copy of units onto each node
 buffer_grid_units <- function(units=NULL, radius=1500){
   return(lapply(
       X=1:nrow(units),
       FUN=function(x) buffer_grid_unit(row=x, units=units, radius=radius)
     ))
+}
+#' testing: generalization of buffer_grid_unit with parallel comprehension
+par_buffer_grid_units <- function(units, radius=1500){
+  if (!inherits(units, 'list')){
+    units <- lapply(
+        X=split(units, 1:nrow(units)),
+        FUN=as,
+        'SpatialPolygons'
+      )
+  }
+  e_cl <- parallel::makeCluster(parallel::detectCores()-1)
+  clusterExport(cl=e_cl, varlist=c("buffer_grid_unit"))
+  parallel::clusterCall(
+      e_cl,
+      function(x) {
+        library("rgeos");
+        library("sp");
+        library("raster");
+      }
+    )
+  return(parallel::parLapply(
+    X=units,
+    fun=buffer_grid_unit,
+    radius=radius
+  ))
 }
 #' extract an input raster dataset using polygon feature(s). Bulk process list
 #' objects using the parallel package. Avoid passing raster files that are
@@ -97,7 +124,7 @@ extract_by <- function(polygon=NULL, r=NULL){
   }
   e_cl <- parallel::makeCluster(parallel::detectCores()-1)
   clusterExport(cl=e_cl, varlist=c("r"))
-  ret <- parLapply(
+  ret <- parallel::parLapply(
       e_cl,
       X=polygon,
       fun=function(x){ raster::crop(x=r, y=x) }
@@ -193,6 +220,7 @@ l_calc_stat <- function(x, fun=NULL, from=NULL){
     FUN=fun
   ))
 }
+
 #
 # MAIN
 #
@@ -222,6 +250,7 @@ if(length(argv)>1){
       CRSobj=sp::CRS(raster::projection(r))
     )
 } else {
+  argv <- c(NULL,NULL)
   units <-
     sp::spTransform(readOGR(
         "/gis_data/Grids/",
@@ -236,13 +265,11 @@ if(length(argv)>1){
 
 cat(" -- building 3x3 buffered grid units across project area\n")
 system.time(usng_buffers <- buffer_grid_units(units))
-gc();
 
 # basic implementation for extracting that will use parallel by default,
 # but fails if the grid units are large
 cat(" -- extracting 3x3 buffered grid units across landcover raster\n")
 system.time(usng_extractions <- extract_by(usng_buffers, r))
-gc();
 
 cat(" -- calculating habitat composition metrics\n")
 
