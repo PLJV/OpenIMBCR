@@ -333,16 +333,7 @@ for(i in 1:nrow(area_statistics)){
     par_calc_stat(
       # using our 3x3 buffered unit raster extractions
       X=usng_extractions,
-      fun = function(x){
-         # calculate units of total area in square-kilometers
-         res <- raster::cellStats(x, stat=sum, na.rm=T) *
-                prod(raster::res(x)) * 10^-6
-         if(is.na(res) | is.null(res)){
-           return(0)
-         } else {
-           return(ret)
-         }
-      },
+      fun = calc_total_area,
       # using these PLJV landcover cell values in the reclassification
       from = eval(parse(text=as.character(area_statistics[i, 2])))
     )
