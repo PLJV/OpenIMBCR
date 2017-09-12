@@ -206,7 +206,8 @@ par_calc_stat <- function(X=NULL, fun=NULL, from=NULL, backfill_missing_w=0){
       ]
     null_rets <- rep(backfill_missing_w, length(null_ret_values))
       names(null_rets) <- null_ret_values
-    ret <- sort(c(ret, null_rets))
+    ret <- c(ret, null_rets)
+      ret <- ret[order(as.numeric(names(ret)))]
   }
   # clean-up cluster and return FUN result to user as a vector
   parallel::stopCluster(cl=e_cl); rm(e_cl); gc();
