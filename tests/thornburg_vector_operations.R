@@ -26,7 +26,7 @@ require(parallel)
 system("/usr/bin/clear")
 
 #' generate a square buffer around a single input feature
-buffer_grid_unit_by <- function(row=NULL, units=NULL, radius=1500){
+buffer_grid_unit <- function(row=NULL, units=NULL, radius=1500){
   if (!is.null(row)){
     units <- units[row, ]
   }
@@ -60,13 +60,13 @@ buffer_grid_unit_by <- function(row=NULL, units=NULL, radius=1500){
         proj4string=sp::CRS(raster::projection(units))
       ))
 }
-#' testing: generalization of the buffer_grid_unit_by function that uses
+#' testing: generalization of the buffer_grid_units function that uses
 #' lapply to buffer across all grid features in an input units
 #' data.frame
-l_buffer_grid_unit_by <- function(units=NULL, radius=1500){
+buffer_grid_units <- function(units=NULL, radius=1500){
   return(lapply(
       X=1:nrow(units),
-      FUN=function(x) buffer_grid_unit_by(row=x, units=units, radius=radius)
+      FUN=function(x) buffer_grid_unit(row=x, units=units, radius=radius)
     ))
 }
 #' extract an input raster dataset using polygon feature(s). Bulk process list
@@ -80,14 +80,21 @@ extract_by <- function(polygon=NULL, r=NULL){
         y=spTransform(polygon, sp::CRS(raster::projection(r)))
       ))
   }
+  # simplify our input polygons list to save RAM
+  if(inherits(polygon[[1]], 'SpatialPolygonsDataFrame')){
+    polygon <- lapply(polygon, FUN = as, 'SpatialPolygons')
+  }
   # default list comprehension: reproject to a consistent CRS
   # and then crop our input raster using a local cluster instance
-  # -- this eats up a lot of ram
-  polygon <- lapply(
-      polygon,
-      FUN=sp::spTransform,
-      CRSobj=sp::CRS(raster::projection(r))
-    )
+  if(!raster::compareCRS(polygon[[1]],r)){
+    warning(paste("input polygon= object(s) needed to be reprojected to",
+    "the CRS of r= this may lead to RAM issues", sep = ""))
+    polygon <- lapply(
+        polygon,
+        FUN=sp::spTransform,
+        CRSobj=sp::CRS(raster::projection(r))
+      )
+  }
   e_cl <- parallel::makeCluster(parallel::detectCores()-1)
   clusterExport(cl=e_cl, varlist=c("r"))
   ret <- parLapply(
@@ -132,19 +139,47 @@ binary_reclassify <- function(x=NULL, from=NULL, nomatch=NA){
       ))
 }
 #' shorthand function that applies an arbitrary, user-supplied summary
-#' statistic function across an input list of raster objects. Will optionally
+#' statistic function across an input list of raster objects, returning a
+#' scalar value attributable to each grid unit. Will optionally
 #' reclassify each input raster to a binary using binary_reclassify() if a
 #' non-null value is passed to from=
-parLapply_calc_stat <- function(x, fun=NULL, from=NULL){
-  cl <- parallel::makeCluster(parallel::detectCores()-1)
+par_calc_stat <- function(x, fun=NULL, from=NULL, backfill_missing_w=0){
+  stopifnot(!is.null(fun))
+  e_cl <- parallel::makeCluster(parallel::detectCores()-1)
+  # assume our nodes will always need 'raster' and kick-in our
+  # copy of the binary_reclassify shorthand while we are at it
+  parallel::clusterExport(e_cl, varlist=c('binary_reclassify'))
+  parallel::clusterCall(
+      e_cl,
+      function(x) library("raster")
+    )
   ret <- unlist(parallel::parLapply(
-      cl,
+      e_cl,
       # assume x is already a binary if from is NULL
-      X=if(is.null(from)) x else binary_reclassify(x, from=from),
-      fun=function(x) fun(x)
+      X = if(is.null(from)){
+        x
+      } else {
+        # nested parallel call to reclassify our input list, if needed
+        parallel::parLapply(
+            cl=e_cl,
+            X=x,
+            fun=binary_reclassify,
+            from=from
+          )
+      },
+      fun = fun
     ))
+  # account for any null/na return values from our FUN statistic
+  if (!is.null(backfill_missing_w) && length(ret < length(x))){
+    null_ret_values <- seq(1, length(x))[
+        !seq(1, length(x)) %in% as.numeric(names(ret))
+      ]
+    null_rets <- rep(backfill_missing_w, length(null_ret_values))
+      names(null_rets) <- null_ret_values
+    ret <- sort(c(ret, null_rets))
+  }
   # clean-up cluster and return FUN result to user as a vector
-  parallel::stopCluster(cl=cl); rm(cl); gc();
+  parallel::stopCluster(cl=e_cl); rm(e_cl); gc();
   return(ret)
 }
 #' testing: std lapply implementation to benchmark against parLapply
@@ -155,7 +190,7 @@ l_calc_stat <- function(x, fun=NULL, from=NULL){
       } else {
         x
       },
-    FUN=function(y) fun(y)
+    FUN=fun
   ))
 }
 #
@@ -168,33 +203,39 @@ cat(" -- reading input raster/vector datasets\n")
 # subset our input units by a user-defined range, if possible
 argv <- na.omit(as.numeric(commandArgs(trailingOnly = T)))
 
-if(length(argv)>1){
-  cat(
-      " -- processing units chunkwise (",
-      paste(argv, collapse = ":"),
-      ")\n", sep = ""
-    )
-  units <-
-    readOGR(
-      "/gis_data/Grids/",
-      "1km_usng_pljv_region_v1.0",
-      verbose=F
-    )[(argv[1]+1):argv[2], ]
-} else {
-  units <-
-    readOGR(
-      "/gis_data/Grids/",
-      "1km_usng_pljv_region_v1.0",
-      verbose=F
-    )
-}
-
 r <- raster(paste("/gis_data/Landcover/PLJV_Landcover/LD_Landcover/",
     "PLJV_TX_MORAP_2016_CRP.img", sep=""
   ))
 
+if(length(argv)>1){
+  cat(
+      " -- will process units chunkwise (",
+      paste(argv, collapse = ":"),
+      ")\n", sep = ""
+    )
+  units <-
+    sp::spTransform(readOGR(
+        "/gis_data/Grids/",
+        "1km_usng_pljv_region_v1.0",
+        verbose=F
+      )[(argv[1]+1):argv[2], ],
+      CRSobj=sp::CRS(raster::projection(r))
+    )
+} else {
+  units <-
+    sp::spTransform(readOGR(
+        "/gis_data/Grids/",
+        "1km_usng_pljv_region_v1.0",
+        verbose=F
+      ),
+      CRSobj=sp::CRS(raster::projection(r))
+    )
+}
+
+
+
 cat(" -- building 3x3 buffered grid units across project area\n")
-system.time(usng_buffers <- l_buffer_grid_unit_by(units))
+system.time(usng_buffers <- buffer_grid_units(units))
 gc();
 
 # basic implementation for extracting that will use parallel by default,
@@ -230,7 +271,7 @@ area_statistics <-
 # multiple cores on machines that are memory limited
 for(i in 1:nrow(area_statistics)){
   units@data[, as.character(area_statistics[i, 1])] <-
-    parLapply_calc_stat(
+    par_calc_stat(
       # using our 3x3 buffered unit raster extractions
       usng_extractions,
       fun = function(x){
@@ -241,22 +282,6 @@ for(i in 1:nrow(area_statistics)){
       from = eval(parse(text=as.character(area_statistics[i, 2])))
     )
 }
-
-cat("-- caching area metric results to disk\n")
-
-writeOGR(
-    units,
-    dsn=".",
-    layer=paste(
-        "units_attributed_",
-        argv[1],"-",argv[2],
-        sep=""
-      ),
-    overwrite=T,
-    driver="ESRI Shapefile"
-  )
-
-gc();
 
 # benchmarking lapply implementation
 # start <- Sys.time()
@@ -276,22 +301,15 @@ gc();
 # finish <- Sys.time()
 # l_time <- finish-start
 
-configuration_statistics <-
-  data.frame(
-      field_name=c(
-        'patch_count',
-        'mean_patch_area',
-        'inter-patch distance'
-      ),
-      cmd=c(
-        'function(x) SDMTools::ClassStats(x)$n.patches',
-        'function(x) SDMTools::ClassStats(x)$mean.patch.area',
-        'function(x) mean(raster::distance(x))'
-      )
-    )
+configuration_statistics <- c(
+    'pat_cnt',
+    'mn_pat_ar',
+    'in_pat_dist'
+  )
 
 cat(" -- extracting across our unbuffered grid units\n")
 
+# ~ 1184 seconds per 24634 units
 system.time(
   usng_extractions <- extract_by(
     polygon=unlist(split(units,1:nrow(units))),
@@ -303,7 +321,7 @@ rm(r); gc();
 
 # within-unit patch metric calculations [Short, Mixed,
 # shin oak/sand sage, CRP(?)]
-cat(" -- building a habitat/not-habitat raster surface\n")
+cat(" -- building a habitat/not-habitat raster surfaces\n")
 
 valid_habitat_values <- eval(parse(
     text=paste("c(",paste(area_statistics$src_raster_value[
@@ -311,29 +329,82 @@ valid_habitat_values <- eval(parse(
     ], collapse = ","), ")", sep="")
   ))
 
-system.time(habitat <- binary_reclassify(
-    usng_extractions,
-    from = eval(parse(text=paste("c(",paste(area_statistics$src_raster_value[
-        !grepl(area_statistics$field_name, pattern="rd_area")
-      ], collapse = ","), ")", sep="")))
-  ))
-
 cat(" -- calculating patch configuration metrics\n")
 
-for(i in 1:nrow(configuration_statistics)){
-  units@data[, as.character(configuration_statistics[i, 1])] <-
-    parLapply_calc_stat(
-      # using our 3x3 buffered unit raster extractions
-      usng_extractions,
-      fun = eval(parse(text=as.character(configuration_statistics[i, 2]))),
-      # using these PLJV landcover cell values in the reclassification
-      from = valid_habitat_values
-    )
-  # calculate a within-unit patch count
-
-  # calculate inter-patch distance
-  # calculate mean patch area
-}
+# ~200.377 seconds
+# system.time(units@data[, as.character(configuration_statistics[1])] <-
+#   l_calc_stat(
+#     # using our using our un-buffered unit raster extractions
+#     usng_extractions,
+#     # parse the focal landscape configuration metric
+#     fun = function(x){ SDMTools::ClassStat(x)$n.patches },
+#     # using these PLJV landcover cell values in the supplemental
+#     # reclassification
+#     from = valid_habitat_values
+#   ))
+# ~ 49 seconds
+system.time(units@data[, as.character(configuration_statistics[1])] <-
+par_calc_stat(
+    # using our using our un-buffered unit raster extractions
+    usng_extractions,
+    # parse the focal landscape configuration metric
+    fun = function(x){ SDMTools::ClassStat(x)$n.patches },
+    # using these PLJV landcover cell values in the supplemental
+    # reclassification
+    from = valid_habitat_values
+  ))
+system.time(units@data[, as.character(configuration_statistics[2])] <-
+  par_calc_stat(
+    # using our using our un-buffered unit raster extractions
+    usng_extractions,
+    # mean patch area function:
+    fun = function(x){ SDMTools::ClassStat(x)$mean.patch.area },
+    # using these PLJV landcover cell values in the supplemental
+    # reclassification
+    from = valid_habitat_values
+  ))
+system.time(units@data[, as.character(configuration_statistics[3])] <-
+  par_calc_stat(
+    # using our using our un-buffered unit raster extractions
+    usng_extractions,
+    # mean inter-patch distance function:
+    fun = function(x){
+        # if there are no habitat patches (issolation would theoretically be
+        # very high), don't try to calc inter-patch distance because distance()
+        # will throw an error
+        if (sum(!is.na(raster::values(x))) == 0){
+          return(9999)
+        # if the whole raster is pure habitat (i.e., no inter-patches)
+        } else if (sum(is.na(raster::values(x))) == raster::ncell(x)) {
+          return(0)
+        }
+        else {
+          ret <- try(mean(raster::values(raster::distance(x)), na.rm = T))
+          if(class(ret) == "try-error"){
+            return(NULL)
+          } else {
+            return(ret)
+          }
+        }
+    },
+    # using these PLJV landcover cell values in the supplemental
+    # reclassification
+    from = valid_habitat_values,
+    backfill_missing_w=9999
+  ))
 
 # do a PCA of our fragmentation metrics
+
 # save to disk
+cat(" -- finished: caching metrics to disk")
+writeOGR(
+    units,
+    dsn=".",
+    layer=paste(
+        "units_attributed_",
+        argv[1],"-",argv[2],
+        sep=""
+      ),
+    overwrite=T,
+    driver="ESRI Shapefile"
+  )
