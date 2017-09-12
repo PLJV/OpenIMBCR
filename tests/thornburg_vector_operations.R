@@ -174,7 +174,7 @@ binary_reclassify <- function(x=NULL, from=NULL, nomatch=NA){
 #' reclassify each input raster to a binary using binary_reclassify() if a
 #' non-null value is passed to from=
 par_calc_stat <- function(x, fun=NULL, from=NULL, backfill_missing_w=0){
-  stopifnot(!is.null(fun))
+  stopifnot(!inherits(fun, 'function'))
   e_cl <- parallel::makeCluster(parallel::detectCores()-1)
   # assume our nodes will always need 'raster' and kick-in our
   # copy of the binary_reclassify shorthand while we are at it
@@ -222,6 +222,28 @@ l_calc_stat <- function(x, fun=NULL, from=NULL){
       },
     FUN=fun
   ))
+}
+#' shorthand interpatch distance calculation function that arbitrarily
+#' applies a user-specified summary statistic to observed distances in
+#' a raster image.
+calc_interpatch_distance <- function(x=NULL, stat=mean){
+  # if there are no habitat patches (issolation would theoretically be
+  # very high), don't try to calc inter-patch distance because distance()
+  # will throw an error
+  if (sum(!is.na(raster::values(x))) == 0){
+    return(9999)
+  # if the whole raster is pure habitat (i.e., no inter-patches)
+  } else if (sum(is.na(raster::values(x))) == raster::ncell(x)) {
+    return(0)
+  }
+  else {
+    ret <- try(stat(raster::values(raster::distance(x)), na.rm = T))
+    if(class(ret) == "try-error"){
+      return(NULL)
+    } else {
+      return(ret)
+    }
+  }
 }
 
 #
@@ -347,8 +369,6 @@ system.time(
   )
 )
 
-rm(r); gc();
-
 # within-unit patch metric calculations [Short, Mixed,
 # shin oak/sand sage, CRP(?)]
 cat(" -- building a habitat/not-habitat raster surfaces\n")
@@ -407,8 +427,7 @@ system.time(units@data[, as.character(configuration_statistics[3])] <-
         # if the whole raster is pure habitat (i.e., no inter-patches)
         } else if (sum(is.na(raster::values(x))) == raster::ncell(x)) {
           return(0)
-        }
-        else {
+        } else {
           ret <- try(mean(raster::values(raster::distance(x)), na.rm = T))
           if(class(ret) == "try-error"){
             return(NULL)
