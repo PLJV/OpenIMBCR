@@ -174,7 +174,7 @@ binary_reclassify <- function(x=NULL, from=NULL, nomatch=NA){
 #' reclassify each input raster to a binary using binary_reclassify() if a
 #' non-null value is passed to from=
 par_calc_stat <- function(X=NULL, fun=NULL, from=NULL, backfill_missing_w=0){
-  stopifnot(!inherits(fun, 'function'))
+  stopifnot(inherits(fun, 'function'))
   e_cl <- parallel::makeCluster(parallel::detectCores()-1)
   # assume our nodes will always need 'raster' and kick-in our
   # copy of the binary_reclassify shorthand while we are at it
@@ -200,9 +200,9 @@ par_calc_stat <- function(X=NULL, fun=NULL, from=NULL, backfill_missing_w=0){
       fun = fun
     ))
   # account for any null/na return values from our FUN statistic
-  if (!is.null(backfill_missing_w) && length(ret < length(x))){
-    null_ret_values <- seq(1, length(x))[
-        !seq(1, length(x)) %in% as.numeric(names(ret))
+  if (!is.null(backfill_missing_w) && length(ret < length(X))){
+    null_ret_values <- seq(1, length(X))[
+        !seq(1, length(X)) %in% as.numeric(names(ret))
       ]
     null_rets <- rep(backfill_missing_w, length(null_ret_values))
       names(null_rets) <- null_ret_values
@@ -227,9 +227,9 @@ l_calc_stat <- function(x, fun=NULL, from=NULL){
 #' shorthand total area calculation function
 calc_total_area <- function(x=NULL, area_of_cell = 10^-6){
    # calculate units of total area in square-kilometers
-   res <- raster::cellStats(x, stat=sum, na.rm=T) *
+   ret <- raster::cellStats(x, stat=sum, na.rm=T) *
           prod(raster::res(x)) * area_of_cell
-   if (is.na(res) | is.null(res)){
+   if (is.na(ret) | is.null(ret)){
      return(0)
    } else {
      return(ret)
