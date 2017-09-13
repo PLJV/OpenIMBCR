@@ -1,9 +1,11 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
-import sys, os
+import sys
+import os
+import glob
 from osgeo import ogr
 
-def sp_count_features(path):
+def sp_count_features(path=None):
     """ Returns the number of spatial features in a shapefile"""
     driver = ogr.GetDriverByName("ESRI Shapefile")
     dataSource = driver.Open(path, 0)
@@ -24,43 +26,40 @@ def step_through_grid_units(step=24634, path="/gis_data/Grids/1km_usng_pljv_regi
   for seg in segments:
     run_r_thread(seg)
 
-def ls_shapefiles(path='.', **kwargs):
-    """ this """
-    pass
+def find_shapefile_segments(path='.', pattern="units_attributed_*.shp", **kwargs):
+    """ shorthand  """
+    return(glob.glob(pattern))
+
 def sp_merge_segments(**kwargs):
     """ List all shapefiles in the CWD and merge all features into singe file """
-    outShapefile = "units_arributed.shp"
+
+    outShapefile = "units_attributed.shp"
     outDriver = ogr.GetDriverByName("ESRI Shapefile")
 
     if os.path.exists(outShapefile):
         outDriver.DeleteDataSource(outShapefile)
 
+    outDriver = ogr.GetDriverByName('ESRI Shapefile')
     outDataSource = outDriver.CreateDataSource(outShapefile)
     outLayer = outDataSource.CreateLayer("units_arributed", geom_type=ogr.wkbPolygon)
-    # Add input Layer Fields to the output Layer
-    inLayerDefn = inLayer.GetLayerDefn()
-    for i in range(0, inLayerDefn.GetFieldCount()):
-        fieldDefn = inLayerDefn.GetFieldDefn(i)
-        outLayer.CreateField(fieldDefn)
 
-    # Get the output Layer's Feature Definition
-    outLayerDefn = outLayer.GetLayerDefn()
+    fileSegments = find_shapefile_segments()
 
-    # Add features to the ouput Layer
-    for i in range(0, inLayer.GetFeatureCount()):
-        # Get the input Feature
-        inFeature = inLayer.GetFeature(i)
-        # Create output Feature
-        outFeature = ogr.Feature(outLayerDefn)
-        # Add field values from input Layer
-        for i in range(0, outLayerDefn.GetFieldCount()):
-            outFeature.SetField(outLayerDefn.GetFieldDefn(i).GetNameRef(), inFeature.GetField(i))
-        # Set geometry as centroid
-        geom = inFeature.GetGeometryRef()
-        centroid = geom.Centroid()
-        outFeature.SetGeometry(centroid)
-        # Add new feature to output Layer
-        outLayer.CreateFeature(outFeature)
+    sys.stdout.write(str(" -- merging segments:"));
+    sys.stdout.flush();
+    for file in fileSegments:
+        sys.stdout.write(str("."))
+        sys.stdout.flush()
+        inDataSource = ogr.Open(file)
+        inLayer = inDataSource.GetLayer()
+        for feature in inLayer:
+            outFeature = ogr.Feature(outLayer.GetLayerDefn())
+            outFeature.SetGeometry(feature.GetGeometryRef().Clone())
+            outLayer.CreateFeature(outFeature)
+            outFeature = None
+            outLayer.SyncToDisk()
+    sys.stdout.write(str("\n"));
+    sys.stdout.flush();
 
 if __name__ == "__main__" :
   step_through_grid_units()
