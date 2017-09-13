@@ -5,11 +5,10 @@ import os
 import glob
 from osgeo import ogr
 
-def sp_count_features(path=None):
-    """ Returns the number of spatial features in a shapefile"""
-    driver = ogr.GetDriverByName("ESRI Shapefile")
-    dataSource = driver.Open(path, 0)
-    return(dataSource.GetLayer().GetFeatureCount())
+
+def printf(string=NULL):
+    sys.stdout.write(str(string));
+    sys.stdout.flush();
 
 def run_r_thread(*kwargs):
   """ System wrapper for Rscript that calls our grid unit attribution script
@@ -27,8 +26,14 @@ def step_through_grid_units(step=24634, path="/gis_data/Grids/1km_usng_pljv_regi
     run_r_thread(seg)
 
 def find_shapefile_segments(path='.', pattern="units_attributed_*.shp", **kwargs):
-    """ shorthand  """
+    """ shorthand for glob.glob file finding """
     return(glob.glob(pattern))
+
+def sp_count_features(path=None):
+    """ Returns the number of spatial features in a shapefile"""
+    driver = ogr.GetDriverByName("ESRI Shapefile")
+    dataSource = driver.Open(path, 0)
+    return(dataSource.GetLayer().GetFeatureCount())
 
 def sp_merge_segments(**kwargs):
     """ List all shapefiles in the CWD and merge all features into singe file """
@@ -45,11 +50,9 @@ def sp_merge_segments(**kwargs):
 
     fileSegments = find_shapefile_segments()
 
-    sys.stdout.write(str(" -- merging segments:"));
-    sys.stdout.flush();
+    printf(" -- merging segments:");
     for file in fileSegments:
-        sys.stdout.write(str("."))
-        sys.stdout.flush()
+        printf(".")
         inDataSource = ogr.Open(file)
         inLayer = inDataSource.GetLayer()
         for feature in inLayer:
@@ -58,8 +61,8 @@ def sp_merge_segments(**kwargs):
             outLayer.CreateFeature(outFeature)
             outFeature = None
             outLayer.SyncToDisk()
-    sys.stdout.write(str("\n"));
-    sys.stdout.flush();
+    printf(" -- done\n");
 
 if __name__ == "__main__" :
   step_through_grid_units()
+  sp_merge_segments()
