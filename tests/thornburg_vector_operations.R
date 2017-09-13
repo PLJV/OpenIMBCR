@@ -257,6 +257,34 @@ calc_interpatch_distance <- function(x=NULL, stat=mean){
     }
   }
 }
+#'
+#'
+calc_mean_patch_area <- function(x=NULL, area_of_cell = 10^-6){
+  # if there are no habitat patches don't try to calc
+  if (sum(!is.na(raster::values(x))) == 0){
+    return(0)
+  # if the whole raster is a giant patch
+  } else if (sum(is.na(raster::values(x))) == raster::ncell(x)) {
+    return(raster::ncell(x) * raster::prod(raster::res(x)) * area_of_cell)
+  } else {
+  # default units from SDMTools are m^2
+    return(SDMTools::ClassStat(x)$mean.patch.area * area_of_cell)
+  }
+}
+#'
+#'
+calc_patch_count <- function(x=NULL){
+  # if there are no habitat patches don't try to calc
+  if (sum(!is.na(raster::values(x))) == 0){
+    return(0)
+  # if the whole raster is a giant patch
+  } else if (sum(is.na(raster::values(x))) == raster::ncell(x)) {
+    return(1)
+  } else {
+  # default units from SDMTools are m^2
+    return(SDMTools::ClassStat(x)$n.patches)
+  }
+}
 
 #
 # MAIN
@@ -299,12 +327,12 @@ if(length(argv)>1){
 }
 
 cat(" -- building 3x3 buffered grid units across project area\n")
-system.time(usng_buffers <- par_buffer_grid_units(units))
+usng_buffers <- par_buffer_grid_units(units)
 
 # basic implementation for extracting that will use parallel by default,
 # but fails if the grid units are large
 cat(" -- extracting 3x3 buffered grid units across landcover raster\n")
-system.time(usng_extractions <- extract_by(usng_buffers, r))
+usng_extractions <- extract_by(usng_buffers, r)
 
 cat(" -- calculating habitat composition metrics\n")
 
@@ -339,24 +367,6 @@ for(i in 1:nrow(area_statistics)){
     )
 }
 
-# benchmarking lapply implementation
-# start <- Sys.time()
-# for(i in 1:nrow(area_statistics)){
-#   units@data[, as.character(area_statistics[i, 1])] <-
-#     l_calc_stat(
-#       # using our 3x3 buffered unit raster extractions
-#       usng_extractions,
-#       fun = function(x){
-#          # calculate units of total area in square-kilometers
-#          raster::cellStats(x, stat=sum) * prod(raster::res(x)) * 10^-6
-#       },
-#       # using these PLJV landcover cell values in the reclassification
-#       from = eval(parse(text=as.character(area_statistics[i, 2])))
-#     )
-# }
-# finish <- Sys.time()
-# l_time <- finish-start
-
 configuration_statistics <- c(
     'p_cnt',
     'mn_p_area',
@@ -366,11 +376,9 @@ configuration_statistics <- c(
 cat(" -- extracting across our unbuffered grid units\n")
 
 # ~ 1184 seconds per 24634 units
-system.time(
-  usng_extractions <- extract_by(
-    polygon=unlist(split(units,1:nrow(units))),
-    r=r
-  )
+usng_extractions <- extract_by(
+  polygon=unlist(split(units,1:nrow(units))),
+  r=r
 )
 
 # within-unit patch metric calculations [Short, Mixed,
@@ -385,66 +393,37 @@ valid_habitat_values <- eval(parse(
 
 cat(" -- calculating patch configuration metrics\n")
 
-# ~200.377 seconds
-# system.time(units@data[, as.character(configuration_statistics[1])] <-
-#   l_calc_stat(
-#     # using our using our un-buffered unit raster extractions
-#     usng_extractions,
-#     # parse the focal landscape configuration metric
-#     fun = function(x){ SDMTools::ClassStat(x)$n.patches },
-#     # using these PLJV landcover cell values in the supplemental
-#     # reclassification
-#     from = valid_habitat_values
-#   ))
-# ~ 49 seconds
-system.time(units@data[, as.character(configuration_statistics[1])] <-
-par_calc_stat(
-    # using our using our un-buffered unit raster extractions
-    usng_extractions,
-    # parse the focal landscape configuration metric
-    fun = function(x){ SDMTools::ClassStat(x)$n.patches },
-    # using these PLJV landcover cell values in the supplemental
-    # reclassification
-    from = valid_habitat_values
-  ))
-system.time(units@data[, as.character(configuration_statistics[2])] <-
+units@data[, as.character(configuration_statistics[1])] <-
+  par_calc_stat(
+      # using our using our un-buffered unit raster extractions
+      usng_extractions,
+      # parse the focal landscape configuration metric
+      fun = calc_patch_count,
+      # using these PLJV landcover cell values in the supplemental
+      # reclassification
+      from = valid_habitat_values
+    )
+units@data[, as.character(configuration_statistics[2])] <-
   par_calc_stat(
     # using our using our un-buffered unit raster extractions
     usng_extractions,
     # mean patch area function:
-    fun = function(x){ SDMTools::ClassStat(x)$mean.patch.area },
+    fun = calc_mean_patch_area,
     # using these PLJV landcover cell values in the supplemental
     # reclassification
     from = valid_habitat_values
-  ))
-system.time(units@data[, as.character(configuration_statistics[3])] <-
+  )
+units@data[, as.character(configuration_statistics[3])] <-
   par_calc_stat(
     # using our using our un-buffered unit raster extractions
     usng_extractions,
     # mean inter-patch distance function:
-    fun = function(x){
-        # if there are no habitat patches (issolation would theoretically be
-        # very high), don't try to calc inter-patch distance because distance()
-        # will throw an error
-        if (sum(!is.na(raster::values(x))) == 0){
-          return(9999)
-        # if the whole raster is pure habitat (i.e., no inter-patches)
-        } else if (sum(is.na(raster::values(x))) == raster::ncell(x)) {
-          return(0)
-        } else {
-          ret <- try(mean(raster::values(raster::distance(x)), na.rm = T))
-          if(class(ret) == "try-error"){
-            return(NULL)
-          } else {
-            return(ret)
-          }
-        }
-    },
+    fun = calc_interpatch_distance,
     # using these PLJV landcover cell values in the supplemental
     # reclassification
     from = valid_habitat_values,
     backfill_missing_w=9999
-  ))
+  )
 
 # do a PCA of our fragmentation metrics
 

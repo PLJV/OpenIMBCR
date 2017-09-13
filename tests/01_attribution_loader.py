@@ -55,7 +55,7 @@ def sp_merge_segments(**kwargs):
         printf(".")
         inDataSource = ogr.Open(file)
         inLayer = inDataSource.GetLayer()
-
+        # if this is the first file in the merge, create attribute table
         if outLayer.GetLayerDefn().GetFieldCount() == 0:
             for index in range(inLayer.GetLayerDefn().GetFieldCount()):
                 srcField = inLayer.GetLayerDefn().GetFieldDefn(index)
@@ -63,7 +63,7 @@ def sp_merge_segments(**kwargs):
                 field.SetWidth( srcField.GetWidth() )
                 field.SetPrecision( srcField.GetPrecision() )
                 outLayer.CreateField(field)
-
+        # create a feature geometry and populate all fields from source
         for feature in inLayer:
             outFeature = ogr.Feature(outLayer.GetLayerDefn())
             outFeature.SetGeometry(feature.GetGeometryRef().Clone())
@@ -71,7 +71,7 @@ def sp_merge_segments(**kwargs):
               outFeature.SetField(index, feature.GetField(index) )
             outLayer.CreateFeature(outFeature)
             outFeature = None
-
+        # cache the feature dump to disk and continue
         outLayer.SyncToDisk()
 
     printf(" -- done\n");
