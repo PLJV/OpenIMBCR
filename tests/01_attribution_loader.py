@@ -5,8 +5,7 @@ import os
 import glob
 from osgeo import ogr
 
-
-def printf(string=NULL):
+def printf(string=None):
     sys.stdout.write(str(string));
     sys.stdout.flush();
 
@@ -51,18 +50,32 @@ def sp_merge_segments(**kwargs):
     fileSegments = find_shapefile_segments()
 
     printf(" -- merging segments:");
+
     for file in fileSegments:
         printf(".")
         inDataSource = ogr.Open(file)
         inLayer = inDataSource.GetLayer()
+
+        if outLayer.GetLayerDefn().GetFieldCount() == 0:
+            for index in range(inLayer.GetLayerDefn().GetFieldCount()):
+                srcField = inLayer.GetLayerDefn().GetFieldDefn(index)
+                field = ogr.FieldDefn( srcField.GetName(), srcField.GetType() )
+                field.SetWidth( srcField.GetWidth() )
+                field.SetPrecision( srcField.GetPrecision() )
+                outLayer.CreateField(field)
+
         for feature in inLayer:
             outFeature = ogr.Feature(outLayer.GetLayerDefn())
             outFeature.SetGeometry(feature.GetGeometryRef().Clone())
+            for index in range(feature.GetFieldCount()):
+              outFeature.SetField(index, feature.GetField(index) )
             outLayer.CreateFeature(outFeature)
             outFeature = None
-            outLayer.SyncToDisk()
+
+        outLayer.SyncToDisk()
+
     printf(" -- done\n");
 
 if __name__ == "__main__" :
-  step_through_grid_units()
+  #step_through_grid_units()
   sp_merge_segments()
