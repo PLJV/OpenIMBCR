@@ -409,8 +409,8 @@ for(i in 1:nrow(lg_area_statistics)){
 # shin oak/sand sage, CRP(?)]
 cat(" -- building a habitat/not-habitat raster surfaces\n")
 valid_habitat_values <- eval(parse(
-    text=paste("c(",paste(area_statistics$src_raster_value[
-      !grepl(area_statistics$field_name, pattern="rd_ar")
+    text=paste("c(",paste(lg_area_statistics$src_raster_value[
+      !grepl(lg_area_statistics$field_name, pattern="rd_ar")
     ], collapse = ","), ")", sep="")
   ))
 cat(" -- calculating patch configuration metrics\n")
