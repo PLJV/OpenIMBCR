@@ -332,7 +332,7 @@ usng_buffers_9km <- par_buffer_grid_units(units)
 # basic implementation for extracting that will use parallel by default,
 # but fails if the grid units are large
 cat(" -- extracting 3x3 buffered grid units across landcover raster\n")
-usng_extractions_9km <- extract_by(usng_buffers, r)
+usng_extractions_9km <- extract_by(usng_buffers_9km, r)
 
 cat(" -- extracting across our unbuffered (1km) grid units\n")
 # ~ 1184 seconds per 24634 units
@@ -445,7 +445,7 @@ units@data[, as.character(configuration_statistics[3])] <-
     from = valid_habitat_values,
     backfill_missing_w=9999
   )
-  
+
 # do a PCA of our fragmentation metrics
 
 # save to disk
