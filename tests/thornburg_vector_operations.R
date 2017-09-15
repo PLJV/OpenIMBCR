@@ -327,24 +327,30 @@ if(length(argv)>1){
 }
 
 cat(" -- building 3x3 buffered grid units across project area\n")
-usng_buffers <- par_buffer_grid_units(units)
+usng_buffers_9km <- par_buffer_grid_units(units)
 
 # basic implementation for extracting that will use parallel by default,
 # but fails if the grid units are large
 cat(" -- extracting 3x3 buffered grid units across landcover raster\n")
-usng_extractions <- extract_by(usng_buffers, r)
+usng_extractions_9km <- extract_by(usng_buffers, r)
 
-cat(" -- calculating habitat composition metrics\n")
+cat(" -- extracting across our unbuffered (1km) grid units\n")
+# ~ 1184 seconds per 24634 units
+usng_extractions_1km <- extract_by(
+  polygon=unlist(split(units,1:nrow(units))),
+  r=r
+)
 
-area_statistics <-
+cat(" -- calculating habitat composition/configuration metrics\n")
+ag_area_statistics <-
   data.frame(
       field_name=c(
-        'sgp_area',
-        'mgp_area',
-        'ok_sg_area',
-        'pl_area',
-        'crp_area',
-        'rd_area'
+        'ag_sgp_ar',
+        'ag_mgp_ar',
+        'ag_oksg_ar',
+        'ag_pl_ar',
+        'ag_crp_ar',
+        'ag_rd_ar'
       ),
       src_raster_value=c(
         '75',
@@ -355,48 +361,63 @@ area_statistics <-
         'c(44,41)'
       )
     )
-
-for(i in 1:nrow(area_statistics)){
-  units@data[, as.character(area_statistics[i, 1])] <-
-    par_calc_stat(
-      # using our 3x3 buffered unit raster extractions
-      X=usng_extractions,
-      fun = calc_total_area,
-      # using these PLJV landcover cell values in the reclassification
-      from = eval(parse(text=as.character(area_statistics[i, 2])))
+lg_area_statistics <-
+  data.frame(
+      field_name=c(
+        'lg_sgp_ar',
+        'lg_mgp_ar',
+        'lg_oksg_ar',
+        'lg_pl_ar',
+        'lg_crp_ar',
+        'lg_rd_ar'
+      ),
+      src_raster_value=c(
+        '75',
+        '71',
+        'c(85,87)',
+        '12',
+        '39',
+        'c(44,41)'
+      )
     )
-}
-
 configuration_statistics <- c(
-    'p_cnt',
-    'mn_p_area',
-    'in_p_dist'
+    'pat_ct',
+    'mn_p_ar',
+    'inp_dst'
   )
 
-cat(" -- extracting across our unbuffered grid units\n")
-
-# ~ 1184 seconds per 24634 units
-usng_extractions <- extract_by(
-  polygon=unlist(split(units,1:nrow(units))),
-  r=r
-)
+for(i in 1:nrow(lg_area_statistics)){
+  units@data[, as.character(lg_area_statistics[i, 1])] <-
+    par_calc_stat(
+      # using our 1 km unit raster extractions
+      X=usng_extractions_1km,
+      fun = calc_total_area,
+      # using these PLJV landcover cell values in the reclassification
+      from = eval(parse(text=as.character(lg_area_statistics[i, 2])))
+    )
+  units@data[, as.character(ag_area_statistics[i, 1])] <-
+    par_calc_stat(
+      # using our 3x3 buffered unit raster extractions
+      X=usng_extractions_9km,
+      fun = calc_total_area,
+      # using these PLJV landcover cell values in the reclassification
+      from = eval(parse(text=as.character(ag_area_statistics[i, 2])))
+    )
+}
 
 # within-unit patch metric calculations [Short, Mixed,
 # shin oak/sand sage, CRP(?)]
 cat(" -- building a habitat/not-habitat raster surfaces\n")
-
 valid_habitat_values <- eval(parse(
     text=paste("c(",paste(area_statistics$src_raster_value[
-      !grepl(area_statistics$field_name, pattern="rd_area")
+      !grepl(area_statistics$field_name, pattern="rd_ar")
     ], collapse = ","), ")", sep="")
   ))
-
 cat(" -- calculating patch configuration metrics\n")
-
 units@data[, as.character(configuration_statistics[1])] <-
   par_calc_stat(
       # using our using our un-buffered unit raster extractions
-      usng_extractions,
+      usng_extractions_9km,
       # parse the focal landscape configuration metric
       fun = calc_patch_count,
       # using these PLJV landcover cell values in the supplemental
@@ -406,7 +427,7 @@ units@data[, as.character(configuration_statistics[1])] <-
 units@data[, as.character(configuration_statistics[2])] <-
   par_calc_stat(
     # using our using our un-buffered unit raster extractions
-    usng_extractions,
+    usng_extractions_9km,
     # mean patch area function:
     fun = calc_mean_patch_area,
     # using these PLJV landcover cell values in the supplemental
@@ -416,7 +437,7 @@ units@data[, as.character(configuration_statistics[2])] <-
 units@data[, as.character(configuration_statistics[3])] <-
   par_calc_stat(
     # using our using our un-buffered unit raster extractions
-    usng_extractions,
+    usng_extractions_9km,
     # mean inter-patch distance function:
     fun = calc_interpatch_distance,
     # using these PLJV landcover cell values in the supplemental
@@ -424,7 +445,7 @@ units@data[, as.character(configuration_statistics[3])] <-
     from = valid_habitat_values,
     backfill_missing_w=9999
   )
-
+  
 # do a PCA of our fragmentation metrics
 
 # save to disk
