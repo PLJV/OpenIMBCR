@@ -289,14 +289,36 @@ build_unmarked_gds <- function(df=NULL,
       numPrimary=numPrimary # should be kept at 1 (no within-season visits)
     ))
 }
+#' shorthand vector extraction function that performs a spatial join attributes
+#' vector features in x with overlapping features in y. Will automatically
+#' reproject to a consistent CRS.
+#'
+spatialJoin <- function(x=NULL, y=NULL){
+  over <- sp::over(
+      x = sp::spTransform(
+          x,
+          sp::CRS(raster::projection(y))
+        ),
+      y = y
+    )
+  x@data <- cbind(x@data, over)
+  return(x)
+}
 
 #
 # MAIN
 #
+# Accepts two arguments at runtime -- (1) a full path to the attributed
+# USNG units and (2) the four-letter bird code for the species we are
+# fitting our model to.
+#
 
 argv <- commandArgs(trailingOnly=T)
 
-if(nchar(argv[1])==4){
+stopifnot(file.exists(argv[1]))
+units <- OpenIMBCR:::readOGRfromPath(argv[1])
+
+if(nchar(argv[2])==4){
   stop("expected first argument to be a four-letter bird code")
 } else {
   argv <- toupper(argv)
@@ -305,7 +327,7 @@ if(nchar(argv[1])==4){
 spp_imbcr_observations <-
   scrub_imbcr_df(OpenIMBCR::imbcrTableToShapefile(
     list.files("..",
-         pattern="imbcr_table.csv$",
+         pattern="RawData_PLJV_IMBCR_20161024.csv$",
          recursive=T,
          full.names=T
        )[1]
@@ -319,5 +341,7 @@ spp_imbcr_observations <-
 
 # 2.) build a data.frame from our station points and their respective
 # USNG attributed grid cell
+
+spp_imbcr_observations <- spatialJoin(spp_imbcr_observations, units)
 
 # 3.)

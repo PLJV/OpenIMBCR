@@ -1,3 +1,22 @@
+#' built-in (hidden) function that will accept the full path of a shapefile and parse the string into something that
+#' rgdal can understand (DSN + Layer).
+parseLayerDsn <- function(x=NULL){
+  path <- unlist(strsplit(x, split="/"))
+    layer <- gsub(path[length(path)],pattern=".shp",replacement="")
+      dsn <- paste(path[1:(length(path)-1)],collapse="/")
+  return(c(layer,dsn))
+}
+#' built-in (hidden) function that will accept the full path of a shapefile and read using rgdal::ogr
+#' @param path argument provides the full path to an ESRI Shapefile
+readOGRfromPath <- function(path=NULL, verbose=F){
+  landscapeAnalysis:::include('rgdal')
+  path <- landscapeAnalysis:::parseLayerDsn(path)
+
+  layer <- path[1]
+    dsn <- path[2]
+
+  return(rgdal::readOGR(dsn,layer,verbose=verbose))
+}
 #' strip non-essential characters and spaces from a species common name in a field
 stripCommonName <- function(x) tolower(gsub(x,pattern=" |'|-",replacement=""))
 #' recursively find all files in folder (root) that match the pattern (name)
@@ -56,9 +75,14 @@ imbcrTableToShapefile <- function(filename=NULL,outfile=NULL,write=F){
       row.names(s[[length(s)]]) <- paste(letters[length(s)],row.names(s[[length(s)]]),sep=".") # based on : http://gis.stackexchange.com/questions/155328/merging-multiple-spatialpolygondataframes-into-1-spdf-in-r
     }
 
-    s <- lapply(s,FUN=sp::spTransform,sp::CRS(raster::projection(s[[1]])))
-      s <- do.call(sp::rbind.SpatialPointsDataFrame,s)
-        s$FID <- 1:nrow(s)
+    s <- do.call(
+        sp::rbind.SpatialPointsDataFrame,
+        lapply(
+          s,
+          FUN=sp::spTransform,
+          sp::CRS(raster::projection("+init=epsg:2163"))
+        ))
+    s$FID <- 1:nrow(s)
     # write to disk -- and allow some wiggle-room on filename conventions
     if(write){
       rgdal::writeOGR(s,".",ifelse(is.null(outfile),gsub(filename,pattern=".csv",replacement=""),outfile),driver="ESRI Shapefile",overwrite=T)
