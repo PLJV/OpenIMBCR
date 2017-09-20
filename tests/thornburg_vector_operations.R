@@ -309,7 +309,7 @@ if(length(argv)>1){
   units <-
     sp::spTransform(readOGR(
         "/gis_data/Grids/",
-        "1km_usng_pljv_region_v1.0",
+        "1km_usng_pljv_region_v3.0",
         verbose=F
       )[(argv[1]+1):argv[2], ],
       CRSobj=sp::CRS(raster::projection(r))
