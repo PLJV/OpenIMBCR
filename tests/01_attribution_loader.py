@@ -6,15 +6,16 @@ import glob
 from osgeo import ogr
 
 def printf(string=None):
-    sys.stdout.write(str(string));
-    sys.stdout.flush();
+    sys.stdout.write(str(string))
+    sys.stdout.flush()
 
 
-def run_r_thread(*kwargs):
+def run_r_thread(com="Rscript",
+                 src="/global_workspace/thornburg/thornburg_vector_operations.R",
+                 *kwargs):
   """ System wrapper for Rscript that calls our grid unit attribution script
   chunkwise """
-  com = "Rscript"
-  src = "/global_workspace/thornburg/thornburg_vector_operations.R"
+
   os.system(com + " " + src + " " + str(kwargs[0][0]) + " " + str(kwargs[0][1]))
 
 

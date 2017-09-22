@@ -1,12 +1,3 @@
-# require(OpenIMBCR)
-# require(unmarked)
-# require(rgeos)
-# require(rgdal)
-# require(raster)
-# require(parallel)
-#
-# system("clear")
-
 #
 # Define some useful local functions for manipulating IMBCR data
 #
@@ -354,7 +345,7 @@ if(nchar(argv[2])!=4){
 # 2.) build a data.frame from our station points and their respective
 # USNG attributed grid cell
 
-system.time(imbcr_observations <-
+imbcr_observations <-
   scrub_imbcr_df(OpenIMBCR::imbcrTableToShapefile(
     list.files("/global_workspace/imbcr_number_crunching/",
          pattern="RawData_PLJV_IMBCR_20161201.csv$",
@@ -362,10 +353,10 @@ system.time(imbcr_observations <-
          full.names=T
        )[1]
     ),
-    four_letter_code="WITU",
+    four_letter_code=argv[2],
     back_fill_all_na=F  # keep only NA values for transects with >= 1 spp det
     #back_fill_all_na=T # keep all NA values
-  ))
+  )
 
 # calculate distance bins
 breaks <- append(0,as.numeric(quantile(as.numeric(
@@ -384,16 +375,16 @@ imbcr_observations <- calc_day_of_year(imbcr_observations)
 imbcr_observations <- calc_transect_effort(imbcr_observations)
 
 # join with our habitat covariates
-system.time(imbcr_df <- spatial_join(
+imbcr_df <- spatial_join(
     imbcr_observations,
     units
-  ))
+  )
 
 # pool and convert our SpatialPointsDataFrame to an unmarked gds frame
-system.time(imbcr_df <- scrub_unmarked_dataframe(build_unmarked_gds(
+imbcr_df <- scrub_unmarked_dataframe(build_unmarked_gds(
       df=imbcr_df,
       distance_breaks=breaks
-    )))
+    ))
 
 # 3.) Fit a (null) intercept and our alternative models and test whether
 # we significantly reduce AIC in our alternative model vs our null model
@@ -441,6 +432,11 @@ kitchen_sink_m <- unmarked::gdistsamp(
     se=T,
     K=150,
   )
+
+cat("\n")
+cat(" -- habitat vs intercept:", intercept_m@AIC-kitchen_sink_m@AIC, "\n")
+cat(" --   space vs intercept:", intercept_m@AIC-poly_space_m@AIC, "\n")
+cat("\n")
 
 save(
     compress=T,
