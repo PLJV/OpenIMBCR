@@ -95,15 +95,31 @@ scrub_imbcr_df <- function(df,
 #' clean up the unmarked data.frame. prefer dropping the NA
 #' bin here (rather than in the imbcr data.frame), because here
 #' we still have an accurate account of effort
-scrub_unmarked_dataframe <- function(x=NULL){
+scrub_unmarked_dataframe <- function(x=NULL, normalize=T){
   row.names(x@y) <- NULL
   row.names(x@siteCovs) <- NULL
   x@y <- x@y[,!grepl(colnames(x@y), pattern="_NA")]
   x@obsToY <- matrix(x@obsToY[,1:ncol(x@y)],nrow=1)
-  # normalize our site covariates
-  start <- which(grepl(colnames(x@siteCovs),pattern="transect"))+1
-  x@siteCovs[,start:ncol(x@siteCovs)] <-
-    scale(x@siteCovs[,start:ncol(x@siteCovs)])
+  # normalize our site covariates?
+  if(normalize){
+    # don't try to normalize non-numeric values -- drop these as site covs
+    x@siteCovs <-
+      x@siteCovs[ , as.vector(unlist(lapply(x@siteCovs[1,], FUN=is.numeric)))]
+    # start <- which(grepl(colnames(x@siteCovs),pattern="id"))+1
+    # x@siteCovs[,start:ncol(x@siteCovs)] <-
+    #   scale(x@siteCovs[,start:ncol(x@siteCovs)])
+    x@siteCovs <- as.data.frame(scale(x@siteCovs))
+    # sanity check our normalization and report dropped variables
+    dropped <- as.vector(unlist(lapply(x@siteCovs[1,], FUN=is.na)))
+    if(sum(dropped)>0){
+      warning(paste(
+        "scale() dropped these variables due to very small variance: ",
+        paste(colnames(x@siteCovs)[dropped], collapse=", "),
+        sep=""
+      ))
+      x@siteCovs <- x@siteCovs[,!dropped]
+    }
+  }
   return(x)
 }
 #'
@@ -376,7 +392,6 @@ system.time(imbcr_df <- spatial_join(
 # pool and convert our SpatialPointsDataFrame to an unmarked gds frame
 system.time(imbcr_df <- scrub_unmarked_dataframe(build_unmarked_gds(
       df=imbcr_df,
-      covs=NULL,
       distance_breaks=breaks
     )))
 
@@ -385,7 +400,18 @@ system.time(imbcr_df <- scrub_unmarked_dataframe(build_unmarked_gds(
 intercept_m <- unmarked::gdistsamp(
     ~1+offset(log(effort)), # abundance
     ~1,                     # availability
-    ~1,                     # detection
+    ~doy+starttime,         # detection
+    data=imbcr_df,
+    keyfun="halfnorm",
+    mixture="P",
+    se=T,
+    K=75,
+  )
+
+poly_space_m <- unmarked::gdistsamp(
+    ~poly(lat,2)+poly(lon,2)+offset(log(effort)),
+    ~1,
+    ~doy,
     data=imbcr_df,
     keyfun="halfnorm",
     mixture="NB",
@@ -393,13 +419,16 @@ intercept_m <- unmarked::gdistsamp(
     K=50,
   )
 
-poly_space_time_m <- unmarked::gdistsamp(
-    ~poly(year,2)+poly(lat,3)+poly(lon,3)+offset(log(effort)), # abundance
-    ~1,                                                        # availability
-    ~poly(year,2)+doy,                                         # detection
+kitchen_sink_m <- unmarked::gdistsamp(
+    ~lg_sgp_ar+ag_sgp_ar+lg_mgp_ar+ag_mgp_ar+
+     lg_oksg_ar+ag_oksg_ar+ag_pl_ar+lg_rd_ar+
+     ag_rd_ar+pat_ct+mn_p_ar+inp_dst+
+     offset(log(effort)),
+    ~1,
+    ~doy+starttime+bcr,
     data=imbcr_df,
     keyfun="halfnorm",
-    mixture="NB",
+    mixture="P",
     se=T,
     K=50,
   )
