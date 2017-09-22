@@ -6,12 +6,6 @@ require(raster)
 require(parallel)
 
 #
-# Define our workspace
-#
-# setwd("/global_workspace/imbcr_number_crunching/k_taylor_imbcr_hds_workflow")
-# pljv_boundary <- readOGR("/gis_data/PLJV/","PLJV_Boundary", verbose=F)
-
-#
 # Define some useful local functions for manipulating IMBCR data
 #
 #' hidden function that greps for four-letter-codes
@@ -340,9 +334,13 @@ spatial_join <- function(x=NULL, y=NULL){
 #
 
 argv <- commandArgs(trailingOnly=T)
+stopifnot(length(argv)>1)
 
-#argv[1] <- "/global_workspace/thornburg/vector/units_attributed_training.shp"
-stopifnot(file.exists(argv[1]))
+if(!file.exists(argv[1])){
+  argv[1] <- "/global_workspace/thornburg/vector/units_attributed_training.shp"
+  stopifnot(file.exists(argv[1]))
+}
+
 units <- OpenIMBCR:::readOGRfromPath(argv[1])
 
 if(nchar(argv[2])!=4){
@@ -395,40 +393,61 @@ system.time(imbcr_df <- scrub_unmarked_dataframe(build_unmarked_gds(
       distance_breaks=breaks
     )))
 
-# 3.) Fit a (null) intercept and our alternative models
+# 3.) Fit a (null) intercept and our alternative models and test whether
+# we significantly reduce AIC in our alternative model vs our null model
+
+allSiteCovs <- colnames(imbcr_df@siteCovs)
+allSiteCovs <- allSiteCovs[!(
+  allSiteCovs %in%
+  c("starttime","bcr","doy","effort","id","eightyeight","year","lat","lon")
+)]
 
 intercept_m <- unmarked::gdistsamp(
     ~1+offset(log(effort)), # abundance
     ~1,                     # availability
-    ~doy+starttime,         # detection
+    ~doy+starttime+bcr,     # detection
     data=imbcr_df,
     keyfun="halfnorm",
     mixture="P",
     se=T,
-    K=75,
+    K=150,
   )
 
 poly_space_m <- unmarked::gdistsamp(
-    ~poly(lat,2)+poly(lon,2)+offset(log(effort)),
+    ~poly(lat,3)+poly(lon,3)+offset(log(effort)),
     ~1,
     ~doy,
     data=imbcr_df,
     keyfun="halfnorm",
-    mixture="NB",
+    mixture="P",
     se=T,
-    K=50,
+    K=150,
   )
 
 kitchen_sink_m <- unmarked::gdistsamp(
-    ~lg_sgp_ar+ag_sgp_ar+lg_mgp_ar+ag_mgp_ar+
-     lg_oksg_ar+ag_oksg_ar+ag_pl_ar+lg_rd_ar+
-     ag_rd_ar+pat_ct+mn_p_ar+inp_dst+
-     offset(log(effort)),
+    as.formula(paste(
+      "~",
+      paste(allSiteCovs, collapse="+"),
+      "+offset(log(effort))",
+      sep=""
+    )),
     ~1,
     ~doy+starttime+bcr,
     data=imbcr_df,
     keyfun="halfnorm",
     mixture="P",
     se=T,
-    K=50,
+    K=150,
+  )
+
+save(
+    compress=T,
+    list=c("argv","imbcr_df","intercept_m","poly_space_m","kitchen_sink_m"),
+    file=paste(
+      tolower(argv[2]),
+      "_imbcr_gdistsamp_workflow_",
+      paste(tolower(unlist(strsplit(date(), split=" "))[c(2,3)]), collapse="_"),
+      ".rdata",
+      sep=""
+    )
   )
