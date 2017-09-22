@@ -1,9 +1,11 @@
-require(OpenIMBCR)
-require(unmarked)
-require(rgeos)
-require(rgdal)
-require(raster)
-require(parallel)
+# require(OpenIMBCR)
+# require(unmarked)
+# require(rgeos)
+# require(rgdal)
+# require(raster)
+# require(parallel)
+#
+# system("clear")
 
 #
 # Define some useful local functions for manipulating IMBCR data
