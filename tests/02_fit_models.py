@@ -1,11 +1,9 @@
 import sys
 import os
 
-def run_r_thread(com="Rscript",
-                 src=None,
-                 *kwargs):
+def run_r_thread(*args):
   """ System wrapper for Rscript that calls our model-fitting script chunkwise """
-  os.system(com + " " + src + " " + str(kwargs[0][0]) + " " + str(kwargs[0][1]))
+  os.system("Rscript " + str(args[0]) + " " + str(args[1]) + " " + str(args[2]))
 
 
 def step_through_birdcodes(*kwargs):
@@ -24,3 +22,4 @@ if __name__ == "__main__":
                 'VESP', 'WEME', 'HOLA', 'LARB', 'COYE']
 
     step_through_birdcodes(birdcodes)
+
