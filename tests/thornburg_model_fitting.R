@@ -1,13 +1,9 @@
 require(OpenIMBCR)
+require(unmarked)
 require(rgeos)
 require(rgdal)
 require(raster)
-require(rgeos)
-#require(reshape)
 require(parallel)
-
-require(OpenIMBCR)
-require(unmarked)
 
 #
 # Define our workspace
@@ -95,6 +91,20 @@ scrub_imbcr_df <- function(df,
     df <- detected
   }
   df[order(sqrt(as.numeric(df$transectnum))+sqrt(df$year)+sqrt(df$point)),]
+}
+#' clean up the unmarked data.frame. prefer dropping the NA
+#' bin here (rather than in the imbcr data.frame), because here
+#' we still have an accurate account of effort
+scrub_unmarked_dataframe <- function(x=NULL){
+  row.names(x@y) <- NULL
+  row.names(x@siteCovs) <- NULL
+  x@y <- x@y[,!grepl(colnames(x@y), pattern="_NA")]
+  x@obsToY <- matrix(x@obsToY[,1:ncol(x@y)],nrow=1)
+  # normalize our site covariates
+  start <- which(grepl(colnames(x@siteCovs),pattern="transect"))+1
+  x@siteCovs[,start:ncol(x@siteCovs)] <-
+    scale(x@siteCovs[,start:ncol(x@siteCovs)])
+  return(x)
 }
 #'
 #' @export
@@ -293,7 +303,7 @@ build_unmarked_gds <- function(df=NULL,
 #' vector features in x with overlapping features in y. Will automatically
 #' reproject to a consistent CRS.
 #'
-spatialJoin <- function(x=NULL, y=NULL){
+spatial_join <- function(x=NULL, y=NULL){
   over <- sp::over(
       x = sp::spTransform(
           x,
@@ -309,39 +319,87 @@ spatialJoin <- function(x=NULL, y=NULL){
 # MAIN
 #
 # Accepts two arguments at runtime -- (1) a full path to the attributed
-# USNG units and (2) the four-letter bird code for the species we are
-# fitting our model to.
+# USNG units training dataset and (2) the four-letter bird code for the
+# species we are fitting our model to.
 #
 
 argv <- commandArgs(trailingOnly=T)
 
+#argv[1] <- "/global_workspace/thornburg/vector/units_attributed_training.shp"
 stopifnot(file.exists(argv[1]))
 units <- OpenIMBCR:::readOGRfromPath(argv[1])
 
-if(nchar(argv[2])==4){
+if(nchar(argv[2])!=4){
   stop("expected first argument to be a four-letter bird code")
 } else {
-  argv <- toupper(argv)
+  argv[2] <- toupper(argv[2])
 }
-
-spp_imbcr_observations <-
-  scrub_imbcr_df(OpenIMBCR::imbcrTableToShapefile(
-    list.files("..",
-         pattern="RawData_PLJV_IMBCR_20161024.csv$",
-         recursive=T,
-         full.names=T
-       )[1]
-    ),
-    four_letter_code=argv[1],
-    back_fill_all_na=F  # keep only NA values for transects with >= 1 spp det
-    #back_fill_all_na=T # keep all NA values
-  )
-
-# 1.) calculate our detection parameters at the 1km transect scale
 
 # 2.) build a data.frame from our station points and their respective
 # USNG attributed grid cell
 
-spp_imbcr_observations <- spatialJoin(spp_imbcr_observations, units)
+system.time(imbcr_observations <-
+  scrub_imbcr_df(OpenIMBCR::imbcrTableToShapefile(
+    list.files("/global_workspace/imbcr_number_crunching/",
+         pattern="RawData_PLJV_IMBCR_20161201.csv$",
+         recursive=T,
+         full.names=T
+       )[1]
+    ),
+    four_letter_code="WITU",
+    back_fill_all_na=F  # keep only NA values for transects with >= 1 spp det
+    #back_fill_all_na=T # keep all NA values
+  ))
 
-# 3.)
+# calculate distance bins
+breaks <- append(0,as.numeric(quantile(as.numeric(
+    imbcr_observations$radialdistance),
+    na.rm=T,
+    probs=seq(0.05,0.90,length.out=9))
+  ))
+
+imbcr_observations <- calc_dist_bins(
+    imbcr_observations,
+    breaks=breaks
+  )[[2]]
+
+# calculate our detection covariates
+imbcr_observations <- calc_day_of_year(imbcr_observations)
+imbcr_observations <- calc_transect_effort(imbcr_observations)
+
+# join with our habitat covariates
+system.time(imbcr_df <- spatial_join(
+    imbcr_observations,
+    units
+  ))
+
+# pool and convert our SpatialPointsDataFrame to an unmarked gds frame
+system.time(imbcr_df <- scrub_unmarked_dataframe(build_unmarked_gds(
+      df=imbcr_df,
+      covs=NULL,
+      distance_breaks=breaks
+    )))
+
+# 3.) Fit a (null) intercept and our alternative models
+
+intercept_m <- unmarked::gdistsamp(
+    ~1+offset(log(effort)), # abundance
+    ~1,                     # availability
+    ~1,                     # detection
+    data=imbcr_df,
+    keyfun="halfnorm",
+    mixture="NB",
+    se=T,
+    K=50,
+  )
+
+poly_space_time_m <- unmarked::gdistsamp(
+    ~poly(year,2)+poly(lat,3)+poly(lon,3)+offset(log(effort)), # abundance
+    ~1,                                                        # availability
+    ~poly(year,2)+doy,                                         # detection
+    data=imbcr_df,
+    keyfun="halfnorm",
+    mixture="NB",
+    se=T,
+    K=50,
+  )
