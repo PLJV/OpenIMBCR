@@ -559,18 +559,18 @@ intercept_m <- unmarked::gdistsamp(
     K=500,
   )
 
-poly_space_m <- unmarked::gdistsamp(
-    ~poly(lat,3)+poly(lon,3)+offset(log(effort)),
-    ~1,
-    as.formula(paste("~",paste(allDetCovs, collapse="+"))),
-    data=imbcr_df,
-    keyfun="halfnorm",
-    mixture="P",
-    se=T,
-    K=500,
-  )
+# poly_space_m <- unmarked::gdistsamp(
+#     ~poly(lat,3)+poly(lon,3)+offset(log(effort)),
+#     ~1,
+#     as.formula(paste("~",paste(allDetCovs, collapse="+"))),
+#     data=imbcr_df,
+#     keyfun="halfnorm",
+#     mixture="P",
+#     se=T,
+#     K=500,
+#   )
 
-kitchen_sink_m <- unmarked::gdistsamp(
+p_70_pcr_m <- unmarked::gdistsamp(
     as.formula(paste(
       "~",
       paste(colnames(pca_m[[2]]$rotation), collapse="+"),
@@ -588,13 +588,12 @@ kitchen_sink_m <- unmarked::gdistsamp(
 
 cat("\n")
 cat(" -- species:", argv[2], "\n")
-cat(" -- dAIC (null - habitat):", intercept_m@AIC-kitchen_sink_m@AIC, "\n")
-cat(" -- dAIC (null - lat+lon):", intercept_m@AIC-poly_space_m@AIC, "\n")
+cat(" -- dAIC (null - habitat):", intercept_m@AIC-p_70_pcr_m@AIC, "\n")
 cat("\n")
 
 save(
     compress=T,
-    list=c("argv","imbcr_df","intercept_m","poly_space_m","kitchen_sink_m"),
+    list=c("argv","imbcr_df","intercept_m","pca_m","p_70_pcr_m"),
     file=paste(
       tolower(argv[2]),
       "_imbcr_gdistsamp_workflow_",
