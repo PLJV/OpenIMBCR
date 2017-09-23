@@ -1,0 +1,81 @@
+# Burnham and Anderson (2002) write that delta (dAIC differences) for models
+# within 0-2 of a min have a substantial support; delta within 4-7 considerably less
+# support and delta greater than 10 essentially have no support. These
+# support-levels are intended to be used for selecting a range of models
+# around a minimum model for model averaging. Burnham and Anderson might cringe
+# a little at the inverse interpretation below, where we test for the alternative:
+# whether a model is significantly different from a null (no habitat covs) model.
+# This follows closely the model-based hypothesis testing of Royle and Dorazio
+# (Ch. 2.5), except that we are not using a formal frequentist test statistic
+# (e.g., Wald or LRT).
+#
+
+-- species: NOBO
+-- dAIC (null - habitat): 16.34295
+-- dAIC (null - lat+lon): 231.6195
+-- species: MODO
+-- dAIC (null - habitat): 64.81522
+-- dAIC (null - lat+lon): 135.0069
+-- species: EUCD
+-- dAIC (null - habitat): 63.65205
+-- dAIC (null - lat+lon): 5.649632
+-- species: EAME
+-- dAIC (null - habitat): 5.677604
+-- dAIC (null - lat+lon): 83.08246
+-- species: BEVI
+-- dAIC (null - habitat): 5.237488
+-- dAIC (null - lat+lon): 7.656602
+-- species: SCQU
+-- dAIC (null - habitat): 97.96921
+-- dAIC (null - lat+lon): 179.7872
+-- species: RINP
+-- dAIC (null - habitat): 172.0442
+-- dAIC (null - lat+lon): 148.9383
+-- species: GRSP
+-- dAIC (null - habitat): 30.4069
+-- dAIC (null - lat+lon): 64.77632
+-- species: WITU
+-- dAIC (null - habitat): 17.64173
+-- dAIC (null - lat+lon): -3.335701
+-- species: CASP
+-- dAIC (null - habitat): 118.9238
+-- dAIC (null - lat+lon): 381.4002
+-- species: LOSH
+-- dAIC (null - habitat): -0.803149
+-- dAIC (null - lat+lon): -6.848952
+-- species: BUOW
+-- dAIC (null - habitat): 23.85574
+-- dAIC (null - lat+lon): 8.831273
+-- species: LBCU
+-- dAIC (null - habitat): -3.809284
+-- dAIC (null - lat+lon): -5.668604
+-- species: SWHA
+-- dAIC (null - habitat): 0.249313
+-- dAIC (null - lat+lon): -7.968931
+-- species: LASP
+-- dAIC (null - habitat): 51.16882
+-- dAIC (null - lat+lon): 0.6560701
+-- species: STFL
+-- dAIC (null - habitat): 2.486936
+-- dAIC (null - lat+lon): -1.178329
+-- species: COYE
+-- dAIC (null - habitat): 76.28083
+-- dAIC (null - lat+lon): 78.49743
+-- species: LARB
+-- dAIC (null - habitat): 536.7045
+-- dAIC (null - lat+lon): 930.7919
+-- species: HOLA
+-- dAIC (null - habitat): 473.6349
+-- dAIC (null - lat+lon): 143.451
+-- species: WEME
+-- dAIC (null - habitat): 295.0776
+-- dAIC (null - lat+lon): 168.1874
+-- species: VESP
+-- dAIC (null - habitat): 11.55643
+-- dAIC (null - lat+lon): 12.75868
+-- species: DICK
+-- dAIC (null - habitat): 123.3946
+-- dAIC (null - lat+lon): 223.2797
+-- species: CONI
+-- dAIC (null - habitat): 5.336183
+-- dAIC (null - lat+lon): 12.98768

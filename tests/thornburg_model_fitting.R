@@ -79,20 +79,48 @@ scrub_imbcr_df <- function(df,
   }
   df[order(sqrt(as.numeric(df$transectnum))+sqrt(df$year)+sqrt(df$point)),]
 }
-#' clean up the unmarked data.frame. prefer dropping the NA
-#' bin here (rather than in the imbcr data.frame), because here
-#' we still have an accurate account of effort
-scrub_unmarked_dataframe <- function(x=NULL, normalize=T){
+#' Hidden function used to clean-up an unmarked data.frame (umdf) by dropping
+#' any NA columns attributed by scrub_imbcr_df(), mean-center (scale) our site
+#' covariates (but not sampling effort!), and do some optional quantile filtering
+#' that drops covariates with low variance, which is a useful 'significance
+#' pruning' precursor for principal components analysis. Prefer dropping the NA
+#' bin here (rather than in scrub_imbcr_df), so that we still have an accurate
+#' account of total sampling effort to attribute in scrub_unmarked_dataframe().
+scrub_unmarked_dataframe <- function(x=NULL, normalize=T, prune_cutoff=NULL){
   row.names(x@y) <- NULL
   row.names(x@siteCovs) <- NULL
   x@y <- x@y[,!grepl(colnames(x@y), pattern="_NA")]
   x@obsToY <- matrix(x@obsToY[,1:ncol(x@y)],nrow=1)
+  # do some quantile pruning of our input data, selectively dropping
+  # an arbitrary number of variables based on a user-specified
+  # low-variance threshold
+  if(!is.null(prune_cutoff)){
+    # e.g., what is the total variance for each cov across all sites?
+    # drop those standardized variables with < prune_cutoff=0.05 variance
+    vars_to_scale <- colnames(x@siteCovs)[
+        !grepl(tolower(colnames(x@siteCovs)), pattern="effort")
+      ]
+    variance <- apply(
+        x@siteCovs[,vars_to_scale],
+        MARGIN=2,
+        FUN=var(x)
+      )
+    dropped <- as.vector(variance < quantile(variance, p=prune_cutoff))
+    if(sum(dropped)>0){
+      warning(paste(
+        "prune_cutoff dropped these variables due to very small variance: ",
+        paste(colnames(x@siteCovs)[dropped], collapse=", "),
+        sep=""
+      ))
+      x@siteCovs <- x@siteCovs[,!dropped]
+    }
+  }
   # normalize our site covariates?
   if(normalize){
     # don't try to normalize non-numeric values -- drop these as site covs
     x@siteCovs <-
       x@siteCovs[ , as.vector(unlist(lapply(x@siteCovs[1,], FUN=is.numeric)))]
-    # don't normalize "effort"
+    # don't normalize the "effort" field
     vars_to_scale <- colnames(x@siteCovs)[
         !grepl(tolower(colnames(x@siteCovs)), pattern="effort")
       ]
@@ -100,7 +128,9 @@ scrub_unmarked_dataframe <- function(x=NULL, normalize=T){
     x@siteCovs[,vars_to_scale] <- as.data.frame(
         scale(x@siteCovs[,vars_to_scale])
       )
-    # sanity check our normalization and report dropped variables
+    # sanity check : do some variable pruning based on variance
+    # from our normalization step -- drop variables with low variance
+    # from consideration and report dropped variables to user
     dropped <- as.vector(unlist(lapply(x@siteCovs[1,], FUN=is.na)))
     if(sum(dropped)>0){
       warning(paste(
