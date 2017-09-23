@@ -79,7 +79,7 @@ scrub_imbcr_df <- function(df,
   }
   df[order(sqrt(as.numeric(df$transectnum))+sqrt(df$year)+sqrt(df$point)),]
 }
-#' Hidden function used to clean-up an unmarked data.frame (umdf) by dropping
+#' hidden function used to clean-up an unmarked data.frame (umdf) by dropping
 #' any NA columns attributed by scrub_imbcr_df(), mean-center (scale) our site
 #' covariates (but not sampling effort!), and do some optional quantile filtering
 #' that drops covariates with low variance, which is a useful 'significance
@@ -280,7 +280,7 @@ pool_by_transect_year <- function(x=NULL, df=NULL, breaks=NULL, covs=NULL,
   return(transect_year_summaries)
 }
 #' accepts a formatted IMBCR data.frame and builds an unmarkedFrameGDS
-#' data.frame from it
+#' data.frame from it. Will add latitude and longitude attributes (WGS84)
 #' @export
 build_unmarked_gds <- function(df=NULL,
                                numPrimary=1,
@@ -336,6 +336,75 @@ build_unmarked_gds <- function(df=NULL,
       numPrimary=numPrimary # should be kept at 1 (no within-season visits)
     ))
 }
+#'
+#'
+pca_dim_reduction <- function(x,
+                              covs=NULL,
+                              scale=T,
+                              center=T,
+                              var_threshold=0.9,
+                              force=F)
+{
+  # find the minimum number of components needed to explain our
+  # variance threshold
+  find_min_variance_explained <- function(x){
+    var_explained <- round(diffinv(x$sdev/sum(x$sdev)), 2)
+      var_explained <- var_explained[2:length(var_explained)]
+    return(min(which(var_explained >= var_threshold)))
+  }
+  # extract a projection matrix representing our pca loadings (rotations)
+  # for n components
+  extractProjection <- function(n, princ) {
+    # pull off the rotation.
+    proj <- princ$rotation[,1:n]
+    # sign was arbitrary, so flip in convenient form
+    for(i in seq_len(n)) {
+      si <- sign(mean(proj[,i]))
+      if(si!=0) {
+        proj[,i] <- proj[,i]*si
+      }
+    }
+    return(proj)
+  }
+  if (is.null(covs)){
+    stop("covs= argument must specify input covariates names for our PCA")
+  }
+  # by default, assume that the user has not mean-centered siteCovs
+  # with scrub_unmarked_dataframe(). Duplicate re-scaling here shouldn't
+  # change anything.
+  pca <- prcomp(x@siteCovs[,covs], scale.=scale, center=center)
+  # figure out the final component to include that satisfies our
+  # a priori variance threshold
+  last_component <- find_min_variance_explained(pca)
+  # sanity-check: can we meaningfully drop any input variables?
+  if(last_component == length(covs)){
+    warning(paste("we needed all of our components to satisfy the",
+        " user-specified variance threshold (p=", var_threshold,"). Are",
+        " you sure you want to do a dimensional reduction?",
+        sep=""
+      ))
+    if(!force) return(NULL)
+  } else {
+    # fetch our non-focal (metadata) covs
+    meta_vars <- x@siteCovs[ , !(colnames(x@siteCovs) %in% covs) ]
+    # drop our original covariates to only those included in the PCA
+    covs <- covs[1:last_component]
+    pca <- prcomp(x@siteCovs[,covs], scale.=scale, center=center)
+    # predict() here will export the PCA projection matrix for the training
+    # dataset over the "keeper" components from our analysis
+    x@siteCovs <- x@siteCovs[,covs]
+    x@siteCovs <- as.data.frame(
+        predict(
+          pca,
+          x@siteCovs
+        ),
+        stringsAsFactors = FALSE
+      )
+    # now bind our metadata covs back-in
+    x@siteCovs <- cbind(meta_vars, x@siteCovs)
+    return(list(x, pca))
+  }
+}
 #' shorthand vector extraction function that performs a spatial join attributes
 #' vector features in x with overlapping features in y. Will automatically
 #' reproject to a consistent CRS.
@@ -369,6 +438,17 @@ if(!file.exists(argv[1])){
 }
 
 units <- OpenIMBCR:::readOGRfromPath(argv[1])
+
+# let's mean-center our habitat covariates across the whole PLJV region now,
+# prior to any model fitting or PCA, so that everything is in agreement before
+# fitting and predicting
+
+habitat_covs <- colnames(units@data)
+  habitat_covs <- habitat_covs[grepl(
+      habitat_covs, pattern= c("_ar$|_dst$|_ct$")
+    )]
+
+units@data[,habitat_covs] <- scale(units@data[, habitat_covs])
 
 if(nchar(argv[2])!=4){
   stop("expected first argument to be a four-letter bird code")
@@ -414,28 +494,59 @@ imbcr_df <- spatial_join(
     units
   )
 
-# pool and convert our SpatialPointsDataFrame to an unmarked gds frame
-imbcr_df <- scrub_unmarked_dataframe(build_unmarked_gds(
-      df=imbcr_df,
-      distance_breaks=breaks
-    ))
+# pool stations-> transect and convert our SpatialPointsDataFrame to an
+# unmarked gds data.frame
+imbcr_df <- scrub_unmarked_dataframe(
+      build_unmarked_gds(
+        df=imbcr_df,
+        distance_breaks=breaks
+      ),
+      normalize=F,      # we already applied scale() to our input data
+      prune_cutoff=0.05 # drop variables with low variance
+    )
+
+# we didn't normalize latitude and longitude when we scrubbed our
+# unmarked dataframe, but out other variables should be mean-centered
+imbcr_df@siteCovs[,c('lat','lon')] <- scale(
+    imbcr_df@siteCovs[,c('lat','lon')]
+  )
 
 # 3.) Fit a (null) intercept and our alternative models and test whether
 # we significantly reduce AIC in our alternative model vs our null model
 
-allSiteCovs <- colnames(imbcr_df@siteCovs)
-allSiteCovs <- allSiteCovs[!(
-  allSiteCovs %in%
-  c("starttime","bcr","doy","effort","id","eightyeight","year","lat","lon")
+allHabitatCovs <- colnames(imbcr_df@siteCovs)
+allHabitatCovs <- allHabitatCovs[!(
+  allHabitatCovs %in%
+  c("starttime","bcr","doy","effort","id","eightyeight","year")
 )]
-# drop the luke george version of covs for our initial round of testing
-allSiteCovs <- allSiteCovs[!grepl(allSiteCovs, pattern="lg_")]
+
+# drop the luke george version of habitat covariates
+# for our initial round of testing
+allHabitatCovs <- allHabitatCovs[!grepl(allHabitatCovs, pattern="lg_")]
 
 allDetCovs <- colnames(imbcr_df@siteCovs)
 allDetCovs <- allDetCovs[(
   allDetCovs %in%
   c("starttime","bcr","doy")
 )]
+
+# explicitly define our metadata covariates
+metaDataCovs <- c("effort", "id")
+
+# drop anything lurking in the unmarked dataframe that isn't cogent
+# to the PCA or modeling
+imbcr_df@siteCovs <- imbcr_df@siteCovs[,c(metaDataCovs,allDetCovs,allHabitatCovs)]
+
+# this is a traditional PCA reduction where all habitat covariates
+# are considered as components (not just fragmentation)
+
+pca_m <- pca_dim_reduction(
+    x=imbcr_df,
+    covs=allHabitatCovs,
+    var_threshold=0.7
+  )
+
+imbcr_df <- pca_m[[1]] # contains our PCA projection matrix and our model obj
 
 intercept_m <- unmarked::gdistsamp(
     ~1+offset(log(effort)), # abundance
@@ -445,7 +556,7 @@ intercept_m <- unmarked::gdistsamp(
     keyfun="halfnorm",
     mixture="P",
     se=T,
-    K=150,
+    K=500,
   )
 
 poly_space_m <- unmarked::gdistsamp(
@@ -456,13 +567,13 @@ poly_space_m <- unmarked::gdistsamp(
     keyfun="halfnorm",
     mixture="P",
     se=T,
-    K=150,
+    K=500,
   )
 
 kitchen_sink_m <- unmarked::gdistsamp(
     as.formula(paste(
       "~",
-      paste(allSiteCovs, collapse="+"),
+      paste(colnames(pca_m[[2]]$rotation), collapse="+"),
       "+offset(log(effort))",
       sep=""
     )),
@@ -472,13 +583,13 @@ kitchen_sink_m <- unmarked::gdistsamp(
     keyfun="halfnorm",
     mixture="P",
     se=T,
-    K=150,
+    K=500,
   )
 
 cat("\n")
 cat(" -- species:", argv[2], "\n")
-cat(" -- (null - habitat):", intercept_m@AIC-kitchen_sink_m@AIC, "\n")
-cat(" -- (null - space):", intercept_m@AIC-poly_space_m@AIC, "\n")
+cat(" -- dAIC (null - habitat):", intercept_m@AIC-kitchen_sink_m@AIC, "\n")
+cat(" -- dAIC (null - lat+lon):", intercept_m@AIC-poly_space_m@AIC, "\n")
 cat("\n")
 
 save(
