@@ -1,3 +1,9 @@
+require(raster)
+require(rgdal)
+require(rgeos)
+
+system("clear")
+
 #
 # Define some useful local functions for manipulating IMBCR data
 #
@@ -97,22 +103,58 @@ scrub_unmarked_dataframe <- function(x=NULL, normalize=T, prune_cutoff=NULL){
   if(!is.null(prune_cutoff)){
     # e.g., what is the total variance for each cov across all sites?
     # drop those standardized variables with < prune_cutoff=0.05 variance
+    effort_field <- ifelse(
+        sum(grepl(colnames(x@siteCovs), pattern="effort")),
+        "effort",
+        NULL
+      )
     vars_to_scale <- colnames(x@siteCovs)[
         !grepl(tolower(colnames(x@siteCovs)), pattern="effort")
       ]
-    variance <- apply(
-        x@siteCovs[,vars_to_scale],
+    # bug-fix : only try to prune numeric variables
+    is_numeric <- apply(
+        x@siteCovs[1,vars_to_scale],
         MARGIN=2,
-        FUN=var(x)
+        FUN=function(x) !is.na(suppressWarnings(as.numeric(x)))
       )
+    if(length(vars_to_scale)!=sum(is_numeric)){
+      warning(paste(
+          "the following input variables are not numeric and cannot be",
+          "filtered by quantile and will not be pruned:",
+          paste(
+              vars_to_scale[!is_numeric],
+              collapse=", "
+            )
+        ))
+      vars_to_scale <- vars_to_scale[is_numeric]
+    }
+    # calculate relative variance across all sites for each variable (column)
+    variance <- apply(
+      x@siteCovs[,vars_to_scale],
+      MARGIN=2,
+      FUN=function(x) ( (x - min(x)) / (max(x)-min(x)) ) # quick min-max normalize
+    )
+    # min-max will return NA on no variance (e.g., divide by zero)
+    variance[is.na(variance)] <- 0
+    variance <- apply(
+        variance,
+        MARGIN=2,
+        FUN=var
+      )
+    # drop variables that don't meet our a priori variance threshold
     dropped <- as.vector(variance < quantile(variance, p=prune_cutoff))
     if(sum(dropped)>0){
       warning(paste(
         "prune_cutoff dropped these variables due to very small variance: ",
-        paste(colnames(x@siteCovs)[dropped], collapse=", "),
+        paste(colnames(x@siteCovs[,vars_to_scale])[dropped], collapse=", "),
         sep=""
       ))
-      x@siteCovs <- x@siteCovs[,!dropped]
+      keep <- unique(c(
+        names(is_numeric[!is_numeric]),
+        effort_field,
+        vars_to_scale[!dropped]
+      ))
+      x@siteCovs <- x@siteCovs[, keep]
     }
   }
   # normalize our site covariates?
@@ -437,11 +479,9 @@ if(!file.exists(argv[1])){
   stopifnot(file.exists(argv[1]))
 }
 
-units <- OpenIMBCR:::readOGRfromPath(argv[1])
+cat(" -- reading habitat training data and mean-centering\n")
 
-# let's mean-center our habitat covariates across the whole PLJV region now,
-# prior to any model fitting or PCA, so that everything is in agreement before
-# fitting and predicting
+units <- OpenIMBCR:::readOGRfromPath(argv[1])
 
 habitat_covs <- colnames(units@data)
   habitat_covs <- habitat_covs[grepl(
@@ -456,8 +496,7 @@ if(nchar(argv[2])!=4){
   argv[2] <- toupper(argv[2])
 }
 
-# 2.) build a data.frame from our station points and their respective
-# USNG attributed grid cell
+cat(" -- reading IMBCR data and parsing focal species observations\n")
 
 imbcr_observations <-
   scrub_imbcr_df(OpenIMBCR::imbcrTableToShapefile(
@@ -472,7 +511,8 @@ imbcr_observations <-
     #back_fill_all_na=T # keep all NA values
   )
 
-# calculate distance bins
+cat(" -- calculating distance bins\n")
+
 breaks <- append(0,as.numeric(quantile(as.numeric(
     imbcr_observations$radialdistance),
     na.rm=T,
@@ -484,40 +524,44 @@ imbcr_observations <- calc_dist_bins(
     breaks=breaks
   )[[2]]
 
-# calculate our detection covariates
+cat(" -- calculating detection covariates\n")
+
 imbcr_observations <- calc_day_of_year(imbcr_observations)
 imbcr_observations <- calc_transect_effort(imbcr_observations)
 
-# join with our habitat covariates
+cat(" -- performing spatial join with our training units dataset\n")
+
 imbcr_df <- spatial_join(
     imbcr_observations,
     units
   )
 
-# pool stations-> transect and convert our SpatialPointsDataFrame to an
-# unmarked gds data.frame
+cat(" -- pooling IMBCR station observations -> transect and",
+    "prepping for 'unmarked'\n")
+
 imbcr_df <- scrub_unmarked_dataframe(
       build_unmarked_gds(
         df=imbcr_df,
         distance_breaks=breaks
       ),
       normalize=F,      # we already applied scale() to our input data
-      prune_cutoff=0.05 # drop variables with low variance
+      prune_cutoff=0.10 # drop variables with low variance
     )
 
-# we didn't normalize latitude and longitude when we scrubbed our
-# unmarked dataframe, but out other variables should be mean-centered
-imbcr_df@siteCovs[,c('lat','lon')] <- scale(
-    imbcr_df@siteCovs[,c('lat','lon')]
+cat(" -- mean-centering our spatial covariates and detection covariates\n")
+
+imbcr_df@siteCovs[,c('lat','lon','starttime','doy')] <- scale(
+    imbcr_df@siteCovs[,c('lat','lon','starttime','doy')]
   )
 
-# 3.) Fit a (null) intercept and our alternative models and test whether
-# we significantly reduce AIC in our alternative model vs our null model
+cat(" -- prepping input unmarked data.frame and performing PCA\n")
 
 allHabitatCovs <- colnames(imbcr_df@siteCovs)
 allHabitatCovs <- allHabitatCovs[!(
   allHabitatCovs %in%
-  c("starttime","bcr","doy","effort","id","eightyeight","year")
+  c("starttime","bcr","doy","effort","id","eightyeight","year",
+    "date","stratum","observer","common.name","birdcode","sex","mgmtentity",
+    "mgmtregion","mgmtunit","county","state","primaryhabitat","transectnum")
 )]
 
 # drop the luke george version of habitat covariates
@@ -547,6 +591,8 @@ pca_m <- pca_dim_reduction(
   )
 
 imbcr_df <- pca_m[[1]] # contains our PCA projection matrix and our model obj
+
+cat(" -- building null (intercept-only) and alternative (habitat PCA) models\n")
 
 intercept_m <- unmarked::gdistsamp(
     ~1+offset(log(effort)), # abundance
