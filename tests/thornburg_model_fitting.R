@@ -334,8 +334,6 @@ if(!file.exists(argv[1])){
   stopifnot(file.exists(argv[1]))
 }
 
-cat(" -- species:", argv[2], "\n")
-
 units <- OpenIMBCR:::readOGRfromPath(argv[1])
 
 if(nchar(argv[2])!=4){
@@ -396,6 +394,8 @@ allSiteCovs <- allSiteCovs[!(
   allSiteCovs %in%
   c("starttime","bcr","doy","effort","id","eightyeight","year","lat","lon")
 )]
+# drop the luke george version of covs for our initial round of testing
+allSiteCovs <- allSiteCovs[!grepl(allSiteCovs, pattern="lg_")]
 
 allDetCovs <- colnames(imbcr_df@siteCovs)
 allDetCovs <- allDetCovs[(
@@ -442,8 +442,9 @@ kitchen_sink_m <- unmarked::gdistsamp(
   )
 
 cat("\n")
-cat(" -- habitat vs null:", intercept_m@AIC-kitchen_sink_m@AIC, "\n")
-cat(" --   space vs null:", intercept_m@AIC-poly_space_m@AIC, "\n")
+cat(" -- species:", argv[2], "\n")
+cat(" -- (null - habitat):", intercept_m@AIC-kitchen_sink_m@AIC, "\n")
+cat(" -- (null - space):", intercept_m@AIC-poly_space_m@AIC, "\n")
 cat("\n")
 
 save(
