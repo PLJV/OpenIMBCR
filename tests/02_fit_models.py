@@ -6,8 +6,8 @@ def run_r_thread(*args):
   os.system("Rscript " + str(args[0]) + " " + str(args[1]) + " " + str(args[2]))
 
 
-def step_through_birdcodes(*kwargs):
-  for birdcode in kwargs[0]:
+def step_through_birdcodes(*args):
+  for birdcode in args[0]:
       run_r_thread(
         "/home/ktaylora/Projects/OpenIMBCR/tests/thornburg_model_fitting.R",
         "/global_workspace/thornburg/vector/units_attributed_training.shp",
@@ -22,4 +22,3 @@ if __name__ == "__main__":
                 'VESP', 'WEME', 'HOLA', 'LARB', 'COYE']
 
     step_through_birdcodes(birdcodes)
-

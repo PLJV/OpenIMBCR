@@ -92,10 +92,14 @@ scrub_unmarked_dataframe <- function(x=NULL, normalize=T){
     # don't try to normalize non-numeric values -- drop these as site covs
     x@siteCovs <-
       x@siteCovs[ , as.vector(unlist(lapply(x@siteCovs[1,], FUN=is.numeric)))]
-    # start <- which(grepl(colnames(x@siteCovs),pattern="id"))+1
-    # x@siteCovs[,start:ncol(x@siteCovs)] <-
-    #   scale(x@siteCovs[,start:ncol(x@siteCovs)])
-    x@siteCovs <- as.data.frame(scale(x@siteCovs))
+    # don't normalize "effort"
+    vars_to_scale <- colnames(x@siteCovs)[
+        !grepl(tolower(colnames(x@siteCovs)), pattern="effort")
+      ]
+    # scaling call
+    x@siteCovs[,vars_to_scale] <- as.data.frame(
+        scale(x@siteCovs[,vars_to_scale])
+      )
     # sanity check our normalization and report dropped variables
     dropped <- as.vector(unlist(lapply(x@siteCovs[1,], FUN=is.na)))
     if(sum(dropped)>0){
