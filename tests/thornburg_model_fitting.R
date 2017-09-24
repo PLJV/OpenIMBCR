@@ -414,7 +414,7 @@ pca_dim_reduction <- function(x,
   # bug-fix drop columns that have zero variance, otherwise prcomp() will
   # fail when you attempt to mean-center
   x@siteCovs[is.na(x@siteCovs)] <- 0
-  no_variance <- round(apply(
+  no_variance <- floor(apply(
       x@siteCovs,
       MARGIN=2,
       FUN=var
