@@ -479,6 +479,10 @@ spatial_join <- function(x=NULL, y=NULL){
   x@data <- cbind(x@data, over)
   return(x)
 }
+#' negative heurisitc filter against potential habitat variables -- dig through
+#' everything in an unmarked data.frame's siteCovs slot and drop those variables
+#' that we know are not habitat related. Return filtered vector to user for
+#' consideration.
 get_habitat_covs <- function(x){
   allHabitatCovs <- colnames(x@siteCovs)
   # heuristic -- drop anything wonky from the IMBCR dataset
@@ -490,6 +494,10 @@ get_habitat_covs <- function(x){
   )]
   return(allHabitatCovs)
 }
+#' positive heurisitc filter against potential detection variables -- dig through
+#' everything in an unmarked data.frame's siteCovs slot and drop those variables
+#' that we know are not detection related. Return filtered vector to user for
+#' consideration.
 get_detection_covs <- function(x){
   allDetCovs <- colnames(imbcr_df@siteCovs)
   allDetCovs <- allDetCovs[(
@@ -498,10 +506,13 @@ get_detection_covs <- function(x){
   )]
   return(allDetCovs)
 }
+
 #
 # MAIN
 #
-# Accepts two arguments at runtime -- (1) a full path to the attributed
+
+#
+# accepts two arguments at runtime -- (1) a full path to the attributed
 # USNG units training dataset and (2) the four-letter bird code for the
 # species we are fitting our model to.
 #
@@ -612,7 +623,8 @@ imbcr_df@siteCovs <- imbcr_df@siteCovs[,c(metaDataCovs,allDetCovs,allHabitatCovs
 pca_m <- pca_dim_reduction(
     x=imbcr_df,
     covs=allHabitatCovs,
-    var_threshold=0.7
+    var_threshold=0.7,
+    force=T # force a PCA, even if we can't satisfy the var_threshold
   )
 
 imbcr_df_original <- imbcr_df
