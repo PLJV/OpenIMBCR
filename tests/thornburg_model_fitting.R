@@ -590,6 +590,7 @@ pca_m <- pca_dim_reduction(
     var_threshold=0.7
   )
 
+imbcr_df_original <- imbcr_df
 imbcr_df <- pca_m[[1]] # contains our PCA projection matrix and our model obj
 
 cat(" -- building null (intercept-only) and alternative (habitat PCA) models\n")
@@ -639,7 +640,9 @@ cat("\n")
 
 save(
     compress=T,
-    list=c("argv","imbcr_df","intercept_m","pca_m","p_70_pcr_m"),
+    list=c("argv","imbcr_df_original","imbcr_df",
+           "allHabitatCovs","intercept_m","pca_m",
+           "p_70_pcr_m"),
     file=paste(
       tolower(argv[2]),
       "_imbcr_gdistsamp_workflow_",
