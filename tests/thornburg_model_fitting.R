@@ -479,7 +479,25 @@ spatial_join <- function(x=NULL, y=NULL){
   x@data <- cbind(x@data, over)
   return(x)
 }
-
+get_habitat_covs <- function(x){
+  allHabitatCovs <- colnames(x@siteCovs)
+  # heuristic -- drop anything wonky from the IMBCR dataset
+  allHabitatCovs <- allHabitatCovs[!(
+    allHabitatCovs %in%
+    c("starttime","bcr","doy","effort","id","eightyeight","year",
+      "date","stratum","observer","common.name","birdcode","sex","mgmtentity",
+      "mgmtregion","mgmtunit","county","state","primaryhabitat","transectnum")
+  )]
+  return(allHabitatCovs)
+}
+get_detection_covs <- function(x){
+  allDetCovs <- colnames(imbcr_df@siteCovs)
+  allDetCovs <- allDetCovs[(
+    allDetCovs %in%
+    c("starttime","bcr","doy")
+  )]
+  return(allDetCovs)
+}
 #
 # MAIN
 #
@@ -573,23 +591,13 @@ imbcr_df@siteCovs[,c('lat','lon','starttime','doy')] <- scale(
 
 cat(" -- prepping input unmarked data.frame and performing PCA\n")
 
-allHabitatCovs <- colnames(imbcr_df@siteCovs)
-allHabitatCovs <- allHabitatCovs[!(
-  allHabitatCovs %in%
-  c("starttime","bcr","doy","effort","id","eightyeight","year",
-    "date","stratum","observer","common.name","birdcode","sex","mgmtentity",
-    "mgmtregion","mgmtunit","county","state","primaryhabitat","transectnum")
-)]
+allHabitatCovs <- get_habitat_covs(imbcr_df)
 
 # drop the luke george version of habitat covariates
 # for our initial round of testing
 allHabitatCovs <- allHabitatCovs[!grepl(allHabitatCovs, pattern="lg_")]
 
-allDetCovs <- colnames(imbcr_df@siteCovs)
-allDetCovs <- allDetCovs[(
-  allDetCovs %in%
-  c("starttime","bcr","doy")
-)]
+allDetCovs <- get_detection_covs(imbcr_df)
 
 # explicitly define our metadata covariates
 metaDataCovs <- c("effort", "id")
@@ -609,6 +617,11 @@ pca_m <- pca_dim_reduction(
 
 imbcr_df_original <- imbcr_df
 imbcr_df <- pca_m[[1]] # contains our PCA projection matrix and our model obj
+
+# update our detection covariates in-case they were dropped from the PCA
+# due to missingness
+
+allDetCovs <- get_detection_covs(imbcr_df)
 
 cat(" -- building null (intercept-only) and alternative (habitat PCA) models\n")
 
