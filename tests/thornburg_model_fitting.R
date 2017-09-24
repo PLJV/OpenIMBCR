@@ -423,6 +423,14 @@ pca_dim_reduction <- function(x,
   # by default, assume that the user has not mean-centered siteCovs
   # with scrub_unmarked_dataframe(). Duplicate re-scaling here shouldn't
   # change anything.
+  if ( sum(!covs %in% colnames(x@siteCovs))>0 ){
+    warnings(paste(
+        "the following were not found in the source data.frame: covs=",
+        paste(covs[!covs %in% colnames(x@siteCovs)], collapse=", "),
+        " -- due to zero-variance or misspecification - dropping from PCA"
+      ))
+  }
+  covs <- covs[covs %in% colnames(x@siteCovs)]
   pca <- prcomp(x@siteCovs[,covs], scale.=scale, center=center)
   # figure out the final component to include that satisfies our
   # a priori variance threshold

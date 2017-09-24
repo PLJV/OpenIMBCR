@@ -1,0 +1,38 @@
+# Burnham and Anderson (2002) write that delta difference (dAIC) for models
+# within 0-2 of a min have a substantial support; deltas within 4-7 considerably less
+# support and deltas greater than 10 essentially have no support. These
+# support-levels are intended to be used for selecting a range of models
+# around a minimum model for model averaging. And Burnham and Anderson might cringe
+# a little at the inverse interpretation below, where we test for the alternative:
+# whether a model is significantly different from a null (no habitat covs) model.
+# But this follows the model-based hypothesis testing of Royle and Dorazio
+# (Ch. 2.5), except that we are not using a  frequentist test statistic
+# (e.g., Wald or LRT).
+#
+
+-- species: CASP
+-- dAIC (null - habitat): 104.8962
+-- species: EAME
+-- dAIC (null - habitat): 5.241803
+-- species: EUCD
+-- dAIC (null - habitat): 47.09437
+-- species: GRSP
+-- dAIC (null - habitat): 25.62437
+-- species: LBCU
+-- dAIC (null - habitat): -6.877742
+-- species: LOSH
+-- dAIC (null - habitat): -9.509657
+-- species: MODO
+-- dAIC (null - habitat): 60.64717
+-- species: NOBO
+-- dAIC (null - habitat): 14.65064
+-- species: RINP
+-- dAIC (null - habitat): 152.702
+-- species: SCQU
+-- dAIC (null - habitat): 103.1186
+-- species: SWHA
+-- dAIC (null - habitat): 2.339939
+-- species: WEME
+-- dAIC (null - habitat): 279.8266
+-- species: LARB
+-- dAIC (null - habitat): 525.8919
