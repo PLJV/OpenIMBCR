@@ -411,6 +411,15 @@ pca_dim_reduction <- function(x,
   if (is.null(covs)){
     stop("covs= argument must specify input covariates names for our PCA")
   }
+  # bug-fix drop columns that have zero variance, otherwise prcomp() will
+  # fail when you attempt to mean-center
+  x@siteCovs[is.na(x@siteCovs)] <- 0
+  no_variance <- round(apply(
+      variance,
+      MARGIN=2,
+      FUN=var
+    )) == 0
+  x@siteCovs <- x@siteCovs[ , !no_variance]
   # by default, assume that the user has not mean-centered siteCovs
   # with scrub_unmarked_dataframe(). Duplicate re-scaling here shouldn't
   # change anything.
