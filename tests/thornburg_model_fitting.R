@@ -415,7 +415,7 @@ pca_dim_reduction <- function(x,
   # fail when you attempt to mean-center
   x@siteCovs[is.na(x@siteCovs)] <- 0
   no_variance <- round(apply(
-      variance,
+      x@siteCovs,
       MARGIN=2,
       FUN=var
     )) == 0
