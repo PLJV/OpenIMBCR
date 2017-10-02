@@ -378,8 +378,87 @@ build_unmarked_gds <- function(df=NULL,
       numPrimary=numPrimary # should be kept at 1 (no within-season visits)
     ))
 }
-#'
-#'
+#' pavlacky fragmentation pca
+pca_reconstruction <- function(x,
+                                        frag_covs=NULL,
+                                        total_area_prefix=NULL,
+                                        scale=T,
+                                        center=T,
+                                        test=1)
+{
+  which_component_max_area <- function(m, area_metric="total_area"){
+    # find the eigenvector rotation maximums for each component
+    comp_maximums <- apply(abs(m$rotation), MARGIN=2, FUN=max)
+    for(i in 1:ncol(m$rotation)){
+      comp_maximums[i] <- names(which(abs(m$rotation[,i]) == comp_maximums[i]))
+    }
+    return(which(grepl(comp_maximums, pattern=area_metric)))
+  }
+  if(sum(grepl(x@siteCovs,pattern="_ar$"))==0){
+    stop("couldn't find an '_ar' area suffix in our input table")
+  }
+  if(is.null(covs)){
+    fragmentation_metrics <- x@siteCovs[ ,
+        grepl(colnames(x@siteCovs), pattern="mn_p_ar$|pat_ct$|inp_dst$")
+      ]
+  } else {
+    fragmentation_metrics <- x@siteCovs[, frag_covs]
+  }
+  # parse siteCovs for all covs with an area suffix
+  total_area <- colnames(x@siteCovs)[
+      grepl(colnames(x@siteCovs), pattern="_ar$")
+    ]
+  # if there is a prefix that we should filter our area metrics with,
+  # apply it here.
+  if(!is.null(total_area_prefix)){
+    total_area <- total_area[grepl(total_area, pattern=total_area_prefix)]
+  }
+  # bind our fragmentation metrics and our new "total area"
+  # metric
+  fragmentation_metrics <- cbind(
+      fragmentation_metrics,
+      total_area=apply(x@siteCovs[ , total_area], MARGIN=1, FUN=sum)
+    )
+  pca_m <- prcomp(fragmentation_metrics, scale.=T, center=T)
+  # which component captures the greatest variance for "total_area"
+  total_area_component <- which_component_max_area(pca_m)
+  keep_components <- !( 1:ncol(pca_m$x) %in% total_area_component )
+  # drop our total area component and collapse our remaining components
+  # into a single variable reconstruction representing fragmentation
+
+  # test (1) : take the component that captures the greatest remaining variance
+  # after dropping the 'total_area' component. This is almost always PC2
+  if(test==1){
+    # update our keep components to whatever has the next highest variance
+    keep_components <- which(
+        pca_m$sdev ==
+        (pca_m$sdev[keep_components][which.max(pca_m$sdev[keep_components])])
+      )
+    # subset the scores matrix ($x) for our single retained component
+    scores_matrix <- matrix(pca_m$x[,keep_components])
+    colnames(scores_matrix) <- "fragmentation"
+
+    return(scores_matrix)
+  }
+  # test (2) : take the cross product of our 3 retained components; this is
+  # essentially an interaction term for our three retained components
+  if(test==2){
+    # figure out our "keeper" covariates
+    scores_matrix <- pca_m$x[,keep_components]
+    cross_product <- matrix(apply(
+        scores_matrix,
+        #pca_m$x[, keep_components] %*% t(pca_m$rotation[,keep_components]),
+        MARGIN=1,
+        FUN=prod
+      ))
+    colnames(cross_product) <- "fragmentation"
+    return(cross_product)
+  }
+}
+#' A vanilla implementation of PCA that accepts a user-specified variance
+#' threshold for proportion of variance explained and drops all trailing
+#' components after a threshold is met. Meant to be used on all covariates
+#' considered by a model.
 pca_dim_reduction <- function(x,
                               covs=NULL,
                               scale=T,
@@ -395,7 +474,8 @@ pca_dim_reduction <- function(x,
     return(min(which(var_explained >= var_threshold)))
   }
   # extract a projection matrix representing our pca loadings (rotations)
-  # for n components
+  # for n components -- the projection matrix is what you typically fit
+  # in a PCR.
   extractProjection <- function(n, princ) {
     # pull off the rotation.
     proj <- princ$rotation[,1:n]
@@ -430,7 +510,9 @@ pca_dim_reduction <- function(x,
         " -- due to zero-variance or misspecification - dropping from PCA"
       ))
   }
+  # subset our site-level covariates specified by the user
   covs <- covs[covs %in% colnames(x@siteCovs)]
+  # fit a PCA to the site-level covs
   pca <- prcomp(x@siteCovs[,covs], scale.=scale, center=center)
   # figure out the final component to include that satisfies our
   # a priori variance threshold
@@ -443,26 +525,37 @@ pca_dim_reduction <- function(x,
         sep=""
       ))
     if(!force) return(NULL)
-  } else {
-    # fetch our non-focal (metadata) covs
-    meta_vars <- x@siteCovs[ , !(colnames(x@siteCovs) %in% covs) ]
-    # drop our original covariates to only those included in the PCA
-    covs <- covs[1:last_component]
-    pca <- prcomp(x@siteCovs[,covs], scale.=scale, center=center)
-    # predict() here will export the PCA projection matrix for the training
-    # dataset over the "keeper" components from our analysis
-    x@siteCovs <- x@siteCovs[,covs]
-    x@siteCovs <- as.data.frame(
-        predict(
-          pca,
-          x@siteCovs
-        ),
-        stringsAsFactors = FALSE
-      )
-    # now bind our metadata covs back-in
-    x@siteCovs <- cbind(meta_vars, x@siteCovs)
-    return(list(x, pca))
   }
+  # fetch our non-focal (metadata) covs
+  meta_vars <- x@siteCovs[ , !(colnames(x@siteCovs) %in% covs) ]
+  # drop our original site-level covariates so that we only include those
+  # that maximize the variance of our 1:n components
+  covs <- names(
+      pca$rotation[
+        apply(
+          abs(pca$rotation[,1:last_component]),
+          MARGIN=2,
+          FUN=which.max
+        ),
+        1 # columns are arbitrary here
+      ]
+    )
+  # now re-fit a new PCA with an optimal subset of site covs taken from
+  # the first n components from our initial PCA
+  pca <- prcomp(x@siteCovs[,covs], scale.=scale, center=center)
+  # predict() here will simply export the scores matrix ($x) for the training
+  # dataset over the "keeper" components from our analysis
+  x@siteCovs <- x@siteCovs[,covs]
+  x@siteCovs <- as.data.frame(
+      predict(
+        pca,
+        x@siteCovs
+      ),
+      stringsAsFactors = FALSE
+    )
+  # now bind our metadata covs back-in
+  x@siteCovs <- cbind(meta_vars, x@siteCovs)
+  return(list(x, pca))
 }
 #' shorthand vector extraction function that performs a spatial join attributes
 #' vector features in x with overlapping features in y. Will automatically
@@ -556,6 +649,11 @@ imbcr_observations <-
     back_fill_all_na=F  # keep only NA values for transects with >= 1 spp det
     #back_fill_all_na=T # keep all NA values
   )
+
+# sanity-check: do we have enough observations of our bird to make a model?
+if(sum(imbcr_observations$radialdistance, na.rm=T) < 10){
+  stop("we have fewer than 10 distance observations for", argv[2])
+}
 
 cat(" -- calculating distance bins\n")
 
