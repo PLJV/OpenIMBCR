@@ -426,8 +426,9 @@ pca_reconstruction <- function(x,
   # drop our total area component and collapse our remaining components
   # into a single variable reconstruction representing fragmentation
 
-  # test (1) : take the component that captures the greatest remaining variance
-  # after dropping the 'total_area' component. This is almost always PC2
+  # test (1; dim reduction) : take the component that captures the greatest
+  # remaining variance after dropping the 'total_area' component. This is
+  # almost always PC2
   if(test==1){
     # update our keep components to whatever has the next highest variance
     keep_components <- which(
@@ -440,10 +441,11 @@ pca_reconstruction <- function(x,
 
     return(scores_matrix)
   }
-  # test (2) : take the cross product of our 3 retained components; this is
-  # essentially an interaction term for our three retained components
+  # test (2; dim reduction) : take the cross product of our 3 retained
+  # components after dropping 'total_area'; this is essentially an interaction
+  # term for our three retained components
   if(test==2){
-    # figure out our "keeper" covariates
+    # subset our scores matrix for our "keeper" components
     scores_matrix <- pca_m$x[,keep_components]
     cross_product <- matrix(apply(
         scores_matrix,
@@ -454,6 +456,12 @@ pca_reconstruction <- function(x,
     colnames(cross_product) <- "fragmentation"
     return(cross_product)
   }
+  # test (3; reconstruction) : reconstruct total area from our three retained
+  # components (after dropping the total_area component)
+
+  # test (4; reconstruction) : reconstruct our three fragmentation metrics
+  # (after dropping the total area component)
+
 }
 #' A vanilla implementation of PCA that accepts a user-specified variance
 #' threshold for proportion of variance explained and drops all trailing
@@ -472,21 +480,6 @@ pca_dim_reduction <- function(x,
     var_explained <- round(diffinv(x$sdev/sum(x$sdev)), 2)
       var_explained <- var_explained[2:length(var_explained)]
     return(min(which(var_explained >= var_threshold)))
-  }
-  # extract a projection matrix representing our pca loadings (rotations)
-  # for n components -- the projection matrix is what you typically fit
-  # in a PCR.
-  extractProjection <- function(n, princ) {
-    # pull off the rotation.
-    proj <- princ$rotation[,1:n]
-    # sign was arbitrary, so flip in convenient form
-    for(i in seq_len(n)) {
-      si <- sign(mean(proj[,i]))
-      if(si!=0) {
-        proj[,i] <- proj[,i]*si
-      }
-    }
-    return(proj)
   }
   if (is.null(covs)){
     stop("covs= argument must specify input covariates names for our PCA")
