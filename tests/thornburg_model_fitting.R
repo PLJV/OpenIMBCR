@@ -380,14 +380,15 @@ build_unmarked_gds <- function(df=NULL,
 }
 #' pavlacky fragmentation pca
 pca_reconstruction <- function(x,
-                                        frag_covs=NULL,
-                                        total_area_prefix=NULL,
-                                        scale=T,
-                                        center=T,
-                                        test=1)
+                               frag_covs=NULL,
+                               total_area_prefix=NULL,
+                               scale=T,
+                               center=T,
+                               test=1)
 {
   which_component_max_area <- function(m, area_metric="total_area"){
     # find the eigenvector rotation maximums for each component
+    # note: sign is arbitrary here
     comp_maximums <- apply(abs(m$rotation), MARGIN=2, FUN=max)
     for(i in 1:ncol(m$rotation)){
       comp_maximums[i] <- names(which(abs(m$rotation[,i]) == comp_maximums[i]))
