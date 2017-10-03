@@ -438,8 +438,8 @@ pca_reconstruction <- function(x,
         (pca$sdev[keep_components][which.max(pca$sdev[keep_components])])
       )
     # subset the scores matrix ($x) for our single retained component
-    scores_matrix <- matrix(pca$x[,keep_components])
-    colnames(scores_matrix) <- "fragmentation"
+    scores_matrix <- pca$x[,keep_components]
+    colnames(scores_matrix) <- paste("PC",keep_components,sep="")
     return(list(scores_matrix, pca))
   }
   # test (2; dim reduction) : take the cross product of our 3 retained
@@ -689,7 +689,8 @@ imbcr_df <- scrub_unmarked_dataframe(
 
 cat(" -- mean-centering our spatial covariates and detection covariates\n")
 
-imbcr_df@siteCovs[,c('lat','lon','starttime','doy')] <- scale(
+input_data_scale_attr <- imbcr_df@siteCovs[,c('lat','lon','starttime','doy')] <-
+  scale(
     imbcr_df@siteCovs[,c('lat','lon','starttime','doy')]
   )
 
@@ -724,33 +725,39 @@ imbcr_df@siteCovs <- imbcr_df@siteCovs[,c(metaDataCovs,allDetCovs,allHabitatCovs
 # imbcr_df <- pca_m[[1]] # contains our PCA scores matrix and our model obj
 
 # this is a custom PCA reduction on just our fragmentation metrics
-imbcr_df_original <- imbcr_df
-imbcr_df@siteCovs <- cbind(
-    imbcr_df@siteCovs,
-    pca_reconstruction(imbcr_df,test=1),
-    pca_reconstruction(imbcr_df,test=2)
-  )
-
-names <- colnames(imbcr_df@siteCovs)
-names[length(names)]   <- "frag_2"
-names[length(names)-1] <- "frag_1"
-
+# imbcr_df_original <- imbcr_df
+# imbcr_df@siteCovs <- cbind(
+#     imbcr_df@siteCovs,
+#     pca_reconstruction(imbcr_df,test=1),
+#     pca_reconstruction(imbcr_df,test=2)
+#   )
+#
+# names <- colnames(imbcr_df@siteCovs)
+# names[length(names)]   <- "frag_2"
+# names[length(names)-1] <- "frag_1"
+#
 # how well does our new variable capture our three fragmentation metrics?
-apply(abs(
-  cor(imbcr_df@siteCovs[,c('pat_ct','mn_p_ar','inp_dst','frag_1','frag_2')])),
-  MARGIN=2,
-  FUN=sum
-)-1
-# I  like the first fragmentation PCA better
-imbcr_df <- imbcr_df_original
+# apply(abs(
+#   cor(imbcr_df@siteCovs[,c('pat_ct','mn_p_ar','inp_dst','frag_1','frag_2')])),
+#   MARGIN=2,
+#   FUN=sum
+# )-1
+# # I  like the first fragmentation PCA better
+# imbcr_df <- imbcr_df_original
+# imbcr_df@siteCovs <- cbind(
+#     imbcr_df@siteCovs,
+#     pca_reconstruction(imbcr_df,test=1)
+#   )
+# imbcr_df@siteCovs <- imbcr_df@siteCovs[, !grepl(
+#     colnames(imbcr_df@siteCovs),
+#     pattern='pat_ct|mn_p_ar|inp_dst'
+#   )]
+
 imbcr_df@siteCovs <- cbind(
     imbcr_df@siteCovs,
-    pca_reconstruction(imbcr_df,test=1)
+    # test (1) : drop total_area, take best remaining component
+    pca_reconstruction(imbcr_df, test=1),
   )
-imbcr_df@siteCovs <- imbcr_df@siteCovs[, !grepl(
-    colnames(imbcr_df@siteCovs),
-    pattern='pat_ct|mn_p_ar|inp_dst'
-  )]
 
 allHabitatCovs <- get_habitat_covs(imbcr_df)
 # update our detection covariates in-case they were dropped from the PCA
@@ -821,13 +828,13 @@ kitchen_sink_m <- unmarked::gdistsamp(
 
 cat("\n")
 cat(" -- species:", argv[2], "\n")
-cat(" -- dAIC (null - habitat):", intercept_m@AIC-p_70_pcr_m@AIC, "\n")
+cat(" -- dAIC (null - habitat):", intercept_m@AIC-kitchen_sink_m@AIC, "\n")
 cat("\n")
 
 save(
     compress=T,
-    list=c("argv","imbcr_df_original","imbcr_df",
-           "allHabitatCovs","intercept_m","pca_m",
+    list=c("argv","input_data_scale_attr","imbcr_df_original",
+           "imbcr_df","allHabitatCovs","intercept_m","pca_m",
            "p_70_pcr_m"),
     file=paste(
       tolower(argv[2]),
