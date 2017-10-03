@@ -386,14 +386,9 @@ pca_reconstruction <- function(x,
                                center=T,
                                test=1)
 {
-  which_component_max_area <- function(m, area_metric="total_area"){
+  which_component_max_area <- function(m=NULL, area_metric="total_area"){
     # find the eigenvector rotation maximums for each component
-    # note: sign is arbitrary here
-    comp_maximums <- apply(abs(m$rotation), MARGIN=2, FUN=max)
-    for(i in 1:ncol(m$rotation)){
-      comp_maximums[i] <- names(which(abs(m$rotation[,i]) == comp_maximums[i]))
-    }
-    return(which(grepl(comp_maximums, pattern=area_metric)))
+    return(as.vector(which.max(abs(pca$rotation[area_metric,]))))
   }
   if(sum(grepl(colnames(x@siteCovs),pattern="_ar$"))==0){
     stop("couldn't find an '_ar' area suffix in our input table")
@@ -434,11 +429,14 @@ pca_reconstruction <- function(x,
   if(test==1){
     # update our keep components to whatever has the next highest variance
     keep_components <- which(
-        pca$sdev ==
-        (pca$sdev[keep_components][which.max(pca$sdev[keep_components])])
+        round(pca$sdev, 6) ==
+        round(
+          pca$sdev[keep_components][which.max(pca$sdev[keep_components])],
+          6
+        )
       )
     # subset the scores matrix ($x) for our single retained component
-    scores_matrix <- pca$x[,keep_components]
+    scores_matrix <- as.matrix(pca$x[,keep_components])
     colnames(scores_matrix) <- paste("PC",keep_components,sep="")
     return(list(scores_matrix, pca))
   }
@@ -753,10 +751,12 @@ imbcr_df@siteCovs <- imbcr_df@siteCovs[,c(metaDataCovs,allDetCovs,allHabitatCovs
 #     pattern='pat_ct|mn_p_ar|inp_dst'
 #   )]
 
+pca_m <- pca_reconstruction(imbcr_df, test=1)
+
 imbcr_df@siteCovs <- cbind(
     imbcr_df@siteCovs,
     # test (1) : drop total_area, take best remaining component
-    pca_reconstruction(imbcr_df, test=1),
+    pca_m[[1]]
   )
 
 allHabitatCovs <- get_habitat_covs(imbcr_df)
