@@ -751,11 +751,13 @@ imbcr_df@siteCovs <- imbcr_df@siteCovs[,c(metaDataCovs,allDetCovs,allHabitatCovs
 #     pattern='pat_ct|mn_p_ar|inp_dst'
 #   )]
 
+# test (1) : drop total_area, take best remaining component
 pca_m <- pca_reconstruction(imbcr_df, test=1)
+
+imbcr_df_original <- imbcr_df
 
 imbcr_df@siteCovs <- cbind(
     imbcr_df@siteCovs,
-    # test (1) : drop total_area, take best remaining component
     pca_m[[1]]
   )
 
@@ -835,7 +837,7 @@ save(
     compress=T,
     list=c("argv","input_data_scale_attr","imbcr_df_original",
            "imbcr_df","allHabitatCovs","intercept_m","pca_m",
-           "p_70_pcr_m"),
+           "kitchen_sink_m"),
     file=paste(
       tolower(argv[2]),
       "_imbcr_gdistsamp_workflow_",
