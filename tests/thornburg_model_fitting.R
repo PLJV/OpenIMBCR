@@ -395,10 +395,10 @@ pca_reconstruction <- function(x,
     }
     return(which(grepl(comp_maximums, pattern=area_metric)))
   }
-  if(sum(grepl(x@siteCovs,pattern="_ar$"))==0){
+  if(sum(grepl(colnames(x@siteCovs),pattern="_ar$"))==0){
     stop("couldn't find an '_ar' area suffix in our input table")
   }
-  if(is.null(covs)){
+  if(is.null(frag_covs)){
     fragmentation_metrics <- x@siteCovs[ ,
         grepl(colnames(x@siteCovs), pattern="mn_p_ar$|pat_ct$|inp_dst$")
       ]
@@ -586,7 +586,7 @@ get_habitat_covs <- function(x){
 #' that we know are not detection related. Return filtered vector to user for
 #' consideration.
 get_detection_covs <- function(x){
-  allDetCovs <- colnames(imbcr_df@siteCovs)
+  allDetCovs <- colnames(x@siteCovs)
   allDetCovs <- allDetCovs[(
     allDetCovs %in%
     c("starttime","bcr","doy")
@@ -711,17 +711,47 @@ imbcr_df@siteCovs <- imbcr_df@siteCovs[,c(metaDataCovs,allDetCovs,allHabitatCovs
 
 # this is a traditional PCA reduction where all habitat covariates
 # are considered as components (not just fragmentation)
+#
+# pca_m <- pca_dim_reduction(
+#     x=imbcr_df,
+#     covs=allHabitatCovs,
+#     var_threshold=0.7,
+#     force=T # force a PCA, even if we can't satisfy the var_threshold
+#   )
+#
+# imbcr_df_original <- imbcr_df
+# imbcr_df <- pca_m[[1]] # contains our PCA scores matrix and our model obj
 
-pca_m <- pca_dim_reduction(
-    x=imbcr_df,
-    covs=allHabitatCovs,
-    var_threshold=0.7,
-    force=T # force a PCA, even if we can't satisfy the var_threshold
+# this is a custom PCA reduction on just our fragmentation metrics
+imbcr_df_original <- imbcr_df
+imbcr_df@siteCovs <- cbind(
+    imbcr_df@siteCovs,
+    pca_reconstruction(imbcr_df,test=1),
+    pca_reconstruction(imbcr_df,test=2)
   )
 
-imbcr_df_original <- imbcr_df
-imbcr_df <- pca_m[[1]] # contains our PCA projection matrix and our model obj
+names <- colnames(imbcr_df@siteCovs)
+names[length(names)]   <- "frag_2"
+names[length(names)-1] <- "frag_1"
 
+# how well does our new variable capture our three fragmentation metrics?
+apply(abs(
+  cor(imbcr_df@siteCovs[,c('pat_ct','mn_p_ar','inp_dst','frag_1','frag_2')])),
+  MARGIN=2,
+  FUN=sum
+)-1
+# I  like the first fragmentation PCA better
+imbcr_df <- imbcr_df_original
+imbcr_df@siteCovs <- cbind(
+    imbcr_df@siteCovs,
+    pca_reconstruction(imbcr_df,test=1)
+  )
+imbcr_df@siteCovs <- imbcr_df@siteCovs[, !grepl(
+    colnames(imbcr_df@siteCovs),
+    pattern='pat_ct|mn_p_ar|inp_dst'
+  )]
+
+allHabitatCovs <- get_habitat_covs(imbcr_df)
 # update our detection covariates in-case they were dropped from the PCA
 # due to missingness
 
@@ -751,10 +781,30 @@ intercept_m <- unmarked::gdistsamp(
 #     K=500,
 #   )
 
-p_70_pcr_m <- unmarked::gdistsamp(
+# test : build a model where the principal components scores are used
+# up-to explaining 70% of the variance of the input dataset
+# p_70_pcr_m <- unmarked::gdistsamp(
+#     as.formula(paste(
+#       "~",
+#       paste(colnames(pca_m[[2]]$rotation), collapse="+"),
+#       "+offset(log(effort))",
+#       sep=""
+#     )),
+#     ~1,
+#     as.formula(paste("~",paste(allDetCovs, collapse="+"))),
+#     data=imbcr_df,
+#     keyfun="halfnorm",
+#     mixture="P",
+#     se=T,
+#     K=500,
+#   )
+
+# test : build a model where the principal components scores are used
+# up-to explaining 70% of the variance of the input dataset
+kitchen_sink_m <- unmarked::gdistsamp(
     as.formula(paste(
       "~",
-      paste(colnames(pca_m[[2]]$rotation), collapse="+"),
+      paste(allHabitatCovs, collapse="+"),
       "+offset(log(effort))",
       sep=""
     )),
