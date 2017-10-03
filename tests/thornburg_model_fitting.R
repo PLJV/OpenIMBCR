@@ -420,45 +420,46 @@ pca_reconstruction <- function(x,
       fragmentation_metrics,
       total_area=apply(x@siteCovs[ , total_area], MARGIN=1, FUN=sum)
     )
-  pca_m <- prcomp(fragmentation_metrics, scale.=T, center=T)
+  pca <- prcomp(fragmentation_metrics, scale.=T, center=T)
   # which component captures the greatest variance for "total_area"
-  total_area_component <- which_component_max_area(pca_m)
-  keep_components <- !( 1:ncol(pca_m$x) %in% total_area_component )
+  total_area_component <- which_component_max_area(pca)
+  keep_components <- !( 1:ncol(pca$x) %in% total_area_component )
   # drop our total area component and collapse our remaining components
   # into a single variable reconstruction representing fragmentation
 
   # test (1; dim reduction) : take the component that captures the greatest
   # remaining variance after dropping the 'total_area' component. This is
-  # almost always PC2
+  # often PC2 (if total_area was represented best by PC1), but not always.
+  # So we have to dig to make sure.
   if(test==1){
     # update our keep components to whatever has the next highest variance
     keep_components <- which(
-        pca_m$sdev ==
-        (pca_m$sdev[keep_components][which.max(pca_m$sdev[keep_components])])
+        pca$sdev ==
+        (pca$sdev[keep_components][which.max(pca$sdev[keep_components])])
       )
     # subset the scores matrix ($x) for our single retained component
-    scores_matrix <- matrix(pca_m$x[,keep_components])
+    scores_matrix <- matrix(pca$x[,keep_components])
     colnames(scores_matrix) <- "fragmentation"
-
-    return(scores_matrix)
+    return(list(scores_matrix, pca))
   }
   # test (2; dim reduction) : take the cross product of our 3 retained
   # components after dropping 'total_area'; this is essentially an interaction
   # term for our three retained components
   if(test==2){
     # subset our scores matrix for our "keeper" components
-    scores_matrix <- pca_m$x[,keep_components]
+    scores_matrix <- pca$x[,keep_components]
     cross_product <- matrix(apply(
         scores_matrix,
-        #pca_m$x[, keep_components] %*% t(pca_m$rotation[,keep_components]),
+        #pca$x[, keep_components] %*% t(pca$rotation[,keep_components]),
         MARGIN=1,
         FUN=prod
       ))
     colnames(cross_product) <- "fragmentation"
-    return(cross_product)
+    return(list(cross_product, pca))
   }
   # test (3; reconstruction) : reconstruct total area from our three retained
-  # components (after dropping the total_area component)
+  # components (after dropping the total_area component). What does this
+  # represent?
 
   # test (4; reconstruction) : reconstruct our three fragmentation metrics
   # (after dropping the total area component)
@@ -467,7 +468,7 @@ pca_reconstruction <- function(x,
 #' A vanilla implementation of PCA that accepts a user-specified variance
 #' threshold for proportion of variance explained and drops all trailing
 #' components after a threshold is met. Meant to be used on all covariates
-#' considered by a model.
+#' considered by a model as an alternative to model selection via IC.
 pca_dim_reduction <- function(x,
                               covs=NULL,
                               scale=T,
@@ -799,8 +800,9 @@ intercept_m <- unmarked::gdistsamp(
 #     K=500,
 #   )
 
-# test : build a model where the principal components scores are used
-# up-to explaining 70% of the variance of the input dataset
+# test : build a model where fragmentation metrics were collapsed into a
+# single covariate and all of our remaining habitat variables were not
+# included in a PCA. Then use AIC to optimize variable inclusion.
 kitchen_sink_m <- unmarked::gdistsamp(
     as.formula(paste(
       "~",
