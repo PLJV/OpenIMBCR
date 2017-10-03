@@ -592,7 +592,16 @@ get_detection_covs <- function(x){
   )]
   return(allDetCovs)
 }
-
+calc_table_summary_statistics <- function(x=NULL, vars=NULL){
+  training_dataset_variable_ranges <- t(x[, vars])
+  training_dataset_variable_ranges <- data.frame(
+    mean=apply(training_dataset_variable_ranges, MARGIN=1, FUN=mean, na.rm=T),
+    sd=apply(training_dataset_variable_ranges, MARGIN=1, FUN=sd, na.rm=T),
+    min=apply(training_dataset_variable_ranges, MARGIN=1, FUN=min, na.rm=T),
+    max=apply(training_dataset_variable_ranges, MARGIN=1, FUN=max, na.rm=T)
+  )
+  return(training_dataset_variable_ranges)
+}
 #
 # MAIN
 #
@@ -620,9 +629,19 @@ habitat_covs <- colnames(units@data)
       habitat_covs, pattern= c("_ar$|_dst$|_ct$")
     )]
 
+# back-fill any units where no patches occur with NA values
+units$inp_dst[units$inp_dst == 9999] <- NA
+
+# calculate some summary statistics for our habitat variables
+habitat_vars_summary_statistics <- calc_table_summary_statistics(
+    units@data,
+    vars=habitat_covs
+  )
+
+# mean-variance center our data
 units@data[,habitat_covs] <- scale(units@data[, habitat_covs])
 
-if(nchar(argv[2])!=4){
+if (nchar(argv[2])!=4){
   stop("expected first argument to be a four-letter bird code")
 } else {
   argv[2] <- toupper(argv[2])
@@ -666,6 +685,15 @@ cat(" -- calculating detection covariates\n")
 imbcr_observations <- calc_day_of_year(imbcr_observations)
 imbcr_observations <- calc_transect_effort(imbcr_observations)
 
+# append summary statistics to our habitat summary table
+habitat_vars_summary_statistics <- rbind(
+  habitat_vars_summary_statistics,
+  calc_table_summary_statistics(
+    imbcr_observations@data,
+    vars=c("doy","starttime","bcr")
+  )
+)
+
 cat(" -- performing spatial join with our training units dataset\n")
 
 imbcr_df <- spatial_join(
@@ -673,8 +701,8 @@ imbcr_df <- spatial_join(
     units
   )
 
-cat(" -- pooling IMBCR station observations -> transect and",
-    "prepping for 'unmarked'\n")
+cat(" -- pooling IMBCR station observations -> transect, calculating spatial",
+    "covariates and prepping for 'unmarked'\n")
 
 imbcr_df <- scrub_unmarked_dataframe(
       build_unmarked_gds(
@@ -685,9 +713,18 @@ imbcr_df <- scrub_unmarked_dataframe(
       prune_cutoff=0.10 # drop variables with low variance
     )
 
+# append summary statistics to our habitat summary table
+habitat_vars_summary_statistics <- rbind(
+  habitat_vars_summary_statistics,
+  calc_table_summary_statistics(
+    imbcr_df@siteCovs,
+    vars=c("lat","lon")
+  )
+)
+
 cat(" -- mean-centering our spatial covariates and detection covariates\n")
 
-input_data_scale_attr <- imbcr_df@siteCovs[,c('lat','lon','starttime','doy')] <-
+imbcr_df@siteCovs[,c('lat','lon','starttime','doy')] <-
   scale(
     imbcr_df@siteCovs[,c('lat','lon','starttime','doy')]
   )
@@ -755,7 +792,6 @@ imbcr_df@siteCovs <- imbcr_df@siteCovs[,c(metaDataCovs,allDetCovs,allHabitatCovs
 pca_m <- pca_reconstruction(imbcr_df, test=1)
 
 imbcr_df_original <- imbcr_df
-
 imbcr_df@siteCovs <- cbind(
     imbcr_df@siteCovs,
     pca_m[[1]]
@@ -835,7 +871,8 @@ cat("\n")
 
 save(
     compress=T,
-    list=c("argv","input_data_scale_attr","imbcr_df_original",
+    list=c("argv","habitat_vars_summary_statistics",
+           "imbcr_df_original",
            "imbcr_df","allHabitatCovs","intercept_m","pca_m",
            "kitchen_sink_m"),
     file=paste(
