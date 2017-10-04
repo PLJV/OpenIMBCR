@@ -156,7 +156,7 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
   models <- OpenIMBCR:::mCombinations(
       siteCovs=siteCovs,
       availCovs=availCovs,
-      detCovs=detCovs
+      detCovs=detCovs,
       offset=offset
     )
   # parallelize our runs across nCores processors (defined at top)
