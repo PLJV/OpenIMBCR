@@ -98,19 +98,24 @@ downsample_by_normal_dist <- function(distances=NULL, bins=11,
   return(ret)
 }
 #' hidden function to derive a data.frame of all possible combinations of vars=
-mCombinations <- function(vars=NULL,verbose=T){
+mCombinations <- function(siteCovs=NULL,availCovs=NULL,detCovs=NULL,verbose=T){
   if(verbose) cat(" -- deriving model combinations:")
   # calculate : combinations w/o repetition (n!/(r!(n-r)!)... or 2^n
-  m_len <- vector(); for(i in 1:length(vars)) { m_len <- append(m_len,dim(combn(vars,m=i))[2]) }
+  m_len <- vector(); for(i in 1:length(vars)) { m_len <- append(m_len,dim(combn(siteCovs,m=i))[2]) }
     m_len <- sum(m_len)
   # define the model space of all possible combinations of predictors
   models <- data.frame(formula=rep(NA,m_len),AIC=rep(NA,m_len))
   k <- 1 # row of our models data.frame
   for(i in 1:length(vars)){
-   combinations <- combn(vars,m=i)
+   combinations <- combn(siteCovs,m=i)
    # build a formula string with lapply comprehension
    f <- function(j){
-     paste("~doy~",paste(combinations[,j],collapse="+"),collapse="")
+     paste(
+       paste("~",paste(combinations[,j],collapse="+"), sep=""),
+       "~1",
+       paste("~",paste(detCovs,collapse="+"),sep=""),
+       collapse=""
+     )
    }
    # lapply over all combinations of our current n covariates
    # (avoiding a slow, nested for-loop)
@@ -124,28 +129,34 @@ mCombinations <- function(vars=NULL,verbose=T){
 }
 #' perform a random walk on an unmarked dataframe with a user-specified unmarked funtion
 #' @export
-randomWalk_dAIC <- function(vars=NULL, step=1000, umdf=NULL,
-                            umFunction=unmarked::distsamp, keyfun='halfnorm',
-                            nCores=NULL,retAll=FALSE){
+randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
+                            step=100, umdf=NULL,
+                            umFunction=unmarked::distsamp,
+                            nCores=NULL,retAll=FALSE, ...){
   require(parallel)
   if(!require(unmarked)){ stop("function requires the unmarked package is installed") }
   nCores <- ifelse(is.null(nCores), parallel::detectCores()-1, nCores)
       cl <- parallel::makeCluster(nCores)
-  models <- OpenIMBCR:::mCombinations(vars)
+  models <- OpenIMBCR:::mCombinations(
+      siteCovs=siteCovs,
+      availCovs=availCovs,
+      detCovs=detCovs
+    )
   # parallelize our runs across nCores processors (defined at top)
   total_runs <- 1:nrow(models)
   # prime the pump
   cat(" -- starting a random walk:\n")
   # assign a null model AIC to beat (below)
   m <- umFunction(
-      ~doy~1,
-      umdf,
+      ~1+offset(log(effort)), # abundance
+      ~1,                     # availability
+      as.formula(paste("~",paste(detCovs, collapse="+"))), # detection
+      data=umdf,
       keyfun=keyfun,
-      output="density",
-      unitsOut="kmsq"
+      ...
     )
   # begin with our null (intercept) model
-  minimum <- data.frame(formula="~doy~1",AIC=m@AIC)
+  minimum <- data.frame(formula="~1+offset(log(effort))~1~doy+starttime",AIC=m@AIC)
   # iterate over total_runs and try and minimize AIC as you go
   while ( length(total_runs) > 1 ){
     # randomly sample total_runs that the cluster will consider for this run
@@ -154,9 +165,48 @@ randomWalk_dAIC <- function(vars=NULL, step=1000, umdf=NULL,
                          size=ifelse(length(total_runs) > step, step, length(total_runs))
                          )
     # build models for this run across our cluster
+    if(identical(umFunction, unmarked::gdistsamp)){
+      # split the formula comprehension into many arguments
+      functionFactory <- function(x,data=NULL,...){
+        formulas <- unlist(strsplit(
+          formula.tools:::as.character.formula(x),
+          split="~")
+        )
+        lambda=as.formula(paste("~",formulas[2],sep=""))
+        phi=as.formula(paste("~",formulas[3],sep=""))
+        p=as.formula(paste("~",formulas[4],sep=""))
+        return(umFunction(
+            lambdaformula=lambda,
+            phiformula=phi,
+            pformula=p,
+            data=data,
+            ...
+          ))
+      }
+    } else if(identical(umFunction, unmarked::distsamp)) {
+      functionFactory <- function(x,data=NULL,...){
+        formulas <- unlist(strsplit(
+          formula.tools:::as.character.formula(x),
+          split="~")
+        )
+        formula=as.formula(paste(
+            paste("~",formulas[3],sep=""),
+            paste("~",formulas[2],sep="")
+          ))
+        return(umFunction(formula, data=data, ...))
+      }
+    } else {
+      functionFactory <- umFunction
+    }
     runs <- lapply(as.list(models[focal_runs,1]),FUN=as.formula)
-      runs <- parLapply(cl=cl, runs, fun=umFunction, data=umdf,keyfun="hazard", output="density", unitsOut="kmsq") # this should change based on user-specified function
-        runs <- unlist(lapply(runs,FUN=function(x){x@AIC}))
+    runs <- parLapply(
+        cl=cl,
+        runs,
+        fun=functionFactory,
+        data=umdf,
+        ...
+      )
+    runs <- unlist(lapply(runs,FUN=function(x){x@AIC}))
     # if we beat the running lowest AIC, append it to the random walk table
     if(runs[which(runs == min(runs))[1]] < min(minimum$AIC)){
       minimum <- rbind( minimum,
