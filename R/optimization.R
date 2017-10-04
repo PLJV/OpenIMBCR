@@ -118,6 +118,7 @@ mCombinations <- function(siteCovs=NULL,availCovs=NULL,detCovs=NULL,
          paste(
            paste("~",paste(combinations[,j],collapse="+"), sep=""),
            ifelse(is.null(offset),NULL,paste("+",offset,sep=""))
+         )
        },
        if(is.null(availCovs)){
          "~1"
@@ -156,6 +157,7 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
       siteCovs=siteCovs,
       availCovs=availCovs,
       detCovs=detCovs
+      offset=offset
     )
   # parallelize our runs across nCores processors (defined at top)
   total_runs <- 1:nrow(models)
