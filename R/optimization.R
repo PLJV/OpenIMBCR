@@ -101,12 +101,12 @@ downsample_by_normal_dist <- function(distances=NULL, bins=11,
 mCombinations <- function(siteCovs=NULL,availCovs=NULL,detCovs=NULL,verbose=T){
   if(verbose) cat(" -- deriving model combinations:")
   # calculate : combinations w/o repetition (n!/(r!(n-r)!)... or 2^n
-  m_len <- vector(); for(i in 1:length(vars)) { m_len <- append(m_len,dim(combn(siteCovs,m=i))[2]) }
+  m_len <- vector(); for(i in 1:length(siteCovs)) { m_len <- append(m_len,dim(combn(siteCovs,m=i))[2]) }
     m_len <- sum(m_len)
   # define the model space of all possible combinations of predictors
   models <- data.frame(formula=rep(NA,m_len),AIC=rep(NA,m_len))
   k <- 1 # row of our models data.frame
-  for(i in 1:length(vars)){
+  for(i in 1:length(siteCovs)){
    combinations <- combn(siteCovs,m=i)
    # build a formula string with lapply comprehension
    f <- function(j){
@@ -147,12 +147,11 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
   # prime the pump
   cat(" -- starting a random walk:\n")
   # assign a null model AIC to beat (below)
-  m <- umFunction(
-      ~1+offset(log(effort)), # abundance
-      ~1,                     # availability
-      as.formula(paste("~",paste(detCovs, collapse="+"))), # detection
+  m <- unmarked::gdistsamp(
+      lambdaformula=~1+offset(log(effort)), # abundance
+      phiformula=~1,                     # availability
+      pformula=formula(paste("~",paste(detCovs, collapse="+"),sep="")), # detection
       data=umdf,
-      keyfun=keyfun,
       ...
     )
   # begin with our null (intercept) model
