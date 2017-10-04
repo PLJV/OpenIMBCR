@@ -223,6 +223,8 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
         data=umdf,
         ...
       )
+    # drop any models that we failed to fit
+    runs <- unlist(lapply(runs, na.omit))
     runs <- unlist(lapply(runs,FUN=function(x){x@AIC}))
     # if we beat the running lowest AIC, append it to the random walk table
     if(runs[which(runs == min(runs))[1]] < min(minimum$AIC)){
