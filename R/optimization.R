@@ -204,8 +204,8 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
         cl=cl,
         runs,
         fun=functionFactory,
-        data=umdf
-
+        data=umdf,
+        ...
       )
     runs <- unlist(lapply(runs,FUN=function(x){x@AIC}))
     # if we beat the running lowest AIC, append it to the random walk table
