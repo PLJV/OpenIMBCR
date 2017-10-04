@@ -438,12 +438,21 @@ pca_reconstruction <- function(x,
     # subset the scores matrix ($x) for our single retained component
     scores_matrix <- as.matrix(pca$x[,keep_components])
     colnames(scores_matrix) <- paste("PC",keep_components,sep="")
-    return(list(scores_matrix, pca))
+    # drop our lurking configuration metrics
+    x@siteCovs <- cbind(
+        x@siteCovs,
+        scores_matrix
+      )
+    x@siteCovs <- x@siteCovs[ ,
+        !grepl(colnames(x@siteCovs), pattern="mn_p_ar$|pat_ct$|inp_dst$")
+      ]
+    # return unmarked df and pca model to user
+    return(list(x, pca))
   }
   # test (2; dim reduction) : take the cross product of our 3 retained
   # components after dropping 'total_area'; this is essentially an interaction
   # term for our three retained components
-  if(test==2){
+  else if(test==2){
     # subset our scores matrix for our "keeper" components
     scores_matrix <- pca$x[,keep_components]
     cross_product <- matrix(apply(
@@ -453,15 +462,53 @@ pca_reconstruction <- function(x,
         FUN=prod
       ))
     colnames(cross_product) <- "fragmentation"
-    return(list(cross_product, pca))
+    # drop our lurking configuration metrics
+    x@siteCovs <- cbind(
+        x@siteCovs,
+        cross_product
+      )
+    x@siteCovs <- x@siteCovs[ ,
+        !grepl(colnames(x@siteCovs), pattern="mn_p_ar$|pat_ct$|inp_dst$")
+      ]
+    # return unmarked df and pca model to user
+    return(list(x, pca))
   }
   # test (3; reconstruction) : reconstruct total area from our three retained
   # components (after dropping the total_area component). What does this
   # represent?
+  else if(test==3){
 
+  }
   # test (4; reconstruction) : reconstruct our three fragmentation metrics
-  # (after dropping the total area component)
-
+  # (after dropping the total area component) amd then re-calculate a PCA,
+  # accepting the first component as representative of "fragmentation"
+  else if(test==4){
+    # we are going to use two PCA objects, here
+    # keep a copy of both for later prediction
+    pca_1 <- pca
+    x_hat <- pca$x[,keep_components] %*% t(pca$rotation[,keep_components])
+    x_hat <- x_hat[,c("mn_p_ar","pat_ct","inp_dst")]
+    x_hat <- -1*scale(
+      x_hat,
+      center = colMeans(x@siteCovs[,c("mn_p_ar","pat_ct","inp_dst")]),
+      scale = T
+    )
+    # Re-calculate a PCA from our partial reconstruction
+    pca_2 <- prcomp(x_hat, scale.=T, center=T)
+    # subset the scores matrix ($x) for our single retained component
+    scores_matrix <- as.matrix(pca$x[,1])
+    colnames(scores_matrix) <- "PC1"
+    # drop our lurking configuration metrics
+    x@siteCovs <- cbind(
+        x@siteCovs,
+        scores_matrix
+      )
+    x@siteCovs <- x@siteCovs[ ,
+        !grepl(colnames(x@siteCovs), pattern="mn_p_ar$|pat_ct$|inp_dst$")
+      ]
+    # return unmarked df and pca model to user
+    return(list(x,pca_1,pca_2))
+  }
 }
 #' A vanilla implementation of PCA that accepts a user-specified variance
 #' threshold for proportion of variance explained and drops all trailing
@@ -790,12 +837,8 @@ imbcr_df@siteCovs <- imbcr_df@siteCovs[,c(metaDataCovs,allDetCovs,allHabitatCovs
 
 # test (1) : drop total_area, take best remaining component
 pca_m <- pca_reconstruction(imbcr_df, test=1)
-
 imbcr_df_original <- imbcr_df
-imbcr_df@siteCovs <- cbind(
-    imbcr_df@siteCovs,
-    pca_m[[1]]
-  )
+imbcr_df <- pca_m[[1]]
 
 allHabitatCovs <- get_habitat_covs(imbcr_df)
 # update our detection covariates in-case they were dropped from the PCA
