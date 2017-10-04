@@ -477,7 +477,7 @@ pca_reconstruction <- function(x,
   # components (after dropping the total_area component). What does this
   # represent?
   else if(test==3){
-
+    return(NULL)
   }
   # test (4; reconstruction) : reconstruct our three fragmentation metrics
   # (after dropping the total area component) amd then re-calculate a PCA,
@@ -907,6 +907,12 @@ kitchen_sink_m <- unmarked::gdistsamp(
     se=T,
     K=500,
   )
+
+#
+# now for model selection
+#
+
+
 
 cat("\n")
 cat(" -- species:", argv[2], "\n")

@@ -125,7 +125,8 @@ mCombinations <- function(vars=NULL,verbose=T){
 #' perform a random walk on an unmarked dataframe with a user-specified unmarked funtion
 #' @export
 randomWalk_dAIC <- function(vars=NULL, step=1000, umdf=NULL,
-                            umFunction=unmarked::distsamp, nCores=NULL,retAll=FALSE){
+                            umFunction=unmarked::distsamp, keyfun='halfnorm',
+                            nCores=NULL,retAll=FALSE){
   require(parallel)
   if(!require(unmarked)){ stop("function requires the unmarked package is installed") }
   nCores <- ifelse(is.null(nCores), parallel::detectCores()-1, nCores)
@@ -136,7 +137,13 @@ randomWalk_dAIC <- function(vars=NULL, step=1000, umdf=NULL,
   # prime the pump
   cat(" -- starting a random walk:\n")
   # assign a null model AIC to beat (below)
-  m <- distsamp(~doy~1, umdf,keyfun="hazard",output="density",unitsOut="kmsq")
+  m <- umFunction(
+      ~doy~1,
+      umdf,
+      keyfun=keyfun,
+      output="density",
+      unitsOut="kmsq"
+    )
   # begin with our null (intercept) model
   minimum <- data.frame(formula="~doy~1",AIC=m@AIC)
   # iterate over total_runs and try and minimize AIC as you go

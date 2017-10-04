@@ -1,6 +1,6 @@
 #
 # Burnham and Anderson (2002) write that delta difference (dAIC) for models
-# within 0-2 of a min have a substantial support; deltas within 4-7 considerably less
+# within 0-2 of a min have substantial support; deltas within 4-7 considerably less
 # support and deltas greater than 10 essentially have no support. These
 # support-levels are intended to be used for selecting a range of models
 # around a minimum model for model averaging. And Burnham and Anderson might cringe
@@ -8,7 +8,7 @@
 # whether a model is significantly different from a null (no habitat covs) model.
 # But this follows the model-based hypothesis testing of Royle and Dorazio
 # (Ch. 2.5), except that we are not using a frequentist test statistic
-# (e.g., Wald or LRT).
+# (e.g., Wald or LRT). Which i'm cool with.
 #
 
 -- species: CASP
