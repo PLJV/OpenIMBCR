@@ -167,13 +167,15 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
     if(identical(umFunction, unmarked::gdistsamp)){
       # split the formula comprehension into many arguments
       functionFactory <- function(x,data=NULL,...){
-        formulas <- na.omit(unlist(strsplit(
-          formula.tools:::as.character.formula(x),
-          split="~"))
-        )
-        lambda=as.formula(paste("~",formulas[2],sep=""))
-        phi=as.formula(paste("~",formulas[3],sep=""))
-        p=as.formula(paste("~",formulas[4],sep=""))
+        formulas <- gsub(na.omit(unlist(strsplit(
+            Reduce(paste, deparse(x)),
+            split="~"))),
+            pattern=" |[\n]",
+            replacement=""
+          )
+        lambda <- paste("~",formulas[2],sep="")
+        phi <- paste("~",formulas[3],sep="")
+        p <- paste("~",formulas[4],sep="")
         return(unmarked::gdistsamp(
             lambdaformula=lambda,
             phiformula=phi,
@@ -185,7 +187,7 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
     } else if(identical(umFunction, unmarked::distsamp)) {
       functionFactory <- function(x,data=NULL,...){
         formulas <- na.omit(unlist(strsplit(
-          formula.tools:::as.character.formula(x),
+          Reduce(paste, deparse(x)),
           split="~"))
         )
         formula=as.formula(paste(
@@ -202,8 +204,8 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
         cl=cl,
         runs,
         fun=functionFactory,
-        data=umdf,
-        ...
+        data=umdf
+
       )
     runs <- unlist(lapply(runs,FUN=function(x){x@AIC}))
     # if we beat the running lowest AIC, append it to the random walk table
