@@ -111,9 +111,21 @@ mCombinations <- function(siteCovs=NULL,availCovs=NULL,detCovs=NULL,verbose=T){
    # build a formula string with lapply comprehension
    f <- function(j){
      paste(
-       paste("~",paste(combinations[,j],collapse="+"), sep=""),
-       "~1",
-       paste("~",paste(detCovs,collapse="+"),sep=""),
+       if(is.null(siteCovs)){
+         "~1"
+       } else {
+         paste("~",paste(combinations[,j],collapse="+"), sep="")
+       },
+       if(is.null(availCovs)){
+         "~1"
+       } else {
+         paste("~",paste(availCovs,collapse="+"), sep="")
+       },
+       if(is.null(detCovs)){
+         "~1"
+       } else {
+         paste("~",paste(detCovs,collapse="+"),sep="")
+       },
        collapse=""
      )
    }

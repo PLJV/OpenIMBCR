@@ -909,10 +909,20 @@ kitchen_sink_m <- unmarked::gdistsamp(
   )
 
 #
-# now for model selection
+# now for some model selection
 #
 
-
+model_selection_table <- OpenIMBCR::randomWalk_dAIC(
+  siteCovs=allHabitatCovs,
+  detCovs=c("doy","starttime"),
+  step=50,
+  umdf=imbcr_df,
+  umFunction=unmarked::gdistsamp,
+  mixture="P",
+  K=500,
+  se=T,
+  keyfun="halfnorm"
+)
 
 cat("\n")
 cat(" -- species:", argv[2], "\n")
@@ -922,6 +932,7 @@ cat("\n")
 save(
     compress=T,
     list=c("argv","habitat_vars_summary_statistics",
+           "model_selection_table",
            "imbcr_df_original",
            "imbcr_df","allHabitatCovs","intercept_m","pca_m",
            "kitchen_sink_m"),
