@@ -172,9 +172,9 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
           formula.tools:::as.character.formula(x),
           split="~")
         )
-        lambda=as.formula(paste("~",formulas[2],sep=""))
-        phi=as.formula(paste("~",formulas[3],sep=""))
-        p=as.formula(paste("~",formulas[4],sep=""))
+        lambda=as.formula(na.omit(paste("~",formulas[2],sep="")))
+        phi=as.formula(na.omit(paste("~",formulas[3],sep="")))
+        p=as.formula(na.omit(paste("~",formulas[4],sep="")))
         return(umFunction(
             lambdaformula=lambda,
             phiformula=phi,
