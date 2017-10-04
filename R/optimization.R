@@ -183,7 +183,7 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
     # build models for this run across our cluster
     if(identical(umFunction, unmarked::gdistsamp)){
       # split the formula comprehension into many arguments
-      functionFactory <- function(x,data=NULL,...){
+      functionFactory <- function(x,data=NULL,offset=NULL,...){
         formulas <- gsub(na.omit(unlist(strsplit(
             Reduce(paste, deparse(x)),
             split="~"))),
@@ -203,7 +203,7 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
           ))
       }
     } else if(identical(umFunction, unmarked::distsamp)) {
-      functionFactory <- function(x,data=NULL,...){
+      functionFactory <- function(x,data=NULL,offset=NULL,...){
         formulas <- na.omit(unlist(strsplit(
           Reduce(paste, deparse(x)),
           split="~"))
