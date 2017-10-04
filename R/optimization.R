@@ -175,7 +175,7 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
         lambda=as.formula(paste("~",formulas[2],sep=""))
         phi=as.formula(paste("~",formulas[3],sep=""))
         p=as.formula(paste("~",formulas[4],sep=""))
-        return(umFunction(
+        return(unmarked::gdistsamp(
             lambdaformula=lambda,
             phiformula=phi,
             pformula=p,
