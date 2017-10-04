@@ -835,8 +835,9 @@ imbcr_df@siteCovs <- imbcr_df@siteCovs[,c(metaDataCovs,allDetCovs,allHabitatCovs
 #     pattern='pat_ct|mn_p_ar|inp_dst'
 #   )]
 
-# test (1) : drop total_area, take best remaining component
-pca_m <- pca_reconstruction(imbcr_df, test=1)
+# test (4) : First PCA axis after performing PCA reconstruction after dropping
+# "total area" from a four-component PCA of our configuration statistics
+pca_m <- pca_reconstruction(imbcr_df, test=4)
 imbcr_df_original <- imbcr_df
 imbcr_df <- pca_m[[1]]
 
