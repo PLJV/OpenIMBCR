@@ -168,13 +168,13 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
     if(identical(umFunction, unmarked::gdistsamp)){
       # split the formula comprehension into many arguments
       functionFactory <- function(x,data=NULL,...){
-        formulas <- unlist(strsplit(
+        formulas <- na.omit(unlist(strsplit(
           formula.tools:::as.character.formula(x),
-          split="~")
+          split="~"))
         )
-        lambda=as.formula(na.omit(paste("~",formulas[2],sep="")))
-        phi=as.formula(na.omit(paste("~",formulas[3],sep="")))
-        p=as.formula(na.omit(paste("~",formulas[4],sep="")))
+        lambda=as.formula(paste("~",formulas[2],sep=""))
+        phi=as.formula(paste("~",formulas[3],sep=""))
+        p=as.formula(paste("~",formulas[4],sep=""))
         return(umFunction(
             lambdaformula=lambda,
             phiformula=phi,
@@ -185,9 +185,9 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
       }
     } else if(identical(umFunction, unmarked::distsamp)) {
       functionFactory <- function(x,data=NULL,...){
-        formulas <- unlist(strsplit(
+        formulas <- na.omit(unlist(strsplit(
           formula.tools:::as.character.formula(x),
-          split="~")
+          split="~"))
         )
         formula=as.formula(paste(
             paste("~",formulas[3],sep=""),
