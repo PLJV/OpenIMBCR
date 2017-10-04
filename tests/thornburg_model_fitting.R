@@ -921,7 +921,8 @@ model_selection_table <- OpenIMBCR::randomWalk_dAIC(
   mixture="P",
   K=500,
   se=T,
-  keyfun="halfnorm"
+  keyfun="halfnorm",
+  offset="offset(log(effort))"
 )
 
 cat("\n")

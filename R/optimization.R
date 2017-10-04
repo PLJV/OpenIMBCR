@@ -98,7 +98,8 @@ downsample_by_normal_dist <- function(distances=NULL, bins=11,
   return(ret)
 }
 #' hidden function to derive a data.frame of all possible combinations of vars=
-mCombinations <- function(siteCovs=NULL,availCovs=NULL,detCovs=NULL,verbose=T){
+mCombinations <- function(siteCovs=NULL,availCovs=NULL,detCovs=NULL,
+                          offset=NULL, verbose=T){
   if(verbose) cat(" -- deriving model combinations:")
   # calculate : combinations w/o repetition (n!/(r!(n-r)!)... or 2^n
   m_len <- vector(); for(i in 1:length(siteCovs)) { m_len <- append(m_len,dim(combn(siteCovs,m=i))[2]) }
@@ -114,7 +115,9 @@ mCombinations <- function(siteCovs=NULL,availCovs=NULL,detCovs=NULL,verbose=T){
        if(is.null(siteCovs)){
          "~1"
        } else {
-         paste("~",paste(combinations[,j],collapse="+"), sep="")
+         paste(
+           paste("~",paste(combinations[,j],collapse="+"), sep=""),
+           ifelse(is.null(offset),NULL,paste("+",offset,sep=""))
        },
        if(is.null(availCovs)){
          "~1"
@@ -142,7 +145,7 @@ mCombinations <- function(siteCovs=NULL,availCovs=NULL,detCovs=NULL,verbose=T){
 #' perform a random walk on an unmarked dataframe with a user-specified unmarked funtion
 #' @export
 randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
-                            step=100, umdf=NULL,
+                            step=100, umdf=NULL, offset=NULL,
                             umFunction=unmarked::distsamp,
                             nCores=NULL,retAll=FALSE, ...){
   require(parallel)
@@ -160,8 +163,8 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
   cat(" -- starting a random walk:\n")
   # assign a null model AIC to beat (below)
   m <- unmarked::gdistsamp(
-      lambdaformula=~1+offset(log(effort)), # abundance
-      phiformula=~1,                     # availability
+      lambdaformula=paste("~1+",offset,sep=""), # abundance
+      phiformula=~1,                            # availability
       pformula=formula(paste("~",paste(detCovs, collapse="+"),sep="")), # detection
       data=umdf,
       ...
