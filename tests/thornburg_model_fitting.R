@@ -919,11 +919,10 @@ save(
            "imbcr_df_original",
            "imbcr_df","allHabitatCovs","intercept_m","pca_m",
            "kitchen_sink_m"),
-    file=paste(
+    file=tolower(paste(
       tolower(argv[2]),
       "_imbcr_gdistsamp_workflow_",
-      paste(tolower(unlist(strsplit(date(), split=" "))[c(2,3)]), collapse="_"),
+      gsub(format(Sys.time(), "%b %d %Y"), pattern=" ", replacement="_"),
       ".rdata",
-      sep=""
+      sep=""))
     )
-  )
