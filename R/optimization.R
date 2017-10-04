@@ -188,12 +188,13 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
         lambda <- paste("~",formulas[2],sep="")
         phi <- paste("~",formulas[3],sep="")
         p <- paste("~",formulas[4],sep="")
-        return(unmarked::gdistsamp(
+        return(tryCatch(umFunction(
             lambdaformula=lambda,
             phiformula=phi,
             pformula=p,
             data=data,
-            ...
+            ...),
+            error=function(e) NA
           ))
       }
     } else if(identical(umFunction, unmarked::distsamp)) {
@@ -206,7 +207,10 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
             paste("~",formulas[3],sep=""),
             paste("~",formulas[2],sep="")
           ))
-        return(umFunction(formula, data=data, ...))
+        return(tryCatch(
+            umFunction(formula, data=data, ...),
+            error=function(e) NA
+          ))
       }
     } else {
       functionFactory <- umFunction
