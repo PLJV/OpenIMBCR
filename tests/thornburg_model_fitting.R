@@ -328,7 +328,8 @@ build_unmarked_gds <- function(df=NULL,
                                numPrimary=1,
                                distance_breaks=NULL,
                                covs=NULL,
-                               summary_fun=median
+                               summary_fun=median,
+                               drop_na_values=T
                                ){
   # if we have a SpatialPointsDataFrame, calculate spatial covariates
   # and tag them on to our data.frame for our summary calculations
@@ -364,6 +365,10 @@ build_unmarked_gds <- function(df=NULL,
           covs=covs
         )
     )
+  # bug fix : drop entries with NA values before attempting PCA or quantile pruning
+  if(drop_na_values){
+    transects <- transects[!as.vector(rowSums(is.na(transects)) > 0),]
+  }
   # build our unmarked frame and return to user
   return(unmarked::unmarkedFrameGDS(
       # distance bins
@@ -510,11 +515,6 @@ pca_reconstruction <- function(x,
     return(list(x,pca_1,pca_2))
   }
 }
-#' accepts a list (as returned by pavlacky_pca_reconstruction)
-#'
-pavlacky_pca_reconstruction_predict <- function(pca_m=NULL){
-
-}
 #' A vanilla implementation of PCA that accepts a user-specified variance
 #' threshold for proportion of variance explained and drops all trailing
 #' components after a threshold is met. Meant to be used on all covariates
@@ -601,6 +601,34 @@ pca_dim_reduction <- function(x,
   # now bind our metadata covs back-in
   x@siteCovs <- cbind(meta_vars, x@siteCovs)
   return(list(x, pca))
+}
+#' testing : build a full PCA (for all covariates) and train a model to a subset
+#' of components that explain some threshold of variance
+quantile_pcr <- function(imbcr_df=NULL, siteCovs=NULL, threshold=0.7){
+  pca_m <- pca_dim_reduction(
+      x=imbcr_df,
+      covs=siteCovs,
+      var_threshold=threshold,
+      force=T # force a PCA, even if we can't satisfy the var_threshold
+    )
+
+  imbcr_df <- pca_m[[1]] # contains our PCA scores matrix and our model obj
+
+  p_70_pcr_m <- unmarked::gdistsamp(
+      as.formula(paste(
+        "~",
+        paste(colnames(pca_m[[2]]$rotation), collapse="+"),
+        "+offset(log(effort))",
+        sep=""
+      )),
+      ~1,
+      as.formula(paste("~",paste(allDetCovs, collapse="+"))),
+      data=imbcr_df,
+      keyfun="halfnorm",
+      mixture="P",
+      se=T,
+      K=500,
+    )
 }
 #' shorthand vector extraction function that performs a spatial join attributes
 #' vector features in x with overlapping features in y. Will automatically
@@ -716,7 +744,7 @@ imbcr_observations <-
 
 # sanity-check: do we have enough observations of our bird to make a model?
 if(sum(imbcr_observations$radialdistance, na.rm=T) < 10){
-  stop("we have fewer than 10 distance observations for", argv[2])
+  stop("we have fewer than 10 distance observations for ", argv[2])
 }
 
 cat(" -- calculating distance bins\n")
@@ -762,7 +790,7 @@ imbcr_df <- scrub_unmarked_dataframe(
         distance_breaks=breaks
       ),
       normalize=F,      # we already applied scale() to our input data
-      prune_cutoff=0.10 # drop variables with low variance
+      prune_cutoff=0.1  # drop variables with low variance?
     )
 
 # append summary statistics to our habitat summary table
@@ -798,53 +826,16 @@ metaDataCovs <- c("effort", "id")
 # to the PCA or modeling
 imbcr_df@siteCovs <- imbcr_df@siteCovs[,c(metaDataCovs,allDetCovs,allHabitatCovs)]
 
-# this is a traditional PCA reduction where all habitat covariates
-# are considered as components (not just fragmentation)
-#
-# pca_m <- pca_dim_reduction(
-#     x=imbcr_df,
-#     covs=allHabitatCovs,
-#     var_threshold=0.7,
-#     force=T # force a PCA, even if we can't satisfy the var_threshold
-#   )
-#
-# imbcr_df_original <- imbcr_df
-# imbcr_df <- pca_m[[1]] # contains our PCA scores matrix and our model obj
-
-# this is a custom PCA reduction on just our fragmentation metrics
-# imbcr_df_original <- imbcr_df
-# imbcr_df@siteCovs <- cbind(
-#     imbcr_df@siteCovs,
-#     pca_reconstruction(imbcr_df,test=1),
-#     pca_reconstruction(imbcr_df,test=2)
-#   )
-#
-# names <- colnames(imbcr_df@siteCovs)
-# names[length(names)]   <- "frag_2"
-# names[length(names)-1] <- "frag_1"
-#
-# how well does our new variable capture our three fragmentation metrics?
-# apply(abs(
-#   cor(imbcr_df@siteCovs[,c('pat_ct','mn_p_ar','inp_dst','frag_1','frag_2')])),
-#   MARGIN=2,
-#   FUN=sum
-# )-1
-# # I  like the first fragmentation PCA better
-# imbcr_df <- imbcr_df_original
-# imbcr_df@siteCovs <- cbind(
-#     imbcr_df@siteCovs,
-#     pca_reconstruction(imbcr_df,test=1)
-#   )
-# imbcr_df@siteCovs <- imbcr_df@siteCovs[, !grepl(
-#     colnames(imbcr_df@siteCovs),
-#     pattern='pat_ct|mn_p_ar|inp_dst'
-#   )]
-
 # test (4) : First PCA axis after performing PCA reconstruction after dropping
 # "total area" from a four-component PCA of our configuration statistics
-pca_m <- pca_reconstruction(imbcr_df, test=4)
-imbcr_df_original <- imbcr_df
-imbcr_df <- pca_m[[1]]
+if ( sum(grepl(colnames(imbcr_df@siteCovs), pattern=c("mn_p_ar|pat_ct|inp_dst"))) !=3 ) {
+  warning("we dropped one or more of our fragmentation metrics due to ",
+  "missingness while pruning the input dataset -- skipping PCA calculation")
+} else {
+  pca_m <- pca_reconstruction(imbcr_df, test=4)
+  imbcr_df_original <- imbcr_df
+  imbcr_df <- pca_m[[1]]
+}
 
 allHabitatCovs <- get_habitat_covs(imbcr_df)
 # update our detection covariates in-case they were dropped from the PCA
@@ -867,24 +858,6 @@ intercept_m <- unmarked::gdistsamp(
 
 # poly_space_m <- unmarked::gdistsamp(
 #     ~poly(lat,3)+poly(lon,3)+offset(log(effort)),
-#     ~1,
-#     as.formula(paste("~",paste(allDetCovs, collapse="+"))),
-#     data=imbcr_df,
-#     keyfun="halfnorm",
-#     mixture="P",
-#     se=T,
-#     K=500,
-#   )
-
-# test : build a model where the principal components scores are used
-# up-to explaining 70% of the variance of the input dataset
-# p_70_pcr_m <- unmarked::gdistsamp(
-#     as.formula(paste(
-#       "~",
-#       paste(colnames(pca_m[[2]]$rotation), collapse="+"),
-#       "+offset(log(effort))",
-#       sep=""
-#     )),
 #     ~1,
 #     as.formula(paste("~",paste(allDetCovs, collapse="+"))),
 #     data=imbcr_df,
