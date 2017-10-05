@@ -1,5 +1,6 @@
 require(unmarked)
 require(OpenIMBCR)
+require(parallel)
 
 argv <- commandArgs(trailingOnly=T)
 
@@ -38,10 +39,45 @@ recenter_input_table <- function(table=NULL, summary_table=NULL){
       !grepl(vars_to_recenter, pattern="PC")
     ]
   for(var in vars_to_recenter){
-    table[,var] <- table[,var] - summary_table[var,"mean"] /
-    summary_table[var,"sd"]
+    table[,var] <- as.vector(scale(
+      table[,var],
+      center=summary_table[var,'mean'],
+      scale=summary_table[var,'sd']
+    ))
   }
   return(table)
+}
+
+par_unmarked_predict <- function(run_table=NULL, m_final=NULL){
+
+      steps <- seq(0, nrow(run_table), by=100)
+  run_table <- data.frame(run_table@data)
+
+  if(steps[length(steps)] != nrow(run_table)){
+    steps <- append(steps, nrow(run_table))
+  }
+
+  cl <- parallel::makeCluster(parallel::detectCores()-1)
+
+  parallel::clusterExport(
+      cl,
+      varlist=c("run_table","m_final","steps"),
+      envir=environment()
+    )
+
+  predicted_density <- parLapply(
+    cl=cl,
+    X=1:(length(steps)-1),
+    fun=function(x){
+      unmarked::predict(
+        m_final,
+        newdata=run_table[(steps[x]+1):steps[x+1],],
+        type="lambda"
+      )
+    }
+  )
+  # bind list results and return table to user
+  return(do.call(rbind, predicted_density))
 }
 
 #
@@ -59,6 +95,11 @@ final_model_formula <- gsub(
     pattern=" ",
     replacement=""
   )
+
+# bug fix : drop spatial variables?
+# final_model_formula <- gsub(
+#   final_model_formula, pattern="[+]lon|[+]lat", replacement=""
+# )
 
 cat(" -- re-fitting our final model (selected by minimum AIC)\n")
 
@@ -106,23 +147,43 @@ cat(
   )
 
 units@data <- recenter_input_table(
-    units@data[variables_to_use],
+    units@data[,variables_to_use],
     habitat_vars_summary_statistics
   )
 
 # append a fake effort offset that assumes each unit was sampled
 # across all stations
-units@data <- cbind(units@data, effort=16)
+units@data$effort <- mean(m_final@data@siteCovs$effort)
+
+
 
 cat(" -- predicting against optimal model:")
-density <- unmarked::predict(
-    m_final,
-    newdata=units@data,
-    type="lambda"
+predicted_density <- par_unmarked_predict(units, m_final)
+
+nonsense_filter <- quantile(predicted_density[,1], probs=0.99)
+predicted_density[,1][predicted_density[,1]>nonsense_filter] <- NA
+
+# write our prediction to the attribute table
+spp_name <- strsplit(argv[1], split="_")[[1]][1]
+
+units@data[, spp_name] <-
+  as.vector(predicted_density[,1])
+
+units@data <- as.data.frame(
+    units@data[,spp_name ]
   )
 
-# save output
+colnames(units@data) <- spp_name
+
 cat(" -- writing to disk\n")
+
+rgdal::writeOGR(
+  units,
+  dsn=".",
+  layer=paste(spp_name,"_pred_density_1km", sep=""),
+  driver="ESRI Shapefile",
+  overwrite=T
+)
 
 save(
     compress=T,
@@ -130,11 +191,8 @@ save(
            "model_selection_table",
            "imbcr_df_original",
            "imbcr_df","allHabitatCovs","intercept_m","pca_m",
-           "kitchen_sink_m", "density"),
-    file=tolower(paste(
-      tolower(argv[2]),
-      "_imbcr_gdistsamp_workflow_",
-      gsub(format(Sys.time(), "%b %d %Y"), pattern=" ", replacement="_"),
-      ".rdata",
-      sep=""))
+           "kitchen_sink_m", "predicted_density"),
+    file=paste(
+      tolower(argv[1]),
+      sep="")
     )
