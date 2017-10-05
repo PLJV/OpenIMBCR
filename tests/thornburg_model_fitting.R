@@ -510,6 +510,11 @@ pca_reconstruction <- function(x,
     return(list(x,pca_1,pca_2))
   }
 }
+#' accepts a list (as returned by pavlacky_pca_reconstruction)
+#'
+pavlacky_pca_reconstruction_predict <- function(pca_m=NULL){
+
+}
 #' A vanilla implementation of PCA that accepts a user-specified variance
 #' threshold for proportion of variance explained and drops all trailing
 #' components after a threshold is met. Meant to be used on all covariates
@@ -892,6 +897,7 @@ intercept_m <- unmarked::gdistsamp(
 # test : build a model where fragmentation metrics were collapsed into a
 # single covariate and all of our remaining habitat variables were not
 # included in a PCA. Then use AIC to optimize variable inclusion.
+
 kitchen_sink_m <- unmarked::gdistsamp(
     as.formula(paste(
       "~",
