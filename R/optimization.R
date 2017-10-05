@@ -165,14 +165,20 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
   cat(" -- starting a random walk:\n")
   # assign a null model AIC to beat (below)
   m <- unmarked::gdistsamp(
-      lambdaformula=paste("~1+",offset,sep=""), # abundance
-      phiformula=~1,                            # availability
-      pformula=formula(paste("~",paste(detCovs, collapse="+"),sep="")), # detection
+      # abundance
+      lambdaformula=ifelse(!is.null(offset),
+          paste("~1+",offset,sep=""),
+          "~1"
+        )
+      # availability
+      phiformula=~1,
+      # detection
+      pformula=formula(paste("~",paste(detCovs, collapse="+"),sep="")),
       data=umdf,
       ...
     )
   # begin with our null (intercept) model
-  minimum <- data.frame(formula="~1+offset(log(effort))~1~doy+starttime",AIC=m@AIC)
+  minimum <- data.frame(formula="~1~1~doy+starttime",AIC=m@AIC)
   # iterate over total_runs and try and minimize AIC as you go
   while ( length(total_runs) > 1 ){
     # randomly sample total_runs that the cluster will consider for this run
@@ -228,15 +234,17 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
         data=umdf,
         ...
       )
-    # drop any models that we failed to fit
+    # drop any models that unmarke failed to fit
     runs <- unlist(lapply(runs, na.omit))
+    # fetch our AIC's for those models we retained
     runs <- unlist(lapply(runs,FUN=function(x){x@AIC}))
     # if we beat the running lowest AIC, append it to the random walk table
     if(runs[which(runs == min(runs))[1]] < min(minimum$AIC)){
-      minimum <- rbind( minimum,
-                        data.frame( formula=models[focal_runs[which(runs == min(runs))[1]],'formula'],
-                                        AIC=runs[which(runs == min(runs))[1]] )
-                      )
+      minimum <- rbind(minimum,
+                       data.frame(
+                         formula=models[focal_runs[which(runs == min(runs))[1]],'formula'],
+                         AIC=runs[which(runs == min(runs))[1]]
+                       ))
     }
     total_runs <- total_runs[!(total_runs %in% focal_runs)]
     cat(paste("[jobs remaining:",length(total_runs),"]",sep=""));
