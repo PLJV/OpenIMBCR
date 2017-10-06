@@ -28,34 +28,34 @@ recursiveFindFile <- function(name=NULL,root=Sys.getenv("HOME")){
     return(list.files(root,pattern=name,recursive=T,full.names=T))
   }
 }
-#' parse a source CSV (published by BCR) for IMBCR data and return as a SpatialPointsDataFrame
-#' to the user
+#' parse a source CSV (published by BCR) for IMBCR data and return
+#' as a SpatialPointsDataFrame to the user for post-processing or
+#' conversion to unmarked data.frame objects for modeling
 #' @export
 imbcrTableToShapefile <- function(filename=NULL,outfile=NULL,
                                   write=F, calc_spatial_covs=T){
-  require(raster)
-  require(rgdal)
   if(is.null(outfile) && write && !is.character(filename)){
     stop("cannot write shapefile to disk without an outfile= or filename.ext to parse")
   }
   # sanity-check to see if our output shapefile already exists
   s <- recursiveFindFile(outfile)[1]
   if(!is.null(s)){
-    s <- landscapeAnalysis:::readOGRfromPath(s)
+    s <- OpenIMBCR:::readOGRfromPath(s)
+  # Parse ALL BCR raw data tables into a single table
   } else {
-    #
-    # Parse ALL BCR raw data tables into a single table
-    #
-    if(class(filename) == "data.frame"){
+    if(inherits(filename,"data.frame")){
       t <- filename
     } else {
       if(length(filename)==1){
         t <- read.csv(filename)
       # legacy support : rbind across multiple CSV files
       } else {
-        t <- recursiveFindFile(name=filename)
-          t <- lapply(t,read.csv)
-            t <- do.call(what=rbind,t)
+        t <- lapply(recursiveFindFile(
+              name=filename
+            ),
+            read.csv
+          )
+        t <- do.call(rbind, t)
       }
     }
     names(t) <- tolower(names(t))
@@ -75,7 +75,8 @@ imbcrTableToShapefile <- function(filename=NULL,outfile=NULL,
                         )
       row.names(s[[length(s)]]) <- paste(letters[length(s)],row.names(s[[length(s)]]),sep=".") # based on : http://gis.stackexchange.com/questions/155328/merging-multiple-spatialpolygondataframes-into-1-spdf-in-r
     }
-
+    # merge our segments and convert to a consistent
+    # popular CRS
     s <- do.call(
         sp::rbind.SpatialPointsDataFrame,
         lapply(
@@ -84,19 +85,18 @@ imbcrTableToShapefile <- function(filename=NULL,outfile=NULL,
           sp::CRS(raster::projection("+init=epsg:2163"))
         ))
     s$FID <- 1:nrow(s)
+    # calculate spatial (lat/lon) covariates for each station?
+    if(calc_spatial_covs){
+     # calculate lat/lon covariates in WGS84
+     coords <- sp::spTransform(s,"+init=epsg:4326")@coords
+       colnames(coords) <- c("lon","lat")
+     s@data <- cbind(s@data,coords)
+       rm(coords)
+    }
     # write to disk -- and allow some wiggle-room on filename conventions
     if(write){
       rgdal::writeOGR(s,".",ifelse(is.null(outfile),gsub(filename,pattern=".csv",replacement=""),outfile),driver="ESRI Shapefile",overwrite=T)
     }
-  }
-  if(calc_spatial_covs){
-    s <- df
-   df <- df@data
-   # calculate lat/lon covariates in WGS84
-   coords <- sp::spTransform(s,"+init=epsg:4326")@coords
-     colnames(coords) <- c("lon","lat")
-   s@data <- cbind(s@data,coords)
-     rm(coords)
   }
   return(s)
 }
