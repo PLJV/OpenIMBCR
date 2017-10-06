@@ -382,7 +382,8 @@ build_unmarked_gds <- function(df=NULL,
 #' pavlacky fragmentation pca
 pca_reconstruction <- function(x,
                                frag_covs=NULL,
-                               total_area_prefix=NULL,
+                               total_area_filter=NULL,
+                               total_area_suffix="_ar$",
                                scale=T,
                                center=T,
                                test=1)
@@ -391,8 +392,8 @@ pca_reconstruction <- function(x,
     # find the eigenvector rotation maximums for each component
     return(as.vector(which.max(abs(pca$rotation[area_metric,]))))
   }
-  if(sum(grepl(colnames(x@siteCovs),pattern="_ar$"))==0){
-    stop("couldn't find an '_ar' area suffix in our input table")
+  if(sum(grepl(colnames(x@siteCovs),pattern=total_area_suffix))==0){
+    stop("couldn't find an area suffix in our input table")
   }
   if(is.null(frag_covs)){
     fragmentation_metrics <- x@siteCovs[ ,
@@ -401,20 +402,29 @@ pca_reconstruction <- function(x,
   } else {
     fragmentation_metrics <- x@siteCovs[, frag_covs]
   }
-  # parse siteCovs for all covs with an area suffix
-  total_area <- colnames(x@siteCovs)[
-      grepl(colnames(x@siteCovs), pattern="_ar$")
-    ]
-  # if there is a prefix that we should filter our area metrics with,
-  # apply it here.
-  if(!is.null(total_area_prefix)){
-    total_area <- total_area[grepl(total_area, pattern=total_area_prefix)]
+  if(sum(grepl(colnames(x@siteCovs), pattern="total_area"))==0){
+    warning("no total_area metric found in the input table -- calculating ",
+    "one internally. This might behave poorly if you've mean-centered your ",
+    "data.")
+    s@siteCovs[,'total_area'] <- calc_total_area(
+        x@siteCovs,
+        total_area_filter=total_area_filter,
+        total_area_suffix=total_area_suffix
+      )
   }
+  # bug check : do we need to mean-center our total area metric?
+  if(abs(mean(x@siteCovs$total_area)/sd(x@siteCovs$total_area))>1){
+    warning("there was a lot of variance in the total_area metric, suggesting ",
+    "that it wasn't mean-variance centered. We need to scale it before using ",
+    "it in a PCA.")
+    x@siteCovs[,'total_area'] <- scale(x@siteCovs[,'total_area'])
+  }
+
   # bind our fragmentation metrics and our new "total area"
   # metric
   fragmentation_metrics <- cbind(
       fragmentation_metrics,
-      total_area=apply(x@siteCovs[ , total_area], MARGIN=1, FUN=sum)
+      total_area=x@siteCovs[ , 'total_area']
     )
   pca <- prcomp(fragmentation_metrics, scale.=T, center=T)
   # which component captures the greatest variance for "total_area"
@@ -445,7 +455,10 @@ pca_reconstruction <- function(x,
         scores_matrix
       )
     x@siteCovs <- x@siteCovs[ ,
-        !grepl(colnames(x@siteCovs), pattern="mn_p_ar$|pat_ct$|inp_dst$")
+        !grepl(
+            colnames(x@siteCovs), 
+            pattern="mn_p_ar$|pat_ct$|inp_dst$|total_area"
+          )
       ]
     # return unmarked df and pca model to user
     return(list(x, pca))
@@ -469,7 +482,10 @@ pca_reconstruction <- function(x,
         cross_product
       )
     x@siteCovs <- x@siteCovs[ ,
-        !grepl(colnames(x@siteCovs), pattern="mn_p_ar$|pat_ct$|inp_dst$")
+        !grepl(
+            colnames(x@siteCovs),
+            pattern="mn_p_ar$|pat_ct$|inp_dst$|total_area"
+          )
       ]
     # return unmarked df and pca model to user
     return(list(x, pca))
@@ -678,6 +694,29 @@ calc_table_summary_statistics <- function(x=NULL, vars=NULL){
   )
   return(training_dataset_variable_ranges)
 }
+calc_total_area <- function(table=NULL,
+                            total_area_filter=NULL,
+                            total_area_suffix="_ar$"){
+  if(inherits(table, "Spatial")){
+    table <- table@data
+  } else if(inherits(table, "unmarked")){
+    table <- table@siteCovs
+  }
+  total_area <- colnames(table)[
+      grepl(colnames(table), pattern=total_area_suffix)
+    ]
+  if(!is.null(total_area_filter)){
+    total_area <- total_area[
+        !grepl(total_area, pattern=total_area_filter)
+      ]
+  }
+  return(as.vector(apply(
+      table[ , total_area],
+      MARGIN=1,
+      FUN=sum,
+      na.rm=T
+    )))
+}
 
 #
 # MAIN
@@ -720,6 +759,10 @@ habitat_covs <- colnames(units@data)
 
 # bug-fix : back-fill any units where no patches occur with NA values
 units$inp_dst[units$inp_dst == 9999] <- NA
+
+# calculate a total_area metric for a potential PCA (before mean-centering!)
+# note that this isn't actually included in our habitat_covs
+units$total_area <- calc_total_area(units, total_area_filter="_rd_")
 
 # calculate some summary statistics for our habitat variables
 # so that we can go back from scale() in the future when we
@@ -809,16 +852,6 @@ imbcr_df <- scrub_unmarked_dataframe(
       normalize=F,      # we already applied scale() to our input data
       prune_cutoff=0.1  # drop variables with low variance?
     )
-
-# append summary statistics to our habitat summary table
-# for reversing scale()
-# habitat_vars_summary_statistics <- rbind(
-#   habitat_vars_summary_statistics,
-#   calc_table_summary_statistics(
-#     imbcr_df@siteCovs,
-#     vars=c("lat","lon")
-#   )
-# )
 
 cat(" -- prepping input unmarked data.frame and performing PCA\n")
 
