@@ -456,7 +456,7 @@ pca_reconstruction <- function(x,
       )
     x@siteCovs <- x@siteCovs[ ,
         !grepl(
-            colnames(x@siteCovs), 
+            colnames(x@siteCovs),
             pattern="mn_p_ar$|pat_ct$|inp_dst$|total_area"
           )
       ]
@@ -521,7 +521,7 @@ pca_reconstruction <- function(x,
         scores_matrix
       )
     x@siteCovs <- x@siteCovs[ ,
-        !grepl(colnames(x@siteCovs), pattern="mn_p_ar$|pat_ct$|inp_dst$")
+        !grepl(colnames(x@siteCovs), pattern="mn_p_ar$|pat_ct$|inp_dst$|total_area")
       ]
     # return unmarked df and pca model to user
     return(list(x,pca_1,pca_2))

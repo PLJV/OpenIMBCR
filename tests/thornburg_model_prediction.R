@@ -133,7 +133,7 @@ par_unmarked_predict <- function(run_table=NULL, m_final=NULL){
       envir=environment()
     )
 
-  predicted_density <- parLapply(
+  predicted_density <- parallel::parLapply(
     cl=cl,
     X=1:(length(steps)-1),
     fun=function(x){
@@ -225,7 +225,7 @@ cat(
 
 
 units@data <- units@data[,unlist(lapply(units@data[1,], is.numeric))]
-units@data <- scale(units@data)
+units@data <- data.frame(scale(units@data), stringsAsFactors=F)
 
 # append a fake effort offset that assumes each unit was sampled
 # across all stations
