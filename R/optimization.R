@@ -169,7 +169,7 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
       lambdaformula=ifelse(!is.null(offset),
           paste("~1+",offset,sep=""),
           "~1"
-        )
+        ),
       # availability
       phiformula=~1,
       # detection
