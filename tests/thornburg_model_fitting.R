@@ -768,7 +768,8 @@ imbcr_observations <- calc_transect_effort(imbcr_observations)
 
 # append detection covariate summary statistics to our
 # habitat summary table so we can go-back from mean-variance
-# scaling some point in the future when we go to predict
+# scaling some point in the future when we go to predict()
+
 habitat_vars_summary_statistics <- rbind(
   habitat_vars_summary_statistics,
   calc_table_summary_statistics(
@@ -777,10 +778,8 @@ habitat_vars_summary_statistics <- rbind(
   )
 )
 
-imbcr_df@data[,c('starttime','doy')] <-
-  scale(
-    imbcr_df@data[,c('starttime','doy')]
-  )
+imbcr_observations@data[,c('starttime','doy')] <-
+  scale(imbcr_observations@data[,c('starttime','doy')])
 
 cat(" -- performing spatial join with our training units dataset\n")
 
@@ -794,7 +793,7 @@ cat(" -- pooling IMBCR station observations -> transect, calculating spatial",
 
 # this will take us from IMBCR SpatialPointsDataFrame
 # to an unmarkedFrameGDS so we can fit our model with
-# the unmarked package. 
+# the unmarked package.
 
 imbcr_df <- scrub_unmarked_dataframe(
       build_unmarked_gds(
