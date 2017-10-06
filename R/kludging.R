@@ -31,7 +31,8 @@ recursiveFindFile <- function(name=NULL,root=Sys.getenv("HOME")){
 #' parse a source CSV (published by BCR) for IMBCR data and return as a SpatialPointsDataFrame
 #' to the user
 #' @export
-imbcrTableToShapefile <- function(filename=NULL,outfile=NULL,write=F){
+imbcrTableToShapefile <- function(filename=NULL,outfile=NULL,
+                                  write=F, calc_spatial_covs=T){
   require(raster)
   require(rgdal)
   if(is.null(outfile) && write && !is.character(filename)){
@@ -87,6 +88,15 @@ imbcrTableToShapefile <- function(filename=NULL,outfile=NULL,write=F){
     if(write){
       rgdal::writeOGR(s,".",ifelse(is.null(outfile),gsub(filename,pattern=".csv",replacement=""),outfile),driver="ESRI Shapefile",overwrite=T)
     }
+  }
+  if(calc_spatial_covs){
+    s <- df
+   df <- df@data
+   # calculate lat/lon covariates in WGS84
+   coords <- sp::spTransform(s,"+init=epsg:4326")@coords
+     colnames(coords) <- c("lon","lat")
+   s@data <- cbind(s@data,coords)
+     rm(coords)
   }
   return(s)
 }

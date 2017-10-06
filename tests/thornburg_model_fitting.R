@@ -218,7 +218,10 @@ calc_day_of_year <- function(df=NULL){
     return(df)
   }
 }
-#'
+#' accepts a Spatial*DataFrame object with a distance observation
+#' field name. Will attempt to arbitrarily bin the distances into
+#' a number of distance bin intervals (specified by breaks). Will
+#' reclass raw distances to bin identifier (e.g., distance class 3).
 #' @export
 calc_dist_bins <- function(df=NULL, p=0.90, breaks=10){
   if(inherits(df,"Spatial")){
@@ -229,7 +232,7 @@ calc_dist_bins <- function(df=NULL, p=0.90, breaks=10){
   if(length(breaks) == 1){
     bin_intervals <- seq(
         from=0,
-        to=quantile(df[,distance_fieldname(df)], p=0.90, na.rm=T),
+        to=quantile(df[,distance_fieldname(df)], p=p, na.rm=T),
         length.out=breaks+1
       )
   } else {
@@ -321,8 +324,10 @@ pool_by_transect_year <- function(x=NULL, df=NULL, breaks=NULL, covs=NULL,
   }
   return(transect_year_summaries)
 }
-#' accepts a formatted IMBCR data.frame and builds an unmarkedFrameGDS
-#' data.frame from it. Will add latitude and longitude attributes (WGS84)
+#' accepts a formatted IMBCR SpatialPointsDataFrame and builds an
+#' unmarkedFrameGDS data.frame that we can use for modeling with
+#' the unmarked package. Will optionally add latitude and longitude
+#' attributes (WGS84).
 #' @export
 build_unmarked_gds <- function(df=NULL,
                                numPrimary=1,
@@ -331,18 +336,6 @@ build_unmarked_gds <- function(df=NULL,
                                summary_fun=median,
                                drop_na_values=T
                                ){
-  # if we have a SpatialPointsDataFrame, calculate spatial covariates
-  # and tag them on to our data.frame for our summary calculations
-  if(inherits(df,"Spatial")){
-     s <- df
-    df <- df@data
-    # calculate lat/lon covariates in WGS84
-    coords <- spTransform(s,"+init=epsg:4326")@coords
-      colnames(coords) <- c("lon","lat")
-    df <- cbind(df,coords)
-      rm(coords)
-    covs <- append(covs,c("lon","lat"))
-  }
   # determine distance breaks / classes, if needed
   if(is.null(distance_breaks)){
     distance_breaks  = df$distance_breaks
@@ -695,40 +688,48 @@ calc_table_summary_statistics <- function(x=NULL, vars=NULL){
 argv <- commandArgs(trailingOnly=T)
 stopifnot(length(argv)>1)
 
+# try and load a training dataset with spatial data we can
+# join our IMBCR station points with
 if(!file.exists(argv[1])){
   argv[1] <- "/global_workspace/thornburg/vector/units_attributed_training.shp"
   stopifnot(file.exists(argv[1]))
 }
 
-cat(" -- reading habitat training data and mean-centering\n")
-
-units <- OpenIMBCR:::readOGRfromPath(argv[1])
-
-habitat_covs <- colnames(units@data)
-  habitat_covs <- habitat_covs[grepl(
-      habitat_covs, pattern= c("_ar$|_dst$|_ct$")
-    )]
-
-# back-fill any units where no patches occur with NA values
-units$inp_dst[units$inp_dst == 9999] <- NA
-
-# calculate some summary statistics for our habitat variables
-habitat_vars_summary_statistics <- calc_table_summary_statistics(
-    units@data,
-    vars=habitat_covs
-  )
-
-# mean-variance center our data
-units@data[,habitat_covs] <- scale(units@data[, habitat_covs])
-
+# what's our four-letter bird code?
 if (nchar(argv[2])!=4){
   stop("expected first argument to be a four-letter bird code")
 } else {
   argv[2] <- toupper(argv[2])
 }
 
-cat(" -- reading IMBCR data and parsing focal species observations\n")
+cat(" -- reading habitat training data and mean-centering\n")
 
+units <- OpenIMBCR:::readOGRfromPath(argv[1])
+
+# the raw IMBCR DataFrame will have a mess of variables in
+# it that we don't need. Let's assume anything with the suffix
+# _ar, _dst, and _ct define actual habitat variables.
+habitat_covs <- colnames(units@data)
+  habitat_covs <- habitat_covs[grepl(
+      habitat_covs, pattern= c("_ar$|_dst$|_ct$")
+    )]
+
+# bug-fix : back-fill any units where no patches occur with NA values
+units$inp_dst[units$inp_dst == 9999] <- NA
+
+# calculate some summary statistics for our habitat variables
+# so that we can go back from scale() in the future when we
+# project the model into novel conditions
+habitat_vars_summary_statistics <- calc_table_summary_statistics(
+    units@data,
+    vars=habitat_covs
+  )
+
+# now mean-variance center our data
+units@data[,habitat_covs] <- scale(units@data[, habitat_covs])
+
+cat(" -- reading IMBCR data and parsing focal species observations\n")
+# this returns an IMBCR SpatialPointsDataFrame
 imbcr_observations <-
   scrub_imbcr_df(OpenIMBCR::imbcrTableToShapefile(
     list.files("/global_workspace/imbcr_number_crunching/",
@@ -739,7 +740,6 @@ imbcr_observations <-
     ),
     four_letter_code=argv[2],
     back_fill_all_na=F  # keep only NA values for transects with >= 1 spp det
-    #back_fill_all_na=T # keep all NA values
   )
 
 # sanity-check: do we have enough observations of our bird to make a model?
@@ -749,12 +749,13 @@ if(sum(imbcr_observations$radialdistance, na.rm=T) < 10){
 
 cat(" -- calculating distance bins\n")
 
+# define an arbitrary 10 breaks that will be used
+# to construct distance bins
 breaks <- append(0,as.numeric(quantile(as.numeric(
     imbcr_observations$radialdistance),
     na.rm=T,
     probs=seq(0.05,0.90,length.out=9))
   ))
-
 imbcr_observations <- calc_dist_bins(
     imbcr_observations,
     breaks=breaks
@@ -765,7 +766,9 @@ cat(" -- calculating detection covariates\n")
 imbcr_observations <- calc_day_of_year(imbcr_observations)
 imbcr_observations <- calc_transect_effort(imbcr_observations)
 
-# append summary statistics to our habitat summary table
+# append detection covariate summary statistics to our
+# habitat summary table so we can go-back from mean-variance
+# scaling some point in the future when we go to predict
 habitat_vars_summary_statistics <- rbind(
   habitat_vars_summary_statistics,
   calc_table_summary_statistics(
@@ -784,6 +787,13 @@ imbcr_df <- spatial_join(
 cat(" -- pooling IMBCR station observations -> transect, calculating spatial",
     "covariates and prepping for 'unmarked'\n")
 
+# this will take us from IMBCR SpatialPointsDataFrame
+# to an unmarkedFrameGDS so we can fit our model with
+# the unmarked package. scrub_ also calculates spatial
+# covariates and will do some quantile-based pruning
+# to make sure we aren't trying to use variables with
+# no information to fit our model
+
 imbcr_df <- scrub_unmarked_dataframe(
       build_unmarked_gds(
         df=imbcr_df,
@@ -794,6 +804,8 @@ imbcr_df <- scrub_unmarked_dataframe(
     )
 
 # append summary statistics to our habitat summary table
+# for reversing scale()
+
 habitat_vars_summary_statistics <- rbind(
   habitat_vars_summary_statistics,
   calc_table_summary_statistics(
