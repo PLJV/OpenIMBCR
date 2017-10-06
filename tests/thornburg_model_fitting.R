@@ -777,6 +777,11 @@ habitat_vars_summary_statistics <- rbind(
   )
 )
 
+imbcr_df@data[,c('starttime','doy')] <-
+  scale(
+    imbcr_df@data[,c('starttime','doy')]
+  )
+
 cat(" -- performing spatial join with our training units dataset\n")
 
 imbcr_df <- spatial_join(
@@ -789,10 +794,7 @@ cat(" -- pooling IMBCR station observations -> transect, calculating spatial",
 
 # this will take us from IMBCR SpatialPointsDataFrame
 # to an unmarkedFrameGDS so we can fit our model with
-# the unmarked package. scrub_ also calculates spatial
-# covariates and will do some quantile-based pruning
-# to make sure we aren't trying to use variables with
-# no information to fit our model
+# the unmarked package. 
 
 imbcr_df <- scrub_unmarked_dataframe(
       build_unmarked_gds(
@@ -805,21 +807,13 @@ imbcr_df <- scrub_unmarked_dataframe(
 
 # append summary statistics to our habitat summary table
 # for reversing scale()
-
-habitat_vars_summary_statistics <- rbind(
-  habitat_vars_summary_statistics,
-  calc_table_summary_statistics(
-    imbcr_df@siteCovs,
-    vars=c("lat","lon")
-  )
-)
-
-cat(" -- mean-centering our spatial covariates and detection covariates\n")
-
-imbcr_df@siteCovs[,c('lat','lon','starttime','doy')] <-
-  scale(
-    imbcr_df@siteCovs[,c('lat','lon','starttime','doy')]
-  )
+# habitat_vars_summary_statistics <- rbind(
+#   habitat_vars_summary_statistics,
+#   calc_table_summary_statistics(
+#     imbcr_df@siteCovs,
+#     vars=c("lat","lon")
+#   )
+# )
 
 cat(" -- prepping input unmarked data.frame and performing PCA\n")
 
