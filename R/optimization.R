@@ -148,18 +148,22 @@ mCombinations <- function(siteCovs=NULL,availCovs=NULL,detCovs=NULL,
 randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
                             step=100, umdf=NULL, offset=NULL,
                             umFunction=unmarked::distsamp,
-                            nCores=NULL,retAll=FALSE, ...){
-  require(parallel)
+                            nCores=NULL, ...){
+  # define our workspace and set-up parallel
   if(!require(unmarked)){ stop("function requires the unmarked package is installed") }
-  nCores <- ifelse(is.null(nCores), parallel::detectCores()-1, nCores)
-      cl <- parallel::makeCluster(nCores)
+  nCores <- ifelse(
+      is.null(nCores),
+      parallel::detectCores()-1,
+      nCores
+    )
+  cl <- parallel::makeCluster(nCores)
   models <- OpenIMBCR:::mCombinations(
       siteCovs=siteCovs,
       availCovs=availCovs,
       detCovs=detCovs,
       offset=offset
     )
-  # let's append a null model to the top of our models data.frame
+  # append a null model to the top of our models data.frame
   null_model <- gsub(paste(
     ifelse(
         !is.null(offset),
@@ -175,32 +179,18 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
   models <- rbind(data.frame(formula=null_model, AIC=NA), models)
   # parallelize our runs across nCores processors (defined at top)
   total_runs <- 1:nrow(models)
-  # prime the pump
   cat(" -- starting a random walk:\n")
-  # assign a null model AIC to beat (below)
-  # m <- unmarked::gdistsamp(
-  #     # abundance
-  #     lambdaformula=ifelse(!is.null(offset),
-  #         paste("~1+",offset,sep=""),
-  #         "~1"
-  #       ),
-  #     # availability
-  #     phiformula=~1,
-  #     # detection
-  #     pformula=formula(paste("~",paste(detCovs, collapse="+"),sep="")),
-  #     data=umdf,
-  #     ...
-  #   )
-  # begin with our null (intercept) model
-  # minimum <- data.frame(formula="~1~1~doy+starttime",AIC=m@AIC)
+  # begin with a null (intercept) model
   # iterate over total_runs and try and minimize AIC as you go
   while ( length(total_runs) > 1 ){
     # randomly sample total_runs that the cluster will consider for this run
-    focal_runs <- sample(total_runs,
-                         replace=F,
-                         size=ifelse(length(total_runs) > step, step, length(total_runs))
-                         )
-    # build models for this run across our cluster
+    focal_runs <- sample(
+        total_runs,
+        replace=F,
+        size=ifelse(length(total_runs) > step, step, length(total_runs))
+      )
+    # use factory comprehension to determine function handling for
+    # different unmarked model-fitting calls
     if(identical(umFunction, unmarked::gdistsamp)){
       # split the formula comprehension into many arguments
       functionFactory <- function(x,data=NULL,offset=NULL,...){
@@ -214,12 +204,13 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
         phi <- paste("~",formulas[3],sep="")
         p <- paste("~",formulas[4],sep="")
         return(tryCatch(umFunction(
-            lambdaformula=lambda,
-            phiformula=phi,
-            pformula=p,
-            data=data,
-            ...),
-            error=function(e) NA
+              lambdaformula=lambda,
+              phiformula=phi,
+              pformula=p,
+              data=data,
+              ...
+            ),
+            error = function(e) NA
           ))
       }
     } else if(identical(umFunction, unmarked::distsamp)) {
@@ -232,15 +223,24 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
             paste("~",formulas[3],sep=""),
             paste("~",formulas[2],sep="")
           ))
-        return(tryCatch(
-            umFunction(formula, data=data, ...),
-            error=function(e) NA
+        return(tryCatch(umFunction(
+              formula,
+              data=data,
+              ...
+            ),
+            error = function(e) NA
           ))
       }
     } else {
+      # uncaught haymaker
       functionFactory <- umFunction
     }
-    runs <- lapply(as.list(models[focal_runs,1]),FUN=as.formula)
+    # set-up our model runs by chunking the formulas table
+    # across our 'focal_runs'
+    runs <- lapply(as.list(as.character(
+        models[focal_runs, 1])),
+        FUN = as.formula
+      )
     runs <- parLapply(
         cl=cl,
         runs,
@@ -248,12 +248,17 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
         data=umdf,
         ...
       )
-    # drop any models that unmarke failed to fit
+    # drop any models that unmarked failed to fit
     runs <- unlist(lapply(runs, na.omit))
     # fetch our AIC's for those models we retained
     runs <- unlist(lapply(runs,FUN=function(x){x@AIC}))
     # if we beat the running lowest AIC, append it to the random walk table
-    if(runs[which(runs == min(runs))[1]] < min(minimum$AIC)){
+    if(!exists("minimum")){
+      minimum <- data.frame(
+        formula=models[focal_runs[which(runs == min(runs))[1]],'formula'],
+        AIC=runs[which(runs == min(runs))[1]]
+      )
+    } else if(runs[which(runs == min(runs))[1]] < min(minimum$AIC)){
       minimum <- rbind(minimum,
                        data.frame(
                          formula=models[focal_runs[which(runs == min(runs))[1]],'formula'],
@@ -265,14 +270,7 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
   };
   cat("\n");
   parallel::stopCluster(cl)
-  if(retAll){
-    return(
-        data.frame( formula=models[focal_runs,'formula'],
-                    AIC=runs )
-          )
-  } else {
-    return(minimum)
-  }
+  return(minimum)
 }
 #' use a globally-sensitive numerical optimization procedure to select covariates for
 #' inclusion in our model. This should be considerably faster for walking large variable
