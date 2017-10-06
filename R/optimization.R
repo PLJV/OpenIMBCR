@@ -192,7 +192,7 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
   #     ...
   #   )
   # begin with our null (intercept) model
-  minimum <- data.frame(formula="~1~1~doy+starttime",AIC=m@AIC)
+  # minimum <- data.frame(formula="~1~1~doy+starttime",AIC=m@AIC)
   # iterate over total_runs and try and minimize AIC as you go
   while ( length(total_runs) > 1 ){
     # randomly sample total_runs that the cluster will consider for this run
