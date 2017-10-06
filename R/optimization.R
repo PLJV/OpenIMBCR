@@ -159,24 +159,38 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
       detCovs=detCovs,
       offset=offset
     )
+  # let's append a null model to the top of our models data.frame
+  null_model <- gsub(paste(
+    ifelse(
+        !is.null(offset),
+        paste(paste("~1+",offset,sep=""),"~1~"),
+        "~1~1~"
+      ),
+      paste(detCovs,collapse="+"),
+      sep=""
+    ),
+    pattern=" ",
+    replacement=""
+  )
+  models <- rbind(data.frame(formula=null_model, AIC=NA), models)
   # parallelize our runs across nCores processors (defined at top)
   total_runs <- 1:nrow(models)
   # prime the pump
   cat(" -- starting a random walk:\n")
   # assign a null model AIC to beat (below)
-  m <- unmarked::gdistsamp(
-      # abundance
-      lambdaformula=ifelse(!is.null(offset),
-          paste("~1+",offset,sep=""),
-          "~1"
-        ),
-      # availability
-      phiformula=~1,
-      # detection
-      pformula=formula(paste("~",paste(detCovs, collapse="+"),sep="")),
-      data=umdf,
-      ...
-    )
+  # m <- unmarked::gdistsamp(
+  #     # abundance
+  #     lambdaformula=ifelse(!is.null(offset),
+  #         paste("~1+",offset,sep=""),
+  #         "~1"
+  #       ),
+  #     # availability
+  #     phiformula=~1,
+  #     # detection
+  #     pformula=formula(paste("~",paste(detCovs, collapse="+"),sep="")),
+  #     data=umdf,
+  #     ...
+  #   )
   # begin with our null (intercept) model
   minimum <- data.frame(formula="~1~1~doy+starttime",AIC=m@AIC)
   # iterate over total_runs and try and minimize AIC as you go

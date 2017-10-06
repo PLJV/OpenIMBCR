@@ -336,11 +336,14 @@ build_unmarked_gds <- function(df=NULL,
                                summary_fun=median,
                                drop_na_values=T
                                ){
+  if(inherits(df, "Spatial")){
+    df <- df@data
+  }
   # determine distance breaks / classes, if needed
   if(is.null(distance_breaks)){
     distance_breaks  = df$distance_breaks
     distance_classes = append(sort(as.numeric(unique(
-                            df$processed_data$dist_class))),
+                            df$dist_class))),
                             NA
                           )
   } else {
@@ -675,6 +678,7 @@ calc_table_summary_statistics <- function(x=NULL, vars=NULL){
   )
   return(training_dataset_variable_ranges)
 }
+
 #
 # MAIN
 #
@@ -774,12 +778,12 @@ habitat_vars_summary_statistics <- rbind(
   habitat_vars_summary_statistics,
   calc_table_summary_statistics(
     imbcr_observations@data,
-    vars=c("doy","starttime","bcr")
+    vars=c("doy","starttime","bcr","lat","lon")
   )
 )
 
-imbcr_observations@data[,c('starttime','doy')] <-
-  scale(imbcr_observations@data[,c('starttime','doy')])
+imbcr_observations@data[,c('starttime','doy','lat','lon')] <-
+  scale(imbcr_observations@data[,c('starttime','doy','lat','lon')])
 
 cat(" -- performing spatial join with our training units dataset\n")
 
@@ -788,8 +792,10 @@ imbcr_df <- spatial_join(
     units
   )
 
-cat(" -- pooling IMBCR station observations -> transect, calculating spatial",
-    "covariates and prepping for 'unmarked'\n")
+cat(
+    " -- pooling IMBCR station observations -> transect and prepping for",
+    "'unmarked'\n"
+  )
 
 # this will take us from IMBCR SpatialPointsDataFrame
 # to an unmarkedFrameGDS so we can fit our model with
@@ -842,10 +848,11 @@ if ( sum(grepl(colnames(imbcr_df@siteCovs), pattern=c("mn_p_ar|pat_ct|inp_dst"))
   imbcr_df <- pca_m[[1]]
 }
 
-allHabitatCovs <- get_habitat_covs(imbcr_df)
 # update our detection covariates in-case they were dropped from the PCA
-# due to missingness
+# due to missingness and our habitat covariates to account for the PCA
+# fragmentation metric calculation
 
+allHabitatCovs <- get_habitat_covs(imbcr_df)
 allDetCovs <- get_detection_covs(imbcr_df)
 
 cat(" -- building null (intercept-only) and alternative (habitat PCA) models\n")

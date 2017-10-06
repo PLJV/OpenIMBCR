@@ -68,12 +68,22 @@ imbcrTableToShapefile <- function(filename=NULL,outfile=NULL,
     for (zone in unique(na.omit(t$ptvisitzone))){
       s[[length(s) + 1]] <- na.omit(t[t$ptvisitzone == zone,])
       s[[length(s)]] <- sp::SpatialPointsDataFrame(
-                                  coords = data.frame(x = s[[length(s)]]$ptvisiteasting,
-                                  y = s[[length(s)]]$ptvisitnorthing),
-                                  data = s[[length(s)]],
-                                  proj4string = sp::CRS(raster::projection(paste("+init=epsg:269", zone, sep = "")))
-                        )
-      row.names(s[[length(s)]]) <- paste(letters[length(s)],row.names(s[[length(s)]]),sep=".") # based on : http://gis.stackexchange.com/questions/155328/merging-multiple-spatialpolygondataframes-into-1-spdf-in-r
+        coords = data.frame(
+            x = s[[length(s)]]$ptvisiteasting,
+            y = s[[length(s)]]$ptvisitnorthing
+          ),
+        data = s[[length(s)]],
+        proj4string = sp::CRS(raster::projection(
+            paste("+init=epsg:269", zone, sep = "")
+          ))
+      )
+      # based on : http://gis.stackexchange.com/questions/155328/merging-multiple-spatialpolygondataframes-into-1-spdf-in-r
+      row.names(s[[length(s)]]) <-
+        paste(
+          letters[length(s)],
+          row.names(s[[length(s)]]),
+          sep="."
+        )
     }
     # merge our segments and convert to a consistent
     # popular CRS
