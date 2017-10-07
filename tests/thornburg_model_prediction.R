@@ -4,7 +4,7 @@ require(parallel)
 
 r_data_file <- commandArgs(trailingOnly=T)
 
-stopifnot(file.exists(argv[1]))
+stopifnot(file.exists(r_data_file))
 
 #' re-fit a model specified by a formula object
 fit_final_model <- function(formula=NULL, imbcr_df=NULL){
@@ -50,6 +50,12 @@ calc_total_area <- function(table=NULL,
       na.rm=T
     )))
 }
+#'
+#'
+which_component_max_area <- function(m=NULL, area_metric="total_area"){
+  # find the eigenvector rotation maximums for each component
+  return(as.vector(which.max(abs(m$rotation[area_metric,]))))
+}
 #' testing: fragmentation metric calculator. Using a new input table, do a
 #' partial PCA reconstruction using a previously fit PCA. Then re-calculate a
 #' new PCA from the retained components and accept the first axis (PC1) as our
@@ -69,17 +75,26 @@ calc_fragmentation_metric <- function(table=NULL,
       total_area_filter=total_area_filter,
       total_area_suffix=total_area_suffix
     )
-  table <- scale(table)
+
+  table <- table[ , as.vector(unlist(lapply(table[1,], FUN=is.numeric)))]
+  table <- data.frame(scale(table), stringsAsFactors=F)
+  scores_matrix <- predict(pca_m[[2]], newdata=table)
+
   # build a score matrix from our initial PCA
-  x_hat <- pca_m[[2]]$x[,keep_components] %*% t(pca_m[[2]]$rotation[,keep_components])
+  total_area_component <- which_component_max_area(m=pca_m[[2]])
+  keep_components <- !( 1:ncol(pca_m[[2]]$x) %in% total_area_component )
+
+  x_hat <- scores_matrix[,keep_components] %*% t(pca_m[[2]]$rotation[,keep_components])
   x_hat <- x_hat[,c("mn_p_ar","pat_ct","inp_dst")]
-  x_hat <- -1*scale(
+
+  x_hat <- scale(
     x_hat,
     center = colMeans(table[,c("mn_p_ar","pat_ct","inp_dst")]),
     scale = T
   )
+
   # Re-calculate a PCA from our partial reconstruction
-  pca_2 <- prcomp(x_hat, scale.=T, center=T)
+  pca <- prcomp(x_hat, scale.=T, center=T)
   # subset the scores matrix ($x) for our single retained component
   scores_matrix <- as.matrix(pca$x[,1])
   colnames(scores_matrix) <- "PC1"
@@ -90,7 +105,7 @@ calc_fragmentation_metric <- function(table=NULL,
     )
   table <- table[ ,
       !grepl(
-          colnames(x@siteCovs),
+          colnames(table),
           pattern="mn_p_ar$|pat_ct$|inp_dst$|total_area"
         )
     ]
@@ -152,7 +167,7 @@ par_unmarked_predict <- function(run_table=NULL, m_final=NULL){
 # MAIN
 #
 
-load(argv[1])
+load(r_data_file)
 
 # find the minimum model from the random walk table
 
@@ -199,19 +214,29 @@ units@data <- cbind(units@data, centroids)
 # scale our input table and then pass-off our configuration metrics
 # to our pca model for re-scaling if needed
 
+cat(
+    " -- mean-variance centering our input dataset so it's consistent with",
+    "model training data\n"
+  )
+
 if(grepl(final_model_formula, pattern="+PC")){
   cat(" -- calculating a fragmentation metric from our input configuration data")
   units@data <- calc_fragmentation_metric(units, total_area_filter="_rd_")
+  units@data <- units@data[,unlist(lapply(units@data[1,], is.numeric))]
+  # to be consistent with training data, don't scale our PC
+  not_pc <- !grepl(colnames(units@data),pattern="PC1")
+  units@data[,not_pc] <- data.frame(
+      scale(units@data[,not_pc]),
+      stringsAsFactors=F
+    )
+} else{
+  units@data <- units@data[,unlist(lapply(units@data[1,], is.numeric))]
+  units@data <- data.frame(scale(units@data), stringsAsFactors=F)
 }
 
 variables_to_use <- unlist(lapply(
     colnames(units@data),
     function(x) grepl(final_model_formula, pattern=x))
-  )
-
-cat(
-    " -- mean-variance centering our input dataset so it's consistent with",
-    "model training data\n"
   )
 
 # re-centering using stored mean/sd values doesn't work very well for some
@@ -223,10 +248,6 @@ cat(
 #     habitat_vars_summary_statistics
 #   )
 
-
-units@data <- units@data[,unlist(lapply(units@data[1,], is.numeric))]
-units@data <- data.frame(scale(units@data), stringsAsFactors=F)
-
 # append a fake effort offset that assumes each unit was sampled
 # across all stations
 units@data$effort <- mean(m_final@data@siteCovs$effort)
@@ -234,12 +255,12 @@ units@data$effort <- mean(m_final@data@siteCovs$effort)
 cat(" -- predicting against optimal model:")
 predicted_density <- par_unmarked_predict(units, m_final)
 
-if(mean(predicted_density[,1])>500){ # outliers dragging our PI past K?
+if(mean(predicted_density[,1])>m_final@K){ # outliers dragging our PI past K?
   warning(
     "mean prediction is larger than K -- censoring, but this ",
     "probably shouldn't happen"
   )
-  nonsense_filter <- quantile(predicted_density[,1], probs=0.99)
+  nonsense_filter <- median(predicted_density[,1])*3
   predicted_density[,1][predicted_density[,1]>nonsense_filter] <- NA
 }
 

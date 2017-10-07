@@ -390,7 +390,7 @@ pca_reconstruction <- function(x,
 {
   which_component_max_area <- function(m=NULL, area_metric="total_area"){
     # find the eigenvector rotation maximums for each component
-    return(as.vector(which.max(abs(pca$rotation[area_metric,]))))
+    return(as.vector(which.max(abs(m$rotation[area_metric,]))))
   }
   if(sum(grepl(colnames(x@siteCovs),pattern=total_area_suffix))==0){
     stop("couldn't find an area suffix in our input table")
