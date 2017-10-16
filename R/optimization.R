@@ -143,12 +143,24 @@ mCombinations <- function(siteCovs=NULL,availCovs=NULL,detCovs=NULL,
   if(verbose) cat("\n");
   return(models)
 }
-#' perform a random walk on an unmarked dataframe with a user-specified unmarked funtion
+#' testing: perform a random walk on an unmarked dataframe with a
+#' user-specified unmarked function and some depth for exploring
+#' our model covariates. This allows for exploring models across
+#' high-dimensional space without having to fit millions of models.
+#' But it's controversial, because Kyle made it up. There are no papers
+#' in the statistics literature demonstrating that this is a valid way
+#' of exploring high-dimensional datasets. So, let's write one.
 #' @export
-randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
-                            step=100, umdf=NULL, offset=NULL,
-                            umFunction=unmarked::distsamp,
-                            nCores=NULL, ...){
+randomWalk_dAIC <- function(
+  siteCovs=NULL,
+  availCovs=NULL,
+  detCovs=NULL,
+  step=100,
+  umdf=NULL,
+  offset=NULL,
+  depth=1,
+  umFunction=unmarked::distsamp,
+  nCores=NULL, ...){
   # define our workspace and set-up parallel
   if(!require(unmarked)){ stop("function requires the unmarked package is installed") }
   nCores <- ifelse(
@@ -163,6 +175,10 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
       detCovs=detCovs,
       offset=offset
     )
+  if(depth<1){
+    sample_size <- round(nrow(models) * depth)
+    models <- models[sample(1:nrow(models), size=sample_size), ]
+  }
   # append a null model to the top of our models data.frame
   null_model <- gsub(paste(
     ifelse(
@@ -271,6 +287,155 @@ randomWalk_dAIC <- function(siteCovs=NULL, availCovs=NULL, detCovs=NULL,
   cat("\n");
   parallel::stopCluster(cl)
   return(minimum)
+}
+#'
+#'
+allCombinations_dAIC <- function(
+  siteCovs=NULL,
+  availCovs=NULL,
+  detCovs=NULL,
+  step=100,
+  umdf=NULL,
+  offset=NULL,
+  ic=OpenIMBCR:::AICc,
+  umFunction=unmarked::distsamp,
+  nCores=NULL,
+  ...){
+  # define our workspace and set-up parallel
+  if(!require(unmarked)){ stop("function requires the unmarked package is installed") }
+  nCores <- ifelse(
+      is.null(nCores),
+      parallel::detectCores()-1,
+      nCores
+    )
+  cl <- parallel::makeCluster(nCores)
+  models <- OpenIMBCR:::mCombinations(
+      siteCovs=siteCovs,
+      availCovs=availCovs,
+      detCovs=detCovs,
+      offset=offset
+    )
+  # append a null model to the top of our models data.frame
+  null_model <- gsub(paste(
+    ifelse(
+        !is.null(offset),
+        paste(paste("~1+",offset,sep=""),"~1~"),
+        "~1~1~"
+      ),
+      paste(detCovs,collapse="+"),
+      sep=""
+    ),
+    pattern=" ",
+    replacement=""
+  )
+  models <- rbind(data.frame(formula=null_model, AIC=NA), models)
+  # parallelize our runs across nCores processors (defined at top)
+  total_runs <- 1:nrow(models)
+  cat(" -- building models across all covariate combinations:\n")
+  # begin with a null (intercept) model
+  # iterate over total_runs and try and minimize AIC as you go
+  while ( length(total_runs) > 1 ){
+    # randomly sample total_runs that the cluster will consider for this run
+    focal_runs <- sample(
+        total_runs,
+        replace=F,
+        size=ifelse(length(total_runs) > step, step, length(total_runs))
+      )
+    # use factory comprehension to determine function handling for
+    # different unmarked model-fitting calls
+    if(identical(umFunction, unmarked::gdistsamp)){
+      # split the formula comprehension into many arguments
+      functionFactory <- function(x,data=NULL,offset=NULL,...){
+        formulas <- gsub(na.omit(unlist(strsplit(
+            Reduce(paste, deparse(x)),
+            split="~"))),
+            pattern=" |[\n]",
+            replacement=""
+          )
+        lambda <- paste("~",formulas[2],sep="")
+        phi <- paste("~",formulas[3],sep="")
+        p <- paste("~",formulas[4],sep="")
+        return(tryCatch(umFunction(
+              lambdaformula=lambda,
+              phiformula=phi,
+              pformula=p,
+              data=data,
+              ...
+            ),
+            error = function(e) NA
+          ))
+      }
+    } else if(identical(umFunction, unmarked::distsamp)) {
+      functionFactory <- function(x,data=NULL,offset=NULL,...){
+        formulas <- na.omit(unlist(strsplit(
+          Reduce(paste, deparse(x)),
+          split="~"))
+        )
+        formula=as.formula(paste(
+            paste("~",formulas[3],sep=""),
+            paste("~",formulas[2],sep="")
+          ))
+        return(tryCatch(umFunction(
+              formula,
+              data=data,
+              ...
+            ),
+            error = function(e) NA
+          ))
+      }
+    } else {
+      # uncaught haymaker
+      functionFactory <- umFunction
+    }
+    # set-up our model runs by chunking the formulas table
+    # across our 'focal_runs'
+    runs <- lapply(as.list(as.character(
+        models[focal_runs, 1])),
+        FUN = as.formula
+      )
+    runs <- parLapply(
+        cl=cl,
+        runs,
+        fun=functionFactory,
+        data=umdf,
+        ...
+      )
+    # drop any models that unmarked failed to fit
+    keep <- !unlist(lapply(runs, is.na))
+    runs <- runs[keep]
+    # fetch our AIC's for those models we retained
+    runs <- unlist(lapply(
+        runs,
+        FUN=ic
+      ))
+    # append our AIC's and formulas to the output table
+    if(sum(keep)>0){
+      if(!exists("model_formula_table")){
+        model_formula_table <- data.frame(
+          formula=models[focal_runs * keep, 'formula'],
+          #formula=models[,'formula'],
+          AIC=runs
+        )
+      } else {
+        model_formula_table <- rbind(
+          model_formula_table,
+          data.frame(
+              formula=models[focal_runs * keep, 'formula'],
+              #formula=models[focal_runs[which(runs == min(runs))[1]],'formula'],
+              AIC=runs
+              #AIC=runs[which(runs == min(runs))[1]]
+            )
+          )
+      }
+    }
+    total_runs <- total_runs[!(total_runs %in% focal_runs)]
+    cat(paste("[jobs remaining:",length(total_runs),"]",sep=""));
+  };
+  cat("\n");
+  parallel::stopCluster(cl)
+  return(
+      model_selection_table[order(model_selection_table[,2], decreasing=F),]
+    )
 }
 #' use a globally-sensitive numerical optimization procedure to select covariates for
 #' inclusion in our model. This should be considerably faster for walking large variable

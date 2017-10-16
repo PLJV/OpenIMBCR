@@ -10,29 +10,42 @@
 #
 
 #' expit link function
-#' @export
 expit <- function(x) 1/(1+exp(-x))
 #' logit link function
-#' @export
 logit <- function(x) log(x/(1-x))
 #' calculate AIC from a likelihood function optimization procedure
-#' @export
 AIC <- function(m){
-  if(as.character(class(m))=="unmarkedFitDS"){
+  if(inherits(m, "unmarkedFit")){
     return(m@AIC)
   }
-  # if it isn't an unmarked dataframe, assume we rolled our own optimization with nlm()
+  # if it isn't an unmarked dataframe, assume we rolled our own likelhood with nlm()
   return((m$minimum*2) + (2*length(m$estimate)))
 }
 #' calculate AICc from a likelihood function optimization procedure
-#' @export
-AICc <- function(m) AIC(m) + ((2*length(m$estimate)*(length(m$estimate)+1))/(m$size-length(m$estimate)-1))
+AICc <- function(m=NULL){
+  if(inherits(m, "unmarkedFit")){
+    # num abundance parameters minus intercept
+    p <- unlist(strsplit(paste(as.character(
+          m@formlist[[1]]),
+          collapse=""
+        ),
+        "[+]"
+      ))
+    # don't include effort
+    p <- sum(!grepl(p, pattern="effort"))
+    nrow(summary(m)[[1]]) - 1
+    # number of site observations
+    n <- nrow(unmarked:::getY(m@data))
+  } else {
+    p <- length(m$estimate)
+    n <- m$size
+  }
+  return(OpenIMBCR:::AIC(m) + ( (2*p*(p+1)) / (n-p-1) ) )
+}
 #' calculated BIC from a likelihood function optimization procedure
-#' @export
 BIC <- function(m) (m$minimum*2) + (q*log(m$size))
 #'
 #' calculate SE from a likelihood function optimization procedure
-#' @export
 SE <- function(m) sqrt(diag(solve(m$hessian)))
 #' recursively calculate all possible permutations of an input table n
 permutations <- function(n){
