@@ -976,7 +976,7 @@ model_selection_table <- OpenIMBCR:::allCombinations_dAIC(
   step=50,
   umdf=imbcr_df,
   umFunction=unmarked::gdistsamp,
-  mixture="P",
+  mixture=mixture_dist,
   K=K,
   se=T,
   keyfun="halfnorm",
