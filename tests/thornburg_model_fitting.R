@@ -888,9 +888,17 @@ if ( sum(grepl(colnames(imbcr_df@siteCovs), pattern=c("mn_p_ar|pat_ct|inp_dst"))
 allHabitatCovs <- get_habitat_covs(imbcr_df)
 allDetCovs <- get_detection_covs(imbcr_df)
 
+#
+# Determine a reasonable K from our input table
+#
+
+K <- floor(max(
+    rowSums(unmarked:::getY(imbcr_df)))*1.25
+  )
+
 cat(" -- building null (intercept-only) and alternative (habitat PCA) models\n")
 
-intercept_m <- unmarked::gdistsamp(
+intercept_m_pois_aic <- OpenIMBCR::AIC(unmarked::gdistsamp(
     ~1+offset(log(effort)), # abundance
     ~1,                     # availability
     as.formula(paste("~",paste(allDetCovs, collapse="+"))), # detection
@@ -898,25 +906,31 @@ intercept_m <- unmarked::gdistsamp(
     keyfun="halfnorm",
     mixture="P",
     se=T,
-    K=500,
-  )
+    K=K,
+  ))
 
-# poly_space_m <- unmarked::gdistsamp(
-#     ~poly(lat,3)+poly(lon,3)+offset(log(effort)),
-#     ~1,
-#     as.formula(paste("~",paste(allDetCovs, collapse="+"))),
-#     data=imbcr_df,
-#     keyfun="halfnorm",
-#     mixture="P",
-#     se=T,
-#     K=500,
-#   )
+intercept_m_negbin_aic <- OpenIMBCR:::AIC(unmarked::gdistsamp(
+    ~1+offset(log(effort)), # abundance
+    ~1,                     # availability
+    as.formula(paste("~",paste(allDetCovs, collapse="+"))), # detection
+    data=imbcr_df,
+    keyfun="halfnorm",
+    mixture="NB",
+    se=T,
+    K=K,
+  ))
 
-# test : build a model where fragmentation metrics were collapsed into a
-# single covariate and all of our remaining habitat variables were not
-# included in a PCA. Then use AIC to optimize variable inclusion.
+# accept the lower AIC as our preferred mixture and
+# keep the results for later review
+if( diff(c(intercept_m_negbin_aic,intercept_m_pois_aic)) > 2 ){
+  mixture_dist <- "NB"
+# if we don't gain more than 2 AIC units of improvement from the mixture,
+# let's favor the simpler mixture distribution
+} else {
+  mixture_dist <- "P"
+}
 
-kitchen_sink_m <- unmarked::gdistsamp(
+intercept_m <- unmarked::gdistsamp(
     as.formula(paste(
       "~",
       paste(allHabitatCovs, collapse="+"),
@@ -927,31 +941,52 @@ kitchen_sink_m <- unmarked::gdistsamp(
     as.formula(paste("~",paste(allDetCovs, collapse="+"))),
     data=imbcr_df,
     keyfun="halfnorm",
-    mixture="P",
+    mixture=mixture_dist,
     se=T,
-    K=500,
+    K=K,
+  )
+
+# test : build a model where fragmentation metrics were collapsed into a
+# single covariate and all of our remaining habitat variables were not
+# included in a PCA. Then use AIC to optimize variable inclusion.
+
+all_covs_m <- unmarked::gdistsamp(
+    as.formula(paste(
+      "~",
+      paste(allHabitatCovs, collapse="+"),
+      "+offset(log(effort))",
+      sep=""
+    )),
+    ~1,
+    as.formula(paste("~",paste(allDetCovs, collapse="+"))),
+    data=imbcr_df,
+    keyfun="halfnorm",
+    mixture=mixture_dist,
+    se=T,
+    K=K,
   )
 
 #
 # now for some model selection
 #
 
-model_selection_table <- OpenIMBCR::randomWalk_dAIC(
+model_selection_table <- OpenIMBCR:::allCombinations_dAIC(
   siteCovs=allHabitatCovs,
   detCovs=c("doy","starttime"),
   step=50,
   umdf=imbcr_df,
   umFunction=unmarked::gdistsamp,
   mixture="P",
-  K=500,
+  K=K,
   se=T,
   keyfun="halfnorm",
   offset="offset(log(effort))"
+
 )
 
 cat("\n")
 cat(" -- species:", argv[2], "\n")
-cat(" -- dAIC (null - habitat):", intercept_m@AIC-kitchen_sink_m@AIC, "\n")
+cat(" -- dAIC (null - habitat):", intercept_m@AIC-all_covs_m@AIC, "\n")
 cat("\n")
 
 save(
@@ -959,8 +994,11 @@ save(
     list=c("argv","habitat_vars_summary_statistics",
            "model_selection_table",
            "imbcr_df_original",
-           "imbcr_df","allHabitatCovs","intercept_m","pca_m",
-           "kitchen_sink_m"),
+           "imbcr_df","allHabitatCovs",
+           "intercept_m_negbin_aic",
+           "intercept_m_pois_aic",
+           "intercept_m","pca_m",
+           "all_covs_m"),
     file=tolower(paste(
       tolower(argv[2]),
       "_imbcr_gdistsamp_workflow_",
