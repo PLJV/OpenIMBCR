@@ -288,7 +288,7 @@ rgdal::writeOGR(
 
 save(
     compress=T,
-    list=c(ls(), "predicted_density"),
+    list=ls(),
     file=paste(
       tolower(r_data_file[1]),
       sep="")

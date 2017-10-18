@@ -907,8 +907,8 @@ K <- unlist(lapply(
   ))
 
 cat(
-   " -- estimating a good 'K' parameter and building null (intercept-only) and "
-   "alternative (habitat PCA) models\n"
+   " -- estimating a good 'K' parameter and building null (intercept-only) and",
+   " alternative (habitat PCA) models\n"
   )
 
 intercept_m_pois_aic <- unlist(lapply(
