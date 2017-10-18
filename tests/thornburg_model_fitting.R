@@ -616,7 +616,10 @@ pca_dim_reduction <- function(x,
 }
 #' testing : build a full PCA (for all covariates) and train a model to a subset
 #' of components that explain some threshold of variance
-quantile_pcr <- function(imbcr_df=NULL, siteCovs=NULL, threshold=0.7){
+quantile_pcr <- function(imbcr_df=NULL, siteCovs=NULL, threshold=0.7, K=NULL){
+  if(is.null(K)){
+    K <- calc_k(imbcr_df)
+  }
   pca_m <- pca_dim_reduction(
       x=imbcr_df,
       covs=siteCovs,
@@ -639,7 +642,7 @@ quantile_pcr <- function(imbcr_df=NULL, siteCovs=NULL, threshold=0.7){
       keyfun="halfnorm",
       mixture="P",
       se=T,
-      K=500,
+      K=K,
     )
 }
 #' shorthand vector extraction function that performs a spatial join attributes
@@ -717,7 +720,13 @@ calc_total_area <- function(table=NULL,
       na.rm=T
     )))
 }
-
+#' estimates a K parameter (upper-bound of integration) as a pre-cursor for
+#' various count-based mixture models (e.g., poisson and negative binomial)
+calc_k <- function(df=NULL, multiplier=1){
+  return(floor(max(
+      rowSums(unmarked:::getY(df)))*multiplier
+    ))
+}
 #
 # MAIN
 #
@@ -892,48 +901,74 @@ allDetCovs <- get_detection_covs(imbcr_df)
 # Determine a reasonable K from our input table
 #
 
-K <- floor(max(
-    rowSums(unmarked:::getY(imbcr_df)))*1.25
+K <- unlist(lapply(
+    seq(1, 2.5, by=0.1),
+    FUN=function(x) calc_k(imbcr_df, multiplier=x)
+  ))
+
+cat(
+   " -- estimating a good 'K' parameter and building null (intercept-only) and "
+   "alternative (habitat PCA) models\n"
   )
 
-cat(" -- building null (intercept-only) and alternative (habitat PCA) models\n")
-
-intercept_m_pois_aic <- OpenIMBCR::AIC(unmarked::gdistsamp(
-    ~1+offset(log(effort)), # abundance
-    ~1,                     # availability
-    as.formula(paste("~",paste(allDetCovs, collapse="+"))), # detection
-    data=imbcr_df,
-    keyfun="halfnorm",
-    mixture="P",
-    se=T,
-    K=K,
+intercept_m_pois_aic <- unlist(lapply(
+       K,
+       FUN=function(x){
+         OpenIMBCR::AIC(unmarked::gdistsamp(
+             ~1+offset(log(effort)), # abundance
+             ~1,                     # availability
+             as.formula(paste("~",paste(allDetCovs, collapse="+"))), # detection
+             data=imbcr_df,
+             keyfun="halfnorm",
+             mixture="P",
+             se=T,
+             K=x,
+           ))
+       }
   ))
 
-intercept_m_negbin_aic <- OpenIMBCR:::AIC(unmarked::gdistsamp(
-    ~1+offset(log(effort)), # abundance
-    ~1,                     # availability
-    as.formula(paste("~",paste(allDetCovs, collapse="+"))), # detection
-    data=imbcr_df,
-    keyfun="halfnorm",
-    mixture="NB",
-    se=T,
-    K=K,
+min_k <- min(which(round(diff(diff(intercept_m_pois_aic)),2) < 0.5))
+
+K_pois <- K[min_k]
+intercept_m_pois_aic <- intercept_m_pois_aic[min_k]
+
+intercept_m_negbin_aic <- unlist(lapply(
+    K,
+    FUN=function(x){
+        OpenIMBCR:::AIC(unmarked::gdistsamp(
+        ~1+offset(log(effort)), # abundance
+        ~1,                     # availability
+        as.formula(paste("~",paste(allDetCovs, collapse="+"))), # detection
+        data=imbcr_df,
+        keyfun="halfnorm",
+        mixture="NB",
+        se=T,
+        K=x,
+      ))
+    }
   ))
+
+min_k <- min(which(round(diff(diff(intercept_m_negbin_aic)),2) < 0.5))
+
+K_negbin <- K[min_k]
+intercept_m_negbin_aic <- intercept_m_negbin_aic[min_k]
 
 # accept the lower AIC as our preferred mixture and
 # keep the results for later review
 if( diff(c(intercept_m_negbin_aic,intercept_m_pois_aic)) > 2 ){
   mixture_dist <- "NB"
+  K <- K_negbin
 # if we don't gain more than 2 AIC units of improvement from the mixture,
 # let's favor the simpler mixture distribution
 } else {
   mixture_dist <- "P"
+  K <- K_pois
 }
 
 intercept_m <- unmarked::gdistsamp(
     as.formula(paste(
       "~",
-      paste(allHabitatCovs, collapse="+"),
+      "1",
       "+offset(log(effort))",
       sep=""
     )),
@@ -981,7 +1016,6 @@ model_selection_table <- OpenIMBCR:::allCombinations_dAIC(
   se=T,
   keyfun="halfnorm",
   offset="offset(log(effort))"
-
 )
 
 cat("\n")

@@ -410,20 +410,17 @@ allCombinations_dAIC <- function(
       ))
     # append our AIC's and formulas to the output table
     if(sum(keep)>0){
-      if(!exists("model_formula_table")){
-        model_formula_table <- data.frame(
+      if(!exists("model_selection_table")){
+        model_selection_table <- data.frame(
           formula=models[focal_runs * keep, 'formula'],
-          #formula=models[,'formula'],
           AIC=runs
         )
       } else {
-        model_formula_table <- rbind(
-          model_formula_table,
+        model_selection_table <- rbind(
+          model_selection_table,
           data.frame(
               formula=models[focal_runs * keep, 'formula'],
-              #formula=models[focal_runs[which(runs == min(runs))[1]],'formula'],
               AIC=runs
-              #AIC=runs[which(runs == min(runs))[1]]
             )
           )
       }
