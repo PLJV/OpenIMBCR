@@ -642,7 +642,7 @@ quantile_pcr <- function(imbcr_df=NULL, siteCovs=NULL, threshold=0.7, K=NULL){
       keyfun="halfnorm",
       mixture="P",
       se=T,
-      K=K,
+      K=K
     )
 }
 #' shorthand vector extraction function that performs a spatial join attributes
@@ -922,7 +922,7 @@ intercept_m_pois_aic <- unlist(lapply(
              keyfun="halfnorm",
              mixture="P",
              se=T,
-             K=x,
+             K=x
            ))
        }
   ))
@@ -943,7 +943,7 @@ intercept_m_negbin_aic <- unlist(lapply(
         keyfun="halfnorm",
         mixture="NB",
         se=T,
-        K=x,
+        K=x
       ))
     }
   ))
@@ -978,7 +978,7 @@ intercept_m <- unmarked::gdistsamp(
     keyfun="halfnorm",
     mixture=mixture_dist,
     se=T,
-    K=K,
+    K=K
   )
 
 # test : build a model where fragmentation metrics were collapsed into a
@@ -998,7 +998,7 @@ all_covs_m <- unmarked::gdistsamp(
     keyfun="halfnorm",
     mixture=mixture_dist,
     se=T,
-    K=K,
+    K=K
   )
 
 #
@@ -1017,6 +1017,12 @@ model_selection_table <- OpenIMBCR:::allCombinations_dAIC(
   keyfun="halfnorm",
   offset="offset(log(effort))"
 )
+
+#
+# now calculate some akaike weights from our run table
+#
+
+
 
 cat("\n")
 cat(" -- species:", argv[2], "\n")
