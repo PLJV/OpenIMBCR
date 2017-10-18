@@ -24,7 +24,7 @@ fit_final_model <- function(formula=NULL, imbcr_df=NULL, K=NULL, mixture=NULL){
       keyfun="halfnorm",
       mixture=mixture,
       se=T,
-      K=NULL
+      K=K
     ))
 }
 calc_total_area <- function(table=NULL,
