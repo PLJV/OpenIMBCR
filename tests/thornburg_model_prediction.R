@@ -197,7 +197,7 @@ units <- OpenIMBCR:::readOGRfromPath(
     "/global_workspace/thornburg/vector/units_attributed.shp"
   )
 
-cat(" -- calculating centroids for each USNG unit")
+cat(" -- calculating centroids for each USNG unit\n")
 centroids <- rgeos::gCentroid(
     as(
       sp::spTransform(units, sp::CRS(raster::projection("+init=epsg:4326")))
@@ -220,7 +220,7 @@ cat(
   )
 
 if(grepl(final_model_formula, pattern="+PC")){
-  cat(" -- calculating a fragmentation metric from our input configuration data")
+  cat(" -- calculating a fragmentation metric from our input configuration data\n")
   units@data <- calc_fragmentation_metric(units, total_area_filter="_rd_")
   units@data <- units@data[,unlist(lapply(units@data[1,], is.numeric))]
   # to be consistent with training data, don't scale our PC
@@ -252,7 +252,7 @@ variables_to_use <- unlist(lapply(
 # across all stations
 units@data$effort <- mean(m_final@data@siteCovs$effort)
 
-cat(" -- predicting against optimal model:")
+cat(" -- predicting against optimal model\n")
 predicted_density <- par_unmarked_predict(units, m_final)
 
 if(mean(predicted_density[,1])>m_final@K){ # outliers dragging our PI past K?
@@ -288,13 +288,7 @@ rgdal::writeOGR(
 
 save(
     compress=T,
-    list=c("argv","habitat_vars_summary_statistics",
-           "model_selection_table",
-           "imbcr_df_original",
-           "intercept_m_negbin_aic",
-           "intercept_m_pois_aic",
-           "imbcr_df","intercept_m","pca_m",
-           "all_covs_m", "predicted_density"),
+    list=c(ls(), "predicted_density"),
     file=paste(
       tolower(r_data_file[1]),
       sep="")
