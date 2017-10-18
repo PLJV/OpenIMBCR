@@ -190,7 +190,7 @@ m_final <- fit_final_model(
     final_model_formula,
     imbcr_df,
     K=K,
-    mixture=
+    mixture=mixture_dist
   )
 
 cat(" -- reading our input vector data containing covariates for predict()\n")
