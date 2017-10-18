@@ -5,7 +5,7 @@
 \title{use Monte Carlo randomization to test for heterogeneity in detection across
 within-transect temporal replicates}
 \usage{
-monteCarloTemporalHeterogeneity(s = NULL)
+monteCarloTemporalHeterogeneity(s = NULL, plot = F, main = NA, ...)
 }
 \description{
 use Monte Carlo randomization to test for heterogeneity in detection across

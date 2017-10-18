@@ -2,12 +2,15 @@
 % Please edit documentation in R/kludging.R
 \name{imbcrTableToShapefile}
 \alias{imbcrTableToShapefile}
-\title{parse a source CSV (published by BCR) for IMBCR data and return as a SpatialPointsDataFrame
-to the user}
+\title{parse a source CSV (published by BCR) for IMBCR data and return
+as a SpatialPointsDataFrame to the user for post-processing or
+conversion to unmarked data.frame objects for modeling}
 \usage{
-imbcrTableToShapefile(filename = NULL, outfile = NULL, write = F)
+imbcrTableToShapefile(filename = NULL, outfile = NULL, write = F,
+  calc_spatial_covs = T)
 }
 \description{
-parse a source CSV (published by BCR) for IMBCR data and return as a SpatialPointsDataFrame
-to the user
+parse a source CSV (published by BCR) for IMBCR data and return
+as a SpatialPointsDataFrame to the user for post-processing or
+conversion to unmarked data.frame objects for modeling
 }

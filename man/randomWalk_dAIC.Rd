@@ -2,11 +2,24 @@
 % Please edit documentation in R/optimization.R
 \name{randomWalk_dAIC}
 \alias{randomWalk_dAIC}
-\title{perform a random walk on an unmarked dataframe with a user-specified unmarked funtion}
+\title{testing: perform a random walk on an unmarked dataframe with a
+user-specified unmarked function and some depth for exploring
+our model covariates. This allows for exploring models across
+high-dimensional space without having to fit millions of models.
+But it's controversial, because Kyle made it up. There are no papers
+in the statistics literature demonstrating that this is a valid way
+of exploring high-dimensional datasets. So, let's write one.}
 \usage{
-randomWalk_dAIC(vars = NULL, step = 1000, umdf = NULL,
-  umFunction = unmarked::distsamp, nCores = NULL, retAll = FALSE)
+randomWalk_dAIC(siteCovs = NULL, availCovs = NULL, detCovs = NULL,
+  step = 100, umdf = NULL, offset = NULL, depth = 1,
+  umFunction = unmarked::distsamp, nCores = NULL, ...)
 }
 \description{
-perform a random walk on an unmarked dataframe with a user-specified unmarked funtion
+testing: perform a random walk on an unmarked dataframe with a
+user-specified unmarked function and some depth for exploring
+our model covariates. This allows for exploring models across
+high-dimensional space without having to fit millions of models.
+But it's controversial, because Kyle made it up. There are no papers
+in the statistics literature demonstrating that this is a valid way
+of exploring high-dimensional datasets. So, let's write one.
 }

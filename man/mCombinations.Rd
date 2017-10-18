@@ -4,7 +4,8 @@
 \alias{mCombinations}
 \title{hidden function to derive a data.frame of all possible combinations of vars=}
 \usage{
-mCombinations(vars = NULL, verbose = T)
+mCombinations(siteCovs = NULL, availCovs = NULL, detCovs = NULL,
+  offset = NULL, verbose = T)
 }
 \description{
 hidden function to derive a data.frame of all possible combinations of vars=

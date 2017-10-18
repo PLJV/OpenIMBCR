@@ -1028,9 +1028,10 @@ save(
     list=c("argv","habitat_vars_summary_statistics",
            "model_selection_table",
            "imbcr_df_original",
-           "imbcr_df","allHabitatCovs",
+           "imbcr_df",
            "intercept_m_negbin_aic",
            "intercept_m_pois_aic",
+           "K",
            "intercept_m","pca_m",
            "all_covs_m"),
     file=tolower(paste(

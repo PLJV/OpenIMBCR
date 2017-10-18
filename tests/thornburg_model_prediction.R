@@ -291,8 +291,10 @@ save(
     list=c("argv","habitat_vars_summary_statistics",
            "model_selection_table",
            "imbcr_df_original",
-           "imbcr_df","allHabitatCovs","intercept_m","pca_m",
-           "kitchen_sink_m", "predicted_density"),
+           "intercept_m_negbin_aic",
+           "intercept_m_pois_aic",
+           "imbcr_df","intercept_m","pca_m",
+           "all_covs_m", "predicted_density"),
     file=paste(
       tolower(r_data_file[1]),
       sep="")

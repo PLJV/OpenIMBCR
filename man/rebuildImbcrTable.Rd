@@ -6,7 +6,7 @@
 are represented with their distances or NA values so that the observations
 are comprehensible by unmarked. This function is currently in testing.}
 \usage{
-rebuildImbcrTable(t = NULL, spp = NULL)
+rebuildImbcrTable(s = NULL, spp = NULL)
 }
 \description{
 Re-build an IMBCR dataframe for a focal species so that all transect / stations

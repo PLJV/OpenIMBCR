@@ -4,7 +4,7 @@
 \alias{AICc}
 \title{calculate AICc from a likelihood function optimization procedure}
 \usage{
-AICc(m)
+AICc(m = NULL)
 }
 \description{
 calculate AICc from a likelihood function optimization procedure

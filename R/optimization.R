@@ -334,6 +334,10 @@ allCombinations_dAIC <- function(
   cat(" -- building models across all covariate combinations:\n")
   # begin with a null (intercept) model
   # iterate over total_runs and try and minimize AIC as you go
+  model_selection_table <- data.frame(
+      formula=NA,
+      AIC=NA
+    )
   while ( length(total_runs) > 1 ){
     # randomly sample total_runs that the cluster will consider for this run
     focal_runs <- sample(
@@ -410,35 +414,22 @@ allCombinations_dAIC <- function(
       ))
     # append our AIC's and formulas to the output table
     if(sum(keep)>0){
-      if(!exists("model_selection_table")){
-        model_selection_table <- data.frame(
-          formula=models[focal_runs * keep, 'formula'],
-          AIC=runs
-        )
-      } else {
-        model_selection_table <- rbind(
-          model_selection_table,
-          data.frame(
-              formula=models[focal_runs * keep, 'formula'],
-              AIC=runs
-            )
+      model_selection_table <- rbind(
+        model_selection_table,
+        data.frame(
+            formula=models[focal_runs * keep, 'formula'],
+            AIC=runs
           )
-      }
+        )
     }
     total_runs <- total_runs[!(total_runs %in% focal_runs)]
     cat(paste("[jobs remaining:",length(total_runs),"]",sep=""));
   };
   cat("\n");
   parallel::stopCluster(cl)
-  return(
+  return(na.omit(
       model_selection_table[order(model_selection_table[,2], decreasing=F),]
-    )
-}
-#' use a globally-sensitive numerical optimization procedure to select covariates for
-#' inclusion in our model. This should be considerably faster for walking large variable
-#' space than randomWalk_dAIC()
-simulatedAnnealing_dAIC <- function(m){
-  return(NA)
+    ))
 }
 #' Frequentist slope intercept test first described by Bartuszevige. Does the
 #' confidence interval of a given variable cross the intercept (i.e., x_n=0)?
