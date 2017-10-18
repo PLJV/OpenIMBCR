@@ -1008,7 +1008,7 @@ all_covs_m <- unmarked::gdistsamp(
 model_selection_table <- OpenIMBCR:::allCombinations_dAIC(
   siteCovs=allHabitatCovs,
   detCovs=c("doy","starttime"),
-  step=50,
+  step=100,
   umdf=imbcr_df,
   umFunction=unmarked::gdistsamp,
   mixture=mixture_dist,
@@ -1037,6 +1037,7 @@ save(
            "imbcr_df",
            "intercept_m_negbin_aic",
            "intercept_m_pois_aic",
+           "mixture_dist",
            "K",
            "intercept_m","pca_m",
            "all_covs_m"),

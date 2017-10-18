@@ -7,7 +7,7 @@ r_data_file <- commandArgs(trailingOnly=T)
 stopifnot(file.exists(r_data_file))
 
 #' re-fit a model specified by a formula object
-fit_final_model <- function(formula=NULL, imbcr_df=NULL){
+fit_final_model <- function(formula=NULL, imbcr_df=NULL, K=NULL, mixture=NULL){
   formula <- unlist(strsplit(formula, split="~"))
   return(unmarked::gdistsamp(
       lambdaformula=as.formula(paste(
@@ -22,9 +22,9 @@ fit_final_model <- function(formula=NULL, imbcr_df=NULL){
       )),
       data=imbcr_df,
       keyfun="halfnorm",
-      mixture="P",
+      mixture=mixture,
       se=T,
-      K=500,
+      K=NULL
     ))
 }
 calc_total_area <- function(table=NULL,
@@ -188,7 +188,9 @@ cat(" -- re-fitting our final model (selected by minimum AIC)\n")
 
 m_final <- fit_final_model(
     final_model_formula,
-    imbcr_df
+    imbcr_df,
+    K=K,
+    mixture=
   )
 
 cat(" -- reading our input vector data containing covariates for predict()\n")
