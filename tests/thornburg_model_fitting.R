@@ -914,7 +914,7 @@ cat(
 intercept_m_pois_aic <- unlist(lapply(
        K,
        FUN=function(x){
-         OpenIMBCR::AIC(unmarked::gdistsamp(
+         OpenIMBCR:::AIC(unmarked::gdistsamp(
              ~1+offset(log(effort)), # abundance
              ~1,                     # availability
              as.formula(paste("~",paste(allDetCovs, collapse="+"))), # detection
