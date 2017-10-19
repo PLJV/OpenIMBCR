@@ -257,6 +257,8 @@ units@data$effort <- mean(m_final@data@siteCovs$effort)
 cat(" -- predicting against optimal model\n")
 predicted_density <- par_unmarked_predict(units, m_final)
 
+# do some sanity checks and report weird predictions
+
 if(mean(predicted_density[,1])>m_final@K){ # outliers dragging our PI past K?
   warning(
     "mean prediction is larger than K -- censoring, but this ",
@@ -265,6 +267,13 @@ if(mean(predicted_density[,1])>m_final@K){ # outliers dragging our PI past K?
   nonsense_filter <- median(predicted_density[,1])*3
   predicted_density[,1][predicted_density[,1]>nonsense_filter] <- NA
 }
+
+cat(paste(
+    " -- ", 
+    sum(predicted_density[,1] > (2*m_final@K))/nrow(predicted_density), 
+    "% of our predictions were more than 2X the K upper-bounds of our integration", 
+    sep=""
+  ), "\n")
 
 # write our prediction to the attribute table
 spp_name <- strsplit(r_data_file[1], split="_")[[1]][1]
