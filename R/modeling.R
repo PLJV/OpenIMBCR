@@ -47,6 +47,11 @@ BIC <- function(m) (m$minimum*2) + (q*log(m$size))
 #'
 #' calculate SE from a likelihood function optimization procedure
 SE <- function(m) sqrt(diag(solve(m$hessian)))
+#' calculate Akaike weights from a vector of AIC values
+akaike_weights <- function(aic_values=NULL, precision=5){
+  weights <- exp( -0.5 * (aic_values-min(aic_values)) )
+  return(round(weights/sum(weights), precision))
+}
 #' recursively calculate all possible permutations of an input table n
 permutations <- function(n){
    if(n==1){
