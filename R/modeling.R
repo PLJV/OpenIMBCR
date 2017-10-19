@@ -17,9 +17,14 @@ logit <- function(x) log(x/(1-x))
 AIC <- function(m){
   if(inherits(m, "unmarkedFit")){
     return(m@AIC)
+  # sometime a calling function will just pass a single numeric value
+  } else if(is.numeric(m)) {
+    warning("need more information on AIC than a single numeric value -- doing nothing")
+    return(m) 
+  # default: if it isn't an unmarked model object, assume we rolled our own likelhood with nlm()
+  } else {
+    return((m$minimum*2) + (2*length(m$estimate)))
   }
-  # if it isn't an unmarked dataframe, assume we rolled our own likelhood with nlm()
-  return((m$minimum*2) + (2*length(m$estimate)))
 }
 #' calculate AICc from a likelihood function optimization procedure
 AICc <- function(m=NULL){

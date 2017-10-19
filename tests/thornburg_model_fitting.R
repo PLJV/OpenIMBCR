@@ -1018,11 +1018,14 @@ model_selection_table <- OpenIMBCR:::allCombinations_dAIC(
   offset="offset(log(effort))"
 )
 
+
 #
 # now calculate some akaike weights from our run table
 #
 
-
+model_selection_table$weight <- OpenIMBCR:::akaike_weights(
+    model_selection_table$AIC
+  )
 
 cat("\n")
 cat(" -- species:", argv[2], "\n")
