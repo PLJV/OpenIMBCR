@@ -14,7 +14,7 @@ logit <- function(x) log(x/(1-x))
 AIC <- function(m){
   if(inherits(m, "unmarkedFit")){
     return(m@AIC)
-  # sometime a calling function will just pass a single numeric value, 
+  # sometimes a calling function will just pass a single numeric value, 
   # for instance AICc() when passed a vector of standard AIC values
   } else if(is.numeric(m)) {
     return(m) 
@@ -72,7 +72,7 @@ permutations <- function(n){
 #' lead to inaccurate predictions of occupancy. This is "model m0" from the literature
 #' and loosely follows Andy Royle's (2008) model specification. It is designed so that
 #' parameter estimates can be derived through an optimization procedure like nlm() and
-#' variables can be easily selected/de-selected, such as for calculating AIC.
+#' variables can be easily selected/un-selected, such as for calculating AIC.
 #'
 #' @param table a data.frame of detection histories ('det') and covariates on
 #' occupancy ('b0') and probability of detection ('a0')
