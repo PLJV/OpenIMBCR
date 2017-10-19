@@ -17,9 +17,9 @@ logit <- function(x) log(x/(1-x))
 AIC <- function(m){
   if(inherits(m, "unmarkedFit")){
     return(m@AIC)
-  # sometime a calling function will just pass a single numeric value
+  # sometime a calling function will just pass a single numeric value, 
+  # for instance AICc() when passed a vector of standard AIC values
   } else if(is.numeric(m)) {
-    warning("need more information on AIC than a single numeric value -- doing nothing")
     return(m) 
   # default: if it isn't an unmarked model object, assume we rolled our own likelhood with nlm()
   } else {
@@ -27,7 +27,7 @@ AIC <- function(m){
   }
 }
 #' calculate AICc from a likelihood function optimization procedure
-AICc <- function(m=NULL){
+AICc <- function(m=NULL, p=NULL, n=NULL){
   if(inherits(m, "unmarkedFit")){
     # num abundance parameters minus intercept
     p <- unlist(strsplit(paste(as.character(
@@ -38,7 +38,6 @@ AICc <- function(m=NULL){
       ))
     # don't include effort
     p <- sum(!grepl(p, pattern="effort"))
-    nrow(summary(m)[[1]]) - 1
     # number of site observations
     n <- nrow(unmarked:::getY(m@data))
   } else {
