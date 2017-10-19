@@ -1,6 +1,7 @@
 #' downsample records in a continuous 'distances' distribution using a
-#' quantile cut-off. Distances can be literal, or the output of a Mahalanobis or Euclidean distance function (see: the 'FNN'
-#' package). This function is in testing.
+#' quantile cut-off. Distances can be literal, or the output of a Mahalanobis 
+#' or Euclidean distance function (see: the 'FNN'package). This function is 
+#' in testing.
 #' @export
 downsample_by_quantile <- function(distances=NULL,
                                    p=0.1,
@@ -17,11 +18,11 @@ downsample_by_quantile <- function(distances=NULL,
   }
   return( distances[ ret ] )
 }
-#' downsample records in a continuous 'distances' distribution using a
+#' testing : downsample records in a continuous 'distances' distribution using a
 #' normal distribution function (can be truncated). Distances can be literal,
 #' or the output of a Mahalanobis or Euclidean distance function (see: the 'FNN'
-#' package). This function is in testing. It behaves oddly sometimes and needs to be refactored.
-#' Use with caution.
+#' package). This function is in testing. It behaves oddly sometimes and 
+#' needs to be refactored. Use with caution.
 #'
 #' @param shape is multiplier applied to the SD of the distances
 #' vector. Multipliers from 1 -> 0 will restrict the variance (increase the
@@ -97,13 +98,16 @@ downsample_by_normal_dist <- function(distances=NULL, bins=11,
   }
   return(ret)
 }
-#' hidden function to derive a data.frame of all possible combinations of vars=
+#' testing : hidden function to derive a data.frame of all possible 
+#' combinations of vars=
 mCombinations <- function(siteCovs=NULL,availCovs=NULL,detCovs=NULL,
                           offset=NULL, verbose=T){
   if(verbose) cat(" -- deriving model combinations:")
-  # calculate : combinations w/o repetition (n!/(r!(n-r)!)... or 2^n
-  m_len <- vector(); for(i in 1:length(siteCovs)) { m_len <- append(m_len,dim(combn(siteCovs,m=i))[2]) }
-    m_len <- sum(m_len)
+  # calculate : combinations w/o repetition (n!/(r!(n-r)!)... or n^2
+  m_len <- sum(unlist(lapply(
+      1:length(siteCovs), 
+      FUN=function(i) dim(combn(siteCovs,m=i))[2] 
+    )))
   # define the model space of all possible combinations of predictors
   models <- data.frame(formula=rep(NA,m_len),AIC=rep(NA,m_len))
   k <- 1 # row of our models data.frame
