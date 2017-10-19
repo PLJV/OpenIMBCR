@@ -3,9 +3,6 @@
 #
 # Author: Kyle Taylor [2016] (kyle.taylor@pljv.org)
 #
-# Much of this is based on earlier discussions and implementations described by David Pavlacky (Bird Conservancy of the Rockies)
-# Rob Sparks (Bird Conservancy of the Rockies), and a lot of work by Andy Royle (USFWS).
-#
 # Please report bugs to Kyle Taylor
 #
 
