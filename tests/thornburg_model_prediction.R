@@ -131,7 +131,7 @@ recenter_input_table <- function(table=NULL, summary_table=NULL){
 }
 #' testing: use the parallel package to predict across a large input
 #' table (with unmarked) using chunking.
-par_unmarked_predict <- function(run_table=NULL, m_final=NULL){
+par_unmarked_predict <- function(run_table=NULL, m=NULL){
 
       steps <- seq(0, nrow(run_table), by=100)
   run_table <- data.frame(run_table@data)
@@ -144,7 +144,7 @@ par_unmarked_predict <- function(run_table=NULL, m_final=NULL){
 
   parallel::clusterExport(
       cl,
-      varlist=c("run_table","m_final","steps"),
+      varlist=c("run_table","m","steps"),
       envir=environment()
     )
 
@@ -153,7 +153,7 @@ par_unmarked_predict <- function(run_table=NULL, m_final=NULL){
     X=1:(length(steps)-1),
     fun=function(x){
       unmarked::predict(
-        m_final,
+        m,
         newdata=run_table[(steps[x]+1):steps[x+1],],
         type="lambda"
       )
@@ -186,7 +186,7 @@ final_model_formula <- gsub(
 
 cat(" -- re-fitting our final model (selected by minimum AIC)\n")
 
-m_final <- fit_final_model(
+m_top_model <- fit_final_model(
     final_model_formula,
     imbcr_df,
     K=K,
@@ -252,14 +252,14 @@ variables_to_use <- unlist(lapply(
 
 # append a fake effort offset that assumes each unit was sampled
 # across all stations
-units@data$effort <- mean(m_final@data@siteCovs$effort)
+units@data$effort <- mean(m_top_model@data@siteCovs$effort)
 
 cat(" -- predicting against optimal model\n")
-predicted_density <- par_unmarked_predict(units, m_final)
+predicted_density <- par_unmarked_predict(units, m_top_model)
 
 # do some sanity checks and report weird predictions
 
-if(mean(predicted_density[,1])>m_final@K){ # outliers dragging our PI past K?
+if(mean(predicted_density[,1])>m_top_model@K){ # outliers dragging our PI past K?
   warning(
     "mean prediction is larger than K -- censoring, but this ",
     "probably shouldn't happen"
@@ -270,7 +270,7 @@ if(mean(predicted_density[,1])>m_final@K){ # outliers dragging our PI past K?
 
 cat(paste(
     " -- ", 
-    sum(predicted_density[,1] > (2*m_final@K))/nrow(predicted_density), 
+    sum(predicted_density[,1] > (2*m_top_model@K))/nrow(predicted_density), 
     "% of our predictions were more than 2X the K upper-bounds of our integration", 
     sep=""
   ), "\n")
@@ -299,7 +299,11 @@ rgdal::writeOGR(
 
 save(
     compress=T,
-    list=ls(),
+    list=c("all_covs_m", "argv", 
+           "habitat_vars_summary_statistics", "imbcr_df_original",
+           "intercept_m", "intercept_m_negbin_aic", "intercept_m_pois_aic", 
+           "K", "m_top_model", "mixture_dist", "model_selection_table",
+           "pca_m", "predicted_density", ""),
     file=paste(
       tolower(r_data_file[1]),
       sep="")
