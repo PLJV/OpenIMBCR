@@ -103,6 +103,12 @@ def sp_merge_segments(**kwargs):
 
   print(" -- done\n")
 
+def print_usage():
+  print("usage:")
+  print(sys.argv[0], "-h --help")
+  print(sys.argv[0], "-t --buildTrainingDataset",   ": build an IMBCR training dataset from R Vector Operations workflow")
+  print(sys.argv[0], "-p --buildPredictionDataset", ": build an IMBCR prediction dataset from R Vector Operations workflow")
+  sys.exit(0)
 
 if __name__ == "__main__":
 
@@ -121,13 +127,14 @@ if __name__ == "__main__":
        'buildPredictionDataset',
        'help',
        ])
+
   except getopt.GetoptError as e:
     print(e)
     print("see:", sys.argv[0], "-h --help for help")
     sys.exit(1)
 
-  if any(d[0] in ('-h','--help') for d in options):
-    print("help!")
+  if len(sys.argv) < 2 or any(d[0] in ('-h','--help') for d in options):
+    print_usage()
 
   for key, value in options:
     if key in ('-c','--codes'):
@@ -136,9 +143,10 @@ if __name__ == "__main__":
       if not os.path.exists("/gis_data/Grids/units_attributed_training.shp"):
         step_through_grid_units()
         sp_merge_segments()
-        os.system("mv units_attributed.* /gis_data/Grids/")
+        os.system("mv units_attributed.* /gis_data/Grids/units_attributed_training.*")
     elif key in ('-p', '--buildPredictionDataset'):
       pass
+
     for code in birdcodes:
       step_through_training()
       step_through_prediction(find_files(pattern="*.rdata"))

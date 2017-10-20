@@ -7,7 +7,7 @@ r_data_file <- commandArgs(trailingOnly=T)
 stopifnot(file.exists(r_data_file))
 
 #' re-fit a model specified by a formula object
-fit_final_model <- function(formula=NULL, imbcr_df=NULL, K=NULL, mixture=NULL){
+refit_model <- function(formula=NULL, imbcr_df=NULL, K=NULL, mixture=NULL){
   formula <- unlist(strsplit(formula, split="~"))
   return(unmarked::gdistsamp(
       lambdaformula=as.formula(paste(
@@ -163,6 +163,32 @@ par_unmarked_predict <- function(run_table=NULL, m=NULL){
   return(do.call(rbind, predicted_density))
 }
 
+akaike_predict <- function(
+  mod_sel_tab=NULL, 
+  train_data=NULL,
+  pred_data=NULL, 
+  daic_cutoff=2, 
+  K=NULL, 
+  mixture=NULL){
+  keep <- mod_sel_tab$AIC < min(mod_sel_tab$AIC) + daic_cutoff
+  mod_sel_tab <- mod_sel_tab[keep,]
+  models <- lapply(
+    X=as.character(mod_sel_tab$formula),
+    FUN=function(x){
+        refit_model(
+            formula = x, 
+            imbcr_df = train_data, 
+            K = K, 
+            mixture = mixture
+        )
+      }
+  )
+  return(lapply(
+      X=1:nrow(mod_sel_tab), 
+      function(x) list(model=models[[x]], weight=mod_sel_tab$weight[x])
+    ))
+}
+
 #
 # MAIN
 #
@@ -171,7 +197,7 @@ load(r_data_file)
 
 # find the minimum model from the random walk table
 
-final_model_formula <- gsub(
+top_model_formula <- gsub(
     as.character(
       model_selection_table$formula[which.min(model_selection_table$AIC)]
     ),
@@ -184,13 +210,20 @@ final_model_formula <- gsub(
 #   final_model_formula, pattern="[+]lon|[+]lat", replacement=""
 # )
 
-cat(" -- re-fitting our final model (selected by minimum AIC)\n")
+cat(" -- re-fitting our top model (selected by minimum AIC) and our series of Akaike weighted models\n")
 
-m_top_model <- fit_final_model(
-    final_model_formula,
-    imbcr_df,
+top_model_m <- refit_model(
+    top_model_formula,
+    intercept_m@data,
     K=K,
     mixture=mixture_dist
+  )
+
+akaike_models_m <- akaike_predict(
+    model_selection_table, 
+    train_data = intercept_m@data, 
+    K=K, 
+    mixture = mixture_dist
   )
 
 cat(" -- reading our input vector data containing covariates for predict()\n")
@@ -252,14 +285,22 @@ variables_to_use <- unlist(lapply(
 
 # append a fake effort offset that assumes each unit was sampled
 # across all stations
-units@data$effort <- mean(m_top_model@data@siteCovs$effort)
+units@data$effort <- mean(top_model_m@data@siteCovs$effort)
 
-cat(" -- predicting against optimal model\n")
-predicted_density <- par_unmarked_predict(units, m_top_model)
+cat(" -- predicting against top model\n")
+predicted_density_top_model <- par_unmarked_predict(units, top_model_m)
+
+cat(" -- model averaging against akaike-weighted selection of models\n")
+predicted_density_akaike_models <- lapply(
+  X=akaike_models_m, 
+  FUN=function(x) {
+    prediction <- par_unmarked_predict(units, x$model)
+    return(list(prediction=prediction, weight=x$weight))
+  })
 
 # do some sanity checks and report weird predictions
 
-if(mean(predicted_density, na.rm=T)>m_top_model@K){ # outliers dragging our PI past K?
+if(mean(predicted_density, na.rm=T)>top_model_m@K){ # outliers dragging our PI past K?
   warning(
     "mean prediction is larger than K -- censoring, but this ",
     "probably shouldn't happen"
@@ -270,7 +311,7 @@ if(mean(predicted_density, na.rm=T)>m_top_model@K){ # outliers dragging our PI p
 
 cat(paste(
     " -- ", 
-    sum(predicted_density[,1] > (2*m_top_model@K), na.rm=T)/nrow(predicted_density), 
+    sum(predicted_density[,1] > (2*top_model_m@K), na.rm=T)/nrow(predicted_density), 
     "% of our predictions were more than 2X the K upper-bounds of our integration", 
     sep=""
   ), "\n")
@@ -308,8 +349,8 @@ save(
     list=c("all_covs_m", "argv", 
            "habitat_vars_summary_statistics", "imbcr_df_original",
            "intercept_m", "intercept_m_negbin_aic", "intercept_m_pois_aic", 
-           "K", "m_top_model", "mixture_dist", "model_selection_table",
-           "pca_m", "predicted_density"),
+           "K", "top_model_m", "mixture_dist", "model_selection_table",
+           "pca_m", "predicted_density_top_model","predicted_density_akaike_models"),
     file=paste(
       tolower(r_data_file[1]),
       sep="")
