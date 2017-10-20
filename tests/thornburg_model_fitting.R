@@ -2,6 +2,10 @@ require(raster)
 require(rgdal)
 require(rgeos)
 
+stopifnot(grepl(
+    tolower(.Platform$OS.type), pattern = "unix"
+  ))
+
 system("clear")
 
 #

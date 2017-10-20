@@ -28,33 +28,53 @@ def sp_count_features(path=None):
   return (dataSource.GetLayer().GetFeatureCount())
 
 
-def step_through_grid_units(step=24634, path="/gis_data/Grids/1km_usng_pljv_region_v3.0.shp"):
+def step_through_grid_units(step=24634, units_path="/gis_data/Grids/1km_usng_pljv_region_v3.0.shp", **kwargs):
   """ Determine the number of segments in a fixed units shapefile and then
-  process the units stepwise (using run_r_thread) """
-  nFeatures = sp_count_features(path)
+  process the units stepwise (using run_sys_thread) """
+  # script path handling
+  if 'r_script_path' in kwargs:
+    script_path = kwargs['r_script_path']
+  else:
+    script_path = "/global_workspace/thornburg/thornburg_vector_operations.R"
+  nFeatures = sp_count_features(units_path)
   segments = [(n, min(n+step, nFeatures)) for n in range(0, nFeatures, step)]
   for seg in segments:
     run_sys_thread(
       "Rscript",
-      "/global_workspace/thornburg/thornburg_vector_operations.R",
-      seg[0],
-      seg[1])
+      script_path,
+      str(seg[0]),
+      str(seg[1]))
 
 
-def step_through_training(*args):
+def step_through_training(*args, **kwargs):
+  # script path handling
+  if 'r_script_path' in kwargs:
+    script_path = kwargs['r_script_path']
+  else:
+    script_path = "/home/ktaylora/Projects/OpenIMBCR/tests/thornburg_model_fitting.R"
+  # script arguments handling
+  if 'training_dataset_path' in kwargs:
+    train_path = kwargs['training_dataset_path']
+  else:
+    train_path = "/global_workspace/thornburg/vector/units_attributed_training.shp"
+  # process by four-letter code
   for birdcode in args[0]:
     run_sys_thread(
         "Rscript",
-        "/home/ktaylora/Projects/OpenIMBCR/tests/thornburg_model_fitting.R",
-        "/global_workspace/thornburg/vector/units_attributed_training.shp",
+        script_path,
+        train_path,
         birdcode)
 
 
-def step_through_prediction(*args):
+def step_through_prediction(*args, **kwargs):
+  if 'r_script_path' in kwargs:
+    script_path = kwargs['r_script_path']
+  else:
+    script_path = "/home/ktaylora/Projects/OpenIMBCR/tests/thornburg_model_prediction.R"
   for file in args[0]:
     run_sys_thread(
-      "Rscript"
-      "/home/ktaylora/Projects/OpenIMBCR/tests/thornburg_model_prediction.R",
+      "Rscript",
+      script_path,
       file)
 
 
@@ -104,10 +124,12 @@ def sp_merge_segments(**kwargs):
   print(" -- done\n")
 
 def print_usage():
-  print("usage:")
+  print("usage:", sys.argv[0] "<flag(s)> <option(s)>")
   print(sys.argv[0], "-h --help")
   print(sys.argv[0], "-t --buildTrainingDataset",   ": build an IMBCR training dataset from R Vector Operations workflow")
   print(sys.argv[0], "-p --buildPredictionDataset", ": build an IMBCR prediction dataset from R Vector Operations workflow")
+  print(sys.argv[0], "-b --buildModels", ": fit models and generate a shapefile of 1-km densities")
+  print(sys.argv[0], "-c --codes", ": define four-letter bird codes used for model fitting")
   sys.exit(0)
 
 if __name__ == "__main__":
@@ -121,11 +143,12 @@ if __name__ == "__main__":
   try:
     options, remainder = getopt.getopt(
       sys.argv[1:],
-      'c:t:p:h',
+      'c:t:p:h:b',
       ['codes',
        'buildTrainingDataset',
        'buildPredictionDataset',
        'help',
+       'buildModels'
        ])
 
   except getopt.GetoptError as e:
@@ -140,7 +163,12 @@ if __name__ == "__main__":
     if key in ('-c','--codes'):
       birdcodes = value.split(' ')
     elif key in ('-t','--buildTrainingDataset'):
-      if not os.path.exists("/gis_data/Grids/units_attributed_training.shp"):
+      if value:
+        dst_path = value
+      else:
+        dst_path = "/gis_data/Grids/units_attributed_training.shp"
+
+      if not os.path.exists(path):
         step_through_grid_units()
         sp_merge_segments()
         os.system("mv units_attributed.* /gis_data/Grids/units_attributed_training.*")

@@ -294,6 +294,7 @@ cat(" -- model averaging against akaike-weighted selection of models\n")
 predicted_density_akaike_models <- lapply(
   X=akaike_models_m, 
   FUN=function(x) {
+    gc() # forces us to drop an old cluster if it's lurking
     prediction <- par_unmarked_predict(units, x$model)
     return(list(prediction=prediction, weight=x$weight))
   })
