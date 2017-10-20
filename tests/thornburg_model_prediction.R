@@ -259,7 +259,7 @@ predicted_density <- par_unmarked_predict(units, m_top_model)
 
 # do some sanity checks and report weird predictions
 
-if(mean(predicted_density[,1])>m_top_model@K){ # outliers dragging our PI past K?
+if(mean(predicted_density, na.rm=T)>m_top_model@K){ # outliers dragging our PI past K?
   warning(
     "mean prediction is larger than K -- censoring, but this ",
     "probably shouldn't happen"
@@ -270,10 +270,16 @@ if(mean(predicted_density[,1])>m_top_model@K){ # outliers dragging our PI past K
 
 cat(paste(
     " -- ", 
-    sum(predicted_density[,1] > (2*m_top_model@K))/nrow(predicted_density), 
+    sum(predicted_density[,1] > (2*m_top_model@K), na.rm=T)/nrow(predicted_density), 
     "% of our predictions were more than 2X the K upper-bounds of our integration", 
     sep=""
   ), "\n")
+
+cat(
+    " -- total number of predicted birds across the JV:", 
+    sum(predicted_density[,1], na.rm = T),
+    "\n"
+  )
 
 # write our prediction to the attribute table
 spp_name <- strsplit(r_data_file[1], split="_")[[1]][1]
@@ -303,7 +309,7 @@ save(
            "habitat_vars_summary_statistics", "imbcr_df_original",
            "intercept_m", "intercept_m_negbin_aic", "intercept_m_pois_aic", 
            "K", "m_top_model", "mixture_dist", "model_selection_table",
-           "pca_m", "predicted_density", ""),
+           "pca_m", "predicted_density"),
     file=paste(
       tolower(r_data_file[1]),
       sep="")
