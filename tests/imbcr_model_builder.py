@@ -55,15 +55,15 @@ def step_through_training(*args, **kwargs):
     script_path = "/home/ktaylora/Projects/OpenIMBCR/tests/thornburg_model_fitting.R"
   # script arguments handling
   if 'training_dataset_path' in kwargs:
-    train_path = kwargs['training_dataset_path']
+    train_vector_path = kwargs['training_dataset_path']
   else:
-    train_path = "/global_workspace/thornburg/vector/units_attributed_training.shp"
+    train_vector_path = "/global_workspace/thornburg/vector/units_attributed_training.shp"
   # process by four-letter code
   for birdcode in args[0]:
     run_sys_thread(
         "Rscript",
         script_path,
-        train_path,
+        train_vector_path,
         birdcode)
 
 
@@ -133,6 +133,8 @@ def print_usage():
   print(sys.argv[0], "-p --buildPredictionDataset", ": build an IMBCR prediction dataset from R Vector Operations workflow")
   print(sys.argv[0], "-b --buildModels", ": fit models and generate a shapefile of 1-km densities")
   print(sys.argv[0], "-c --codes", ": define four-letter bird codes used for model fitting")
+  print(sys.argv[0], "-z --compressSessionOutput", ": 7zip compress our session output")
+
   sys.exit(0)
 
 
@@ -147,39 +149,68 @@ if __name__ == "__main__":
   try:
     options, remainder = getopt.getopt(
       sys.argv[1:],
-      'c:t:p:h:b',
+      'c:s:d:t:p:h:b:z',
       ['codes',
+       'src',
+       'dst',
        'buildTrainingDataset',
        'buildPredictionDataset',
        'help',
-       'buildModels'
+       'buildModels',
+       'compressSessionOutput'
        ])
 
   except getopt.GetoptError as e:
     print(e)
     print("see:", sys.argv[0], "-h --help for help")
-    sys.exit(1)
+    sys.exit(-1)
 
   if len(sys.argv) < 2 or any(d[0] in ('-h','--help') for d in options):
     print_usage()
 
+  src_path                 = '.'
+  dst_path                 = '.'
+  build_training_datset    = False
+  build_prediction_dataset = False
+  fit_models               = False
+  predict_models           = False
+  compress_session_output  = False
+
   for key, value in options:
-    if key in ('-c','--codes'):
+    if key in ('-s','--src'):
+      src_path = str(value)
+    elif key in ('-d','--dst'):
+      dst_path = str(value)
+    elif key in ('-c','--codes'):
       birdcodes = value.split(' ')
     elif key in ('-t','--buildTrainingDataset'):
-      if value:
-        dst_path = value
-      else:
-        dst_path = "/gis_data/Grids/units_attributed_training.shp"
-
-      if not os.path.exists(path):
-        step_through_grid_units()
-        sp_merge_segments()
-        os.system("mv units_attributed.* /gis_data/Grids/units_attributed_training.*")
+      build_training_datset = True
     elif key in ('-p', '--buildPredictionDataset'):
-      pass
-
-    for code in birdcodes:
-      step_through_training()
+      build_prediction_dataset = True
+    elif key in ('-b', '--buildModels'):
+      fit_models = True
+  if build_training_datset:
+    try:
+      step_through_grid_units()
+      sp_merge_segments()
+      os.system("mv units_attributed.*" + dst_path + "/units_attributed_training.*")
+    except Exception as e:
+      print(e)
+      sys.exit(-1)
+  if build_prediction_dataset:
+    pass
+  if fit_models:
+    try:
+      for code in birdcodes:
+        step_through_training(code)
+    except Exception as e:
+      print(e)
+      sys.exit(-1)
+  if predict_models:
+    try:
       step_through_prediction(find_files(pattern="*.rdata"))
-      step_through_zip(find_files(pattern="*.rdata"))
+    except Exception as e:
+      print(e)
+      sys.exit(-1)
+  if compress_session_output:
+    step_through_zip(find_files(pattern="*.rdata"))

@@ -334,14 +334,14 @@ if(mean(predicted_density, na.rm=T)>top_model_m@K){ # outliers dragging our PI p
 
 cat(paste(
     " -- ", 
-    sum(predicted_density > (2*top_model_m@K), na.rm=T)/length(predicted_density_akaike_models),
+    sum(predicted_density > (2*top_model_m@K), na.rm=T)/length(predicted_density),
     "% of our predictions were more than 2X the K upper-bounds of our integration", 
     sep=""
   ), "\n")
 
 cat(
     " -- total number of predicted birds across the JV:", 
-    sum(predicted_density[,1], na.rm = T),
+    sum(predicted_density, na.rm = T),
     "\n"
   )
 
@@ -362,7 +362,7 @@ cat(" -- writing to disk\n")
 rgdal::writeOGR(
   units,
   dsn=".",
-  layer=paste(spp_name,"_pred_density_1km", sep=""),ensemble_akensemble_akaike_predictionsaike_predictions
+  layer=paste(spp_name,"_pred_density_1km", sep=""),
   driver="ESRI Shapefile",
   overwrite=T
 )

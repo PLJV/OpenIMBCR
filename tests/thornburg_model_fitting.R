@@ -1038,7 +1038,8 @@ cat("\n")
 
 save(
     compress=T,
-    list=c("argv","habitat_vars_summary_statistics",
+    list=c("argv",
+           "habitat_vars_summary_statistics",
            "model_selection_table",
            "imbcr_df_original",
            "imbcr_df",
@@ -1046,7 +1047,8 @@ save(
            "intercept_m_pois_aic",
            "mixture_dist",
            "K",
-           "intercept_m","pca_m",
+           "intercept_m",
+           "pca_m",
            "all_covs_m"),
     file=tolower(paste(
       tolower(argv[2]),
