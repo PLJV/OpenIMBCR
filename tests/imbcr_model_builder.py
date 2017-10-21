@@ -4,6 +4,7 @@ import sys
 import os
 import getopt
 import glob
+
 from osgeo import ogr
 
 
@@ -81,6 +82,7 @@ def step_through_prediction(*args, **kwargs):
 def step_through_zip(*args):
   files = find_files(pattern="*.rdata")
 
+
 def sp_merge_segments(**kwargs):
   """ List all shapefiles in the CWD and merge all features into singe file """
 
@@ -123,6 +125,7 @@ def sp_merge_segments(**kwargs):
 
   print(" -- done\n")
 
+
 def print_usage():
   print("usage:", sys.argv[0] "<flag(s)> <option(s)>")
   print(sys.argv[0], "-h --help")
@@ -131,6 +134,7 @@ def print_usage():
   print(sys.argv[0], "-b --buildModels", ": fit models and generate a shapefile of 1-km densities")
   print(sys.argv[0], "-c --codes", ": define four-letter bird codes used for model fitting")
   sys.exit(0)
+
 
 if __name__ == "__main__":
 

@@ -189,6 +189,27 @@ akaike_predict <- function(
     ))
 }
 
+akaike_weight_predictions <- function(akaike_list=NULL, col=1){
+    table <- (do.call(cbind, lapply(
+        X=akaike_list,
+        FUN=function(x){
+            x$prediction[,col]
+        }
+    )))
+    weights <- unlist(lapply(
+        X=akaike_list,
+        FUN=function(x){
+            x$weight
+        }
+    ))
+    return(apply(
+        table,
+        MARGIN=1,
+        FUN=weighted.mean,
+        w=weights
+    ))
+}
+
 #
 # MAIN
 #
@@ -251,10 +272,16 @@ units@data <- cbind(units@data, centroids)
 
 cat(
     " -- mean-variance centering our input dataset so it's consistent with",
-    "model training data\n"
+    "model training data\n")
+
+
+using_fragmentation_metric <- grepl(
+    paste(unlist(lapply(akaike_models_m,
+    FUN=function(x) as.character(x$model@formula))), collapse=" "),
+    pattern="PC"
   )
 
-if(grepl(final_model_formula, pattern="+PC")){
+if(using_fragmentation_metric){
   cat(" -- calculating a fragmentation metric from our input configuration data\n")
   units@data <- calc_fragmentation_metric(units, total_area_filter="_rd_")
   units@data <- units@data[,unlist(lapply(units@data[1,], is.numeric))]
@@ -269,20 +296,6 @@ if(grepl(final_model_formula, pattern="+PC")){
   units@data <- data.frame(scale(units@data), stringsAsFactors=F)
 }
 
-variables_to_use <- unlist(lapply(
-    colnames(units@data),
-    function(x) grepl(final_model_formula, pattern=x))
-  )
-
-# re-centering using stored mean/sd values doesn't work very well for some
-# reason, but the initial centering was done using the same USNG units across
-# the pljv region. Let's just center using what we've got in our units dataset
-# and see if the models fit a little better
-# units@data <- recenter_input_table(
-#     units@data[,variables_to_use],
-#     habitat_vars_summary_statistics
-#   )
-
 # append a fake effort offset that assumes each unit was sampled
 # across all stations
 units@data$effort <- mean(top_model_m@data@siteCovs$effort)
@@ -290,14 +303,23 @@ units@data$effort <- mean(top_model_m@data@siteCovs$effort)
 cat(" -- predicting against top model\n")
 predicted_density_top_model <- par_unmarked_predict(units, top_model_m)
 
-cat(" -- model averaging against akaike-weighted selection of models\n")
-predicted_density_akaike_models <- lapply(
-  X=akaike_models_m, 
-  FUN=function(x) {
-    gc() # forces us to drop an old cluster if it's lurking
-    prediction <- par_unmarked_predict(units, x$model)
-    return(list(prediction=prediction, weight=x$weight))
-  })
+if(length(akaike_models_m)>1){
+    cat(" -- model averaging against akaike-weighted selection of models\n")
+    predicted_density_akaike_models <- lapply(
+        X=akaike_models_m,
+        FUN=function(x) {
+        gc() # forces us to drop an old cluster if it's lurking
+        prediction <- par_unmarked_predict(units, x$model)
+        return(list(prediction=prediction, weight=x$weight))
+    })
+    # merge our tables
+    predicted_density <- akaike_weight_predictions(
+      predicted_density_akaike_models,
+      col=1 # we're not averaging across stderr here
+    )
+} else {
+    predicted_density <- as.vector(predicted_density_top_model[,1])
+}
 
 # do some sanity checks and report weird predictions
 
@@ -306,13 +328,13 @@ if(mean(predicted_density, na.rm=T)>top_model_m@K){ # outliers dragging our PI p
     "mean prediction is larger than K -- censoring, but this ",
     "probably shouldn't happen"
   )
-  nonsense_filter <- median(predicted_density[,1])*3
-  predicted_density[,1][predicted_density[,1]>nonsense_filter] <- NA
+  nonsense_filter <- median(predicted_density)*3
+  predicted_density[predicted_density>nonsense_filter] <- NA
 }
 
 cat(paste(
     " -- ", 
-    sum(predicted_density[,1] > (2*top_model_m@K), na.rm=T)/nrow(predicted_density), 
+    sum(predicted_density > (2*top_model_m@K), na.rm=T)/length(predicted_density_akaike_models),
     "% of our predictions were more than 2X the K upper-bounds of our integration", 
     sep=""
   ), "\n")
@@ -327,7 +349,7 @@ cat(
 spp_name <- strsplit(r_data_file[1], split="_")[[1]][1]
 
 units@data[, spp_name] <-
-  as.vector(predicted_density[,1])
+  as.vector(predicted_density)
 
 units@data <- as.data.frame(
     units@data[,spp_name ]
@@ -340,18 +362,28 @@ cat(" -- writing to disk\n")
 rgdal::writeOGR(
   units,
   dsn=".",
-  layer=paste(spp_name,"_pred_density_1km", sep=""),
+  layer=paste(spp_name,"_pred_density_1km", sep=""),ensemble_akensemble_akaike_predictionsaike_predictions
   driver="ESRI Shapefile",
   overwrite=T
 )
 
 save(
     compress=T,
-    list=c("all_covs_m", "argv", 
-           "habitat_vars_summary_statistics", "imbcr_df_original",
-           "intercept_m", "intercept_m_negbin_aic", "intercept_m_pois_aic", 
-           "K", "top_model_m", "mixture_dist", "model_selection_table",
-           "pca_m", "predicted_density_top_model","predicted_density_akaike_models"),
+    list=c("all_covs_m",
+           "argv",
+           "habitat_vars_summary_statistics",
+           "imbcr_df_original",
+           "intercept_m",
+           "intercept_m_negbin_aic",
+           "intercept_m_pois_aic",
+           "K",
+           "top_model_m",
+           "akaike_models_m",
+           "mixture_dist",
+           "model_selection_table",
+           "pca_m",
+           "predicted_density",
+           "predicted_density"),
     file=paste(
       tolower(r_data_file[1]),
       sep="")
