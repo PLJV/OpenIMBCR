@@ -29,7 +29,7 @@ def sp_count_features(path=None):
   return (dataSource.GetLayer().GetFeatureCount())
 
 
-def step_through_grid_units(step=24634, units_path="/gis_data/Grids/1km_usng_pljv_region_v3.0.shp", **kwargs):
+def build_model_training_dataset(step=24634, units_path="/gis_data/Grids/1km_usng_pljv_region_v3.0.shp", **kwargs):
   """ Determine the number of segments in a fixed units shapefile and then
   process the units stepwise (using run_sys_thread) """
   # script path handling
@@ -47,7 +47,7 @@ def step_through_grid_units(step=24634, units_path="/gis_data/Grids/1km_usng_plj
       str(seg[1]))
 
 
-def step_through_training(*args, **kwargs):
+def step_through_build_models(*args, **kwargs):
   # script path handling
   if 'r_script_path' in kwargs:
     script_path = kwargs['r_script_path']
@@ -67,7 +67,7 @@ def step_through_training(*args, **kwargs):
         birdcode)
 
 
-def step_through_prediction(*args, **kwargs):
+def step_through_make_model_predictions(*args, **kwargs):
   if 'r_script_path' in kwargs:
     script_path = kwargs['r_script_path']
   else:
@@ -127,7 +127,7 @@ def sp_merge_segments(**kwargs):
 
 
 def print_usage():
-  print("usage:", sys.argv[0] "<flag(s)> <option(s)>")
+  print("usage:", sys.argv[0], "<flag(s)> <option(s)>")
   print(sys.argv[0], "-h --help")
   print(sys.argv[0], "-t --buildTrainingDataset",   ": build an IMBCR training dataset from R Vector Operations workflow")
   print(sys.argv[0], "-p --buildPredictionDataset", ": build an IMBCR prediction dataset from R Vector Operations workflow")
@@ -170,7 +170,7 @@ if __name__ == "__main__":
 
   src_path                 = '.'
   dst_path                 = '.'
-  build_training_datset    = False
+  build_training_dataset   = False
   build_prediction_dataset = False
   fit_models               = False
   predict_models           = False
@@ -184,14 +184,14 @@ if __name__ == "__main__":
     elif key in ('-c','--codes'):
       birdcodes = value.split(' ')
     elif key in ('-t','--buildTrainingDataset'):
-      build_training_datset = True
+      build_training_dataset = True
     elif key in ('-p', '--buildPredictionDataset'):
       build_prediction_dataset = True
     elif key in ('-b', '--buildModels'):
       fit_models = True
-  if build_training_datset:
+  if build_training_dataset:
     try:
-      step_through_grid_units()
+      build_model_training_dataset()
       sp_merge_segments()
       os.system("mv units_attributed.*" + dst_path + "/units_attributed_training.*")
     except Exception as e:
@@ -202,13 +202,13 @@ if __name__ == "__main__":
   if fit_models:
     try:
       for code in birdcodes:
-        step_through_training(code)
+        step_through_build_models(code)
     except Exception as e:
       print(e)
       sys.exit(-1)
   if predict_models:
     try:
-      step_through_prediction(find_files(pattern="*.rdata"))
+      step_through_make_model_predictions(find_files(pattern="*.rdata"))
     except Exception as e:
       print(e)
       sys.exit(-1)

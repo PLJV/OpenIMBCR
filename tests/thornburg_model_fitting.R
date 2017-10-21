@@ -906,7 +906,7 @@ allDetCovs <- get_detection_covs(imbcr_df)
 #
 
 K <- unlist(lapply(
-    seq(1, 2.5, by=0.1),
+    seq(0.8, 2.5, by=0.1),
     FUN=function(x) calc_k(imbcr_df, multiplier=x)
   ))
 
@@ -918,7 +918,7 @@ cat(
 intercept_m_pois_aic <- unlist(lapply(
        K,
        FUN=function(x){
-         OpenIMBCR:::AIC(unmarked::gdistsamp(
+         m <- try(unmarked::gdistsamp(
              ~1+offset(log(effort)), # abundance
              ~1,                     # availability
              as.formula(paste("~",paste(allDetCovs, collapse="+"))), # detection
@@ -928,30 +928,42 @@ intercept_m_pois_aic <- unlist(lapply(
              se=T,
              K=x
            ))
+         if(class(m) == "try-error"){
+             return(NA)
+         } else {
+             return(OpenIMBCR:::AIC(m))
+         }
        }
   ))
 
+intercept_m_pois_aic[is.na(intercept_m_pois_aic)] <- max(intercept_m_pois_aic, na.rm=T)
 min_k <- min(which(round(diff(diff(intercept_m_pois_aic)),2) < 0.5))
 
 K_pois <- K[min_k]
 intercept_m_pois_aic <- intercept_m_pois_aic[min_k]
 
 intercept_m_negbin_aic <- unlist(lapply(
-    K,
-    FUN=function(x){
-        OpenIMBCR:::AIC(unmarked::gdistsamp(
-        ~1+offset(log(effort)), # abundance
-        ~1,                     # availability
-        as.formula(paste("~",paste(allDetCovs, collapse="+"))), # detection
-        data=imbcr_df,
-        keyfun="halfnorm",
-        mixture="NB",
-        se=T,
-        K=x
-      ))
-    }
+       K,
+       FUN=function(x){
+         m <- try(unmarked::gdistsamp(
+             ~1+offset(log(effort)), # abundance
+             ~1,                     # availability
+             as.formula(paste("~",paste(allDetCovs, collapse="+"))), # detection
+             data=imbcr_df,
+             keyfun="halfnorm",
+             mixture="NB",
+             se=T,
+             K=x
+           ))
+         if(class(m) == "try-error"){
+             return(NA)
+         } else {
+             return(OpenIMBCR:::AIC(m))
+         }
+       }
   ))
 
+intercept_m_negbin_aic[is.na(intercept_m_negbin_aic)] <- max(intercept_m_negbin_aic, na.rm=T)
 min_k <- min(which(round(diff(diff(intercept_m_negbin_aic)),2) < 0.5))
 
 K_negbin <- K[min_k]
