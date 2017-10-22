@@ -1,3 +1,9 @@
+#
+# accepts two arguments at runtime -- (1) a full path to the attributed
+# USNG units training dataset and (2) the four-letter bird code for the
+# species we are fitting our model to.
+#
+
 require(raster)
 require(rgdal)
 require(rgeos)
@@ -731,14 +737,49 @@ calc_k <- function(df=NULL, multiplier=1){
       rowSums(unmarked:::getY(df)))*multiplier
     ))
 }
-#
-# MAIN
-#
+#' there is some ambiguity in selecting a good upper-bounds for integration
+#' in gdistamp (the K parameter). This builds an intercept model around a range
+#' of K values and selects the smallest K value for which a decrease in AIC is no
+#' longer observed
+gdistsamp_find_optimal_k <- function(df=NULL, allDetCovs=NULL, mixture=NULL, keyfun="halfnorm"){
+  K <- unlist(lapply(
+    seq(0.8, 2.5, by=0.1),
+    FUN=function(x) calc_k(df, multiplier=x)
+  ))
+  intercept_m_aic <- unlist(lapply(
+       K,
+       FUN=function(x){
+         m <- try(suppressMessages(unmarked::gdistsamp(
+             ~1+offset(log(effort)), # abundance
+             ~1,                     # availability
+             as.formula(paste("~",paste(allDetCovs, collapse="+"))), # detection
+             data=df,
+             keyfun=keyfun,
+             mixture=mixture,
+             se=T,
+             K=x
+           )))
+         if(class(m) == "try-error"){
+             return(NA)
+         } else {
+             return(OpenIMBCR:::AIC(m))
+         }
+       }
+  ))
+  # bug-fix swap out our NA values with noise that
+  # our second derivative won't settle on
+  if(any(is.na(intercept_m_aic))){
+    intercept_m_aic[is.na(intercept_m_aic)] <-
+      which(is.na(intercept_m_aic)) * 2 * max(intercept_m_aic, na.rm=T)
+  }
+  # at what array position does the change in AIC start to bottom out?
+  tail <- quantile(abs(round(diff(diff(intercept_m_aic)),3)), p=0.6) # median, but more tail-ey
+  min_k <- min(which(abs(round(diff(diff(intercept_m_aic)),2)) < tail))
+  return(list(K=K[min_k], AIC=intercept_m_aic[min_k]))
+}
 
 #
-# accepts two arguments at runtime -- (1) a full path to the attributed
-# USNG units training dataset and (2) the four-letter bird code for the
-# species we are fitting our model to.
+# MAIN
 #
 
 argv <- commandArgs(trailingOnly=T)
@@ -915,59 +956,24 @@ cat(
    " alternative (habitat PCA) models\n"
   )
 
-intercept_m_pois_aic <- unlist(lapply(
-       K,
-       FUN=function(x){
-         m <- try(unmarked::gdistsamp(
-             ~1+offset(log(effort)), # abundance
-             ~1,                     # availability
-             as.formula(paste("~",paste(allDetCovs, collapse="+"))), # detection
-             data=imbcr_df,
-             keyfun="halfnorm",
-             mixture="P",
-             se=T,
-             K=x
-           ))
-         if(class(m) == "try-error"){
-             return(NA)
-         } else {
-             return(OpenIMBCR:::AIC(m))
-         }
-       }
-  ))
+intercept_m_pois_aic <- gdistsamp_find_optimal_k(
+    df=imbcr_df,
+    allDetCovs=allDetCovs,
+    mixture="P"
+  )
 
-intercept_m_pois_aic[is.na(intercept_m_pois_aic)] <- max(intercept_m_pois_aic, na.rm=T)
-min_k <- min(which(round(diff(diff(intercept_m_pois_aic)),2) < 0.5))
 
-K_pois <- K[min_k]
-intercept_m_pois_aic <- intercept_m_pois_aic[min_k]
+K_pois <- intercept_m_pois_aic$K
+intercept_m_pois_aic <- intercept_m_pois_aic$AIC
 
-intercept_m_negbin_aic <- unlist(lapply(
-       K,
-       FUN=function(x){
-         m <- try(unmarked::gdistsamp(
-             ~1+offset(log(effort)), # abundance
-             ~1,                     # availability
-             as.formula(paste("~",paste(allDetCovs, collapse="+"))), # detection
-             data=imbcr_df,
-             keyfun="halfnorm",
-             mixture="NB",
-             se=T,
-             K=x
-           ))
-         if(class(m) == "try-error"){
-             return(NA)
-         } else {
-             return(OpenIMBCR:::AIC(m))
-         }
-       }
-  ))
+intercept_m_negbin_aic <- gdistsamp_find_optimal_k(
+    df=imbcr_df,
+    allDetCovs=allDetCovs,
+    mixture="NB"
+  )
 
-intercept_m_negbin_aic[is.na(intercept_m_negbin_aic)] <- max(intercept_m_negbin_aic, na.rm=T)
-min_k <- min(which(round(diff(diff(intercept_m_negbin_aic)),2) < 0.5))
-
-K_negbin <- K[min_k]
-intercept_m_negbin_aic <- intercept_m_negbin_aic[min_k]
+K_negbin <- intercept_m_negbin_aic$K
+intercept_m_negbin_aic <- intercept_m_negbin_aic$AIC
 
 # accept the lower AIC as our preferred mixture and
 # keep the results for later review
