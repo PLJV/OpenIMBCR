@@ -23,6 +23,7 @@ refit_model <- function(formula=NULL, imbcr_df=NULL, K=NULL, mixture=NULL){
       data=imbcr_df,
       keyfun="halfnorm",
       mixture=mixture,
+      unitsOut="kmsq",
       se=T,
       K=K
     ))
