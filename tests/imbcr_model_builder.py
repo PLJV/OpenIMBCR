@@ -149,14 +149,19 @@ if __name__ == "__main__":
   try:
     options, remainder = getopt.getopt(
       sys.argv[1:],
-      'c:s:d:t:p:h:b:z',
+      'c:s:d:t:p:h:b1:b2:b3:b4:b5:b6:z',
       ['codes',
        'src',
        'dst',
        'buildTrainingDataset',
        'buildPredictionDataset',
        'help',
-       'buildModels',
+       'build1kmDistanceModels',
+       'build1kmMultinomialMixtureModels',
+       'build1kmZIPModels',
+       'build1kmPoissonGLMs',
+       'build1kmNegBinomialGLMs',
+       'build1KmDistanceInterceptKriging',
        'compressSessionOutput'
        ])
 
@@ -187,7 +192,7 @@ if __name__ == "__main__":
       build_training_dataset = True
     elif key in ('-p', '--buildPredictionDataset'):
       build_prediction_dataset = True
-    elif key in ('-b', '--buildModels'):
+    elif key in ('-b1', '--build1kmDistanceModels'):
       fit_models = True
   if build_training_dataset:
     try:
