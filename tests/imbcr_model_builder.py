@@ -8,6 +8,26 @@ import glob
 from osgeo import ogr
 
 
+class SysThread:
+  def __init__(self, *args, **kwargs):
+    """ System wrapper for Rscript that calls our R thread """
+    background = ''
+    if 'background' in kwargs:
+      if kwargs['background']:
+        background = '&'
+    self.run_string = (' '.join(args) + background)
+  def run(self):
+    os.system(self.run_string)
+
+
+class RScriptThread(SysThread):
+  def __init__(self, *scriptArgs, **scriptNamedOptions):
+    if not 'Rscript' in scriptArgs:
+      args = ('Rscript',) + scriptArgs
+    super().__init__(*scriptArgs, **scriptNamedOptions)
+    self.run()
+
+
 def run_sys_thread(*args, **kwargs):
   """ System wrapper for Rscript that calls our R thread """
   if 'background' in kwargs:
