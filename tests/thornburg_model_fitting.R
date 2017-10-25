@@ -45,7 +45,7 @@ scrub_imbcr_df <- function(df,
                            allow_duplicate_timeperiods=F,
                            four_letter_code=NULL,
                            back_fill_all_na=F,
-                           drop_all_na=F){
+                           drop_na="none"){
   # throw-out any lurking 88 values, count before start values, and
   # -1 distance observations
   df <- df[!df@data[, timeperiod_fieldname(df)] == 88, ]
@@ -84,13 +84,17 @@ scrub_imbcr_df <- function(df,
       transect_heuristic(detected),
     ]
   df <- rbind(y=detected, x=not_detected)
-  # zero-inflation fix (1) : drop transects without at least one detection
-  if(!back_fill_all_na){
+  # zero-inflation fix (1) : don't drop any transects
+  if(grepl(tolower(drop_na), pattern="none")){
+      df <- sp:::rbind.SpatialPointsDataFrame(detected, not_detected)
+  }
+  # zero-inflation fix (2) : drop transects without at least one detection
+  else if(grepl(tolower(drop_na),pattern="some")){
     valid_transects <- unique(detected@data[,transect_fieldname(df)])
     df <- df[df@data[,transect_fieldname(df)] %in% valid_transects,]
   }
-  # zero-inflation fix (2) : drop all NA values
-  if(drop_all_na){
+  # zero-inflation fix (3) : drop all NA values
+  else if(grep(tolower(drop_na), pattern="all")){
     df <- detected
   }
   df[order(sqrt(as.numeric(df$transectnum))+sqrt(df$year)+sqrt(df$point)),]
@@ -374,7 +378,8 @@ build_unmarked_gds <- function(df=NULL,
     )
   # bug fix : drop entries with NA values before attempting PCA or quantile pruning
   if(drop_na_values){
-    transects <- transects[!as.vector(rowSums(is.na(transects)) > 0),]
+    transects <- transects[ !as.vector(rowSums(is.na(transects)) > 0) , ]
+    transects <- transects[ , !grepl(colnames(transects), pattern="_NA")]
   }
   # build our unmarked frame and return to user
   return(unmarked::unmarkedFrameGDS(
@@ -742,42 +747,48 @@ calc_k <- function(df=NULL, multiplier=1){
 #' in gdistamp (the K parameter). This builds an intercept model around a range
 #' of K values and selects the smallest K value for which a decrease in AIC is no
 #' longer observed
-gdistsamp_find_optimal_k <- function(df=NULL, allDetCovs=NULL, mixture=NULL, keyfun="halfnorm"){
+gdistsamp_find_optimal_k <- function(df=NULL, allHabitatCovs=NULL, allDetCovs=NULL, mixture=NULL, keyfun="halfnorm"){
   K <- unlist(lapply(
     seq(0.8, 2.5, by=0.1),
     FUN=function(x) calc_k(df, multiplier=x)
   ))
-  intercept_m_aic <- unlist(lapply(
-       K,
-       FUN=function(x){
-         m <- try(suppressMessages(unmarked::gdistsamp(
-             ~1+offset(log(effort)), # abundance
-             ~1,                     # availability
-             as.formula(paste("~",paste(allDetCovs, collapse="+"))), # detection
-             data=df,
-             keyfun=keyfun,
-             mixture=mixture,
-             unitsOut="kmsq",
-             se=T,
-             K=x
-           )))
-         if(class(m) == "try-error"){
-             return(NA)
-         } else {
-             return(OpenIMBCR:::AIC(m))
-         }
+  all_covs_m <- unlist(lapply(
+     K,
+     FUN=function(x){
+       m <- try(suppressMessages(unmarked::gdistsamp(
+          # abundance
+          as.formula(paste(
+            "~",
+            paste(allHabitatCovs, collapse="+"),
+            "+offset(log(effort))",
+            sep=""
+          )),
+          ~1, # availability
+          as.formula(paste("~",paste(allDetCovs, collapse="+"))), # detection
+          data=imbcr_df,
+          keyfun="halfnorm",
+          mixture=mixture,
+          unitsOut="kmsq",
+          se=T,
+           K=x
+         )))
+       if(class(m) == "try-error"){
+           return(NA)
+       } else {
+           return(OpenIMBCR:::AIC(m))
        }
+     }
   ))
   # bug-fix swap out our NA values with noise that
   # our second derivative won't settle on
-  if(any(is.na(intercept_m_aic))){
-    intercept_m_aic[is.na(intercept_m_aic)] <-
-      which(is.na(intercept_m_aic)) * 2 * max(intercept_m_aic, na.rm=T)
+  if(any(is.na(all_covs_m))){
+    all_covs_m[is.na(all_covs_m)] <-
+      which(is.na(all_covs_m)) * 2 * max(all_covs_m, na.rm=T)
   }
   # at what array position does the change in AIC start to bottom out?
-  tail <- quantile(abs(round(diff(diff(intercept_m_aic)),3)), p=0.6) # median, but more tail-ey
-  min_k <- min(which(abs(round(diff(diff(intercept_m_aic)),2)) < tail))
-  return(list(K=K[min_k], AIC=intercept_m_aic[min_k]))
+  tail <- quantile(abs(round(diff(diff(all_covs_m)),3)), p=0.6) # median, but more tail-ey
+  min_k <- min(which(abs(round(diff(diff(all_covs_m)),2)) < tail))
+  return(list(K=K[min_k], AIC=all_covs_m[min_k]))
 }
 
 #
@@ -842,12 +853,12 @@ imbcr_observations <-
        )[1]
     ),
     four_letter_code=argv[2],
-    back_fill_all_na=F  # keep only NA values for transects with >= 1 spp det
+    drop_na="none"  # keep aLL NA values
   )
 
 # sanity-check: do we have enough observations of our bird to make a model?
-if(sum(imbcr_observations$radialdistance, na.rm=T) < 10){
-  stop("we have fewer than 10 distance observations for ", argv[2])
+if( sum(!is.na(imbcr_observations$radialdistance)) < 80){
+  stop("we have fewer than 80 distance observations for ", argv[2])
 }
 
 cat(" -- calculating distance bins\n")
@@ -903,7 +914,8 @@ cat(
 imbcr_df <- scrub_unmarked_dataframe(
       build_unmarked_gds(
         df=imbcr_df,
-        distance_breaks=breaks
+        distance_breaks=breaks,
+        drop_na_values=T # here we are dropping all NA values within transects and
       ),
       normalize=F,      # we already applied scale() to our input data
       prune_cutoff=0.1  # drop variables with low variance?
@@ -960,6 +972,7 @@ cat(
 
 intercept_m_pois_aic <- gdistsamp_find_optimal_k(
     df=imbcr_df,
+    allHabitatCovs=allHabitatCovs,
     allDetCovs=allDetCovs,
     mixture="P"
   )
@@ -968,11 +981,12 @@ intercept_m_pois_aic <- gdistsamp_find_optimal_k(
 K_pois <- intercept_m_pois_aic$K
 intercept_m_pois_aic <- intercept_m_pois_aic$AIC
 
-intercept_m_negbin_aic <- gdistsamp_find_optimal_k(
+system.time(intercept_m_negbin_aic <- gdistsamp_find_optimal_k(
     df=imbcr_df,
+    allHabitatCovs=allHabitatCovs,
     allDetCovs=allDetCovs,
     mixture="NB"
-  )
+  ))
 
 K_negbin <- intercept_m_negbin_aic$K
 intercept_m_negbin_aic <- intercept_m_negbin_aic$AIC
