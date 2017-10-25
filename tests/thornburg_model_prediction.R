@@ -64,7 +64,8 @@ which_component_max_area <- function(m=NULL, area_metric="total_area"){
 calc_fragmentation_metric <- function(table=NULL,
                                       m_pca=NULL,
                                       total_area_filter=NULL,
-                                      total_area_suffix="_ar$"){
+                                      total_area_suffix="_ar$",
+                                      keep_total_area=T){
   if(inherits(table, "Spatial")){
     table <- table@data
   } else if(inherits(table, "unmarked")){
@@ -107,7 +108,7 @@ calc_fragmentation_metric <- function(table=NULL,
   table <- table[ ,
       !grepl(
           colnames(table),
-          pattern="mn_p_ar$|pat_ct$|inp_dst$|total_area"
+          pattern=ifelse(keep_total_area,"mn_p_ar$|pat_ct$|inp_dst$","mn_p_ar$|pat_ct$|inp_dst$|total_area")
         )
     ]
   return(table)
@@ -168,7 +169,7 @@ akaike_predict <- function(
   mod_sel_tab=NULL, 
   train_data=NULL,
   pred_data=NULL, 
-  daic_cutoff=2, 
+  daic_cutoff=4,
   K=NULL, 
   mixture=NULL){
   keep <- mod_sel_tab$AIC < min(mod_sel_tab$AIC) + daic_cutoff

@@ -3353,6 +3353,7 @@
       <w>colorConverter</w>
       <w>colorRamp</w>
       <w>colorRampPalette</w>
+      <w>colorlegend</w>
       <w>colors</w>
       <w>colorschemes</w>
       <w>colorspace</w>
@@ -3516,6 +3517,7 @@
       <w>copy_to</w>
       <w>cor</w>
       <w>cor.ci</w>
+      <w>cor.mtest</w>
       <w>cor.plot</w>
       <w>cor.plot.upperLowerCi</w>
       <w>cor.smooth</w>
@@ -3550,9 +3552,14 @@
       <w>corr</w>
       <w>corr.p</w>
       <w>corr.test</w>
+      <w>corrMatOrder</w>
+      <w>corrRect</w>
+      <w>corrRect.hclust</w>
       <w>correct.cor</w>
       <w>correlogram</w>
       <w>corresp</w>
+      <w>corrplot</w>
+      <w>corrplot.mixed</w>
       <w>cortest</w>
       <w>cortest.bartlett</w>
       <w>cortest.jennrich</w>

@@ -400,6 +400,7 @@ pca_reconstruction <- function(x,
                                frag_covs=NULL,
                                total_area_filter=NULL,
                                total_area_suffix="_ar$",
+                               drop_total_area=T,
                                scale=T,
                                center=T,
                                test=1)
@@ -431,8 +432,8 @@ pca_reconstruction <- function(x,
   # bug check : do we need to mean-center our total area metric?
   if(abs(mean(x@siteCovs$total_area)/sd(x@siteCovs$total_area))>1){
     warning("there was a lot of variance in the total_area metric, suggesting ",
-    "that it wasn't mean-variance centered. We need to scale it before using ",
-    "it in a PCA.")
+    "that it wasn't mean-variance centered. We are going to scale it before using ",
+    "it in our PCA.")
     x@siteCovs[,'total_area'] <- scale(x@siteCovs[,'total_area'])
   }
 
@@ -517,7 +518,7 @@ pca_reconstruction <- function(x,
   # accepting the first component as representative of "fragmentation"
   else if(test==4){
     # we are going to use two PCA objects, here
-    # keep a copy of both for later prediction
+    # keep a copy of both for later validation and prediction
     pca_1 <- pca
     x_hat <- pca$x[,keep_components] %*% t(pca$rotation[,keep_components])
     x_hat <- x_hat[,c("mn_p_ar","pat_ct","inp_dst")]
@@ -526,6 +527,10 @@ pca_reconstruction <- function(x,
       center = colMeans(x@siteCovs[,c("mn_p_ar","pat_ct","inp_dst")]),
       scale = T
     )
+    if(!drop_total_area){
+        total_area <- pca$x[,total_area_component] %*% t(pca$rotation[,total_area_component])
+        x@siteCovs$total_area <- total_area[,'total_area']
+    }
     # Re-calculate a PCA from our partial reconstruction
     pca_2 <- prcomp(x_hat, scale.=T, center=T)
     # subset the scores matrix ($x) for our single retained component
@@ -537,7 +542,11 @@ pca_reconstruction <- function(x,
         scores_matrix
       )
     x@siteCovs <- x@siteCovs[ ,
-        !grepl(colnames(x@siteCovs), pattern="mn_p_ar$|pat_ct$|inp_dst$|total_area")
+        !grepl(
+          colnames(
+            x@siteCovs),
+            pattern=ifelse(drop_total_area,"mn_p_ar$|pat_ct$|inp_dst$|total_area","mn_p_ar$|pat_ct$|inp_dst$")
+        )
       ]
     # return unmarked df and pca model to user
     return(list(x,pca_1,pca_2))
@@ -746,10 +755,11 @@ calc_k <- function(df=NULL, multiplier=1){
 #' there is some ambiguity in selecting a good upper-bounds for integration
 #' in gdistamp (the K parameter). This builds an intercept model around a range
 #' of K values and selects the smallest K value for which a decrease in AIC is no
-#' longer observed
+#' longer observed. Might also consider checking for stability in the beta parameters
+#' for this as well.
 gdistsamp_find_optimal_k <- function(df=NULL, allHabitatCovs=NULL, allDetCovs=NULL, mixture=NULL, keyfun="halfnorm"){
   K <- unlist(lapply(
-    seq(0.8, 2.5, by=0.1),
+    seq(0.9, 2, by=0.1),
     FUN=function(x) calc_k(df, multiplier=x)
   ))
   all_covs_m <- unlist(lapply(
@@ -770,7 +780,7 @@ gdistsamp_find_optimal_k <- function(df=NULL, allHabitatCovs=NULL, allDetCovs=NU
           mixture=mixture,
           unitsOut="kmsq",
           se=T,
-           K=x
+          K=x
          )))
        if(class(m) == "try-error"){
            return(NA)
@@ -791,6 +801,24 @@ gdistsamp_find_optimal_k <- function(df=NULL, allHabitatCovs=NULL, allDetCovs=NU
   return(list(K=K[min_k], AIC=all_covs_m[min_k]))
 }
 
+check_correlation_matrix <- function(
+  var=NULL,
+  x_correlation_matrix=NULL,
+  imbcr_df=NULL,
+  correlation_threshold=0.5)
+{
+  correlation <- x_correlation_matrix[var,'PC1']
+  # is this positive correlation? It shouldn't be
+  if (correlation > 0) {
+    warning("positive correlation observed between our SGP variable and our fragmentation metric. They should be the",
+    "inverse of each other. Consider -1*PCA transformation")
+  }
+  if (abs(correlation) > correlation_threshold){
+      warning("dropping sgp_ar variable -- it's strongly correlated with our fragmentation PCA")
+      imbcr_df@siteCovs <- imbcr_df@siteCovs[ , !grepl(colnames(imbcr_df@siteCovs), pattern=var) ]
+  }
+  return(imbcr_df)
+}
 #
 # MAIN
 #
@@ -944,10 +972,36 @@ if ( sum(grepl(colnames(imbcr_df@siteCovs), pattern=c("mn_p_ar|pat_ct|inp_dst"))
   warning("we dropped one or more of our fragmentation metrics due to ",
   "missingness while pruning the input dataset -- skipping PCA calculation")
 } else {
-  pca_m <- pca_reconstruction(imbcr_df, test=4)
+  pca_m <- pca_reconstruction(imbcr_df, test=4, drop_total_area=F)
   imbcr_df_original <- imbcr_df
   imbcr_df <- pca_m[[1]]
 }
+
+#
+# Build a correlation matrix for our retained covariates
+#
+
+x_correlation_matrix <- round(cor(imbcr_df@siteCovs),2)
+
+#
+# Check for positive correlation between SGP and MGP
+#
+
+if ( abs(x_correlation_matrix['doy','lat'])-abs(x_correlation_matrix['ag_mgp_ar','ag_sgp_ar']) < 0.25){
+    warning("found a relatively high level of correlation between spg and mgp area -- favoring sgp and dropping mgp")
+    imbcr_df@siteCovs[,!grepl(colnames(imbcr_df@siteCovs), pattern="_sgp")]
+    #imbcr_df@siteCovs[,'grass_ar'] <- rowSums(imbcr_df@siteCovs[, c('ag_sgp_ar','lg_sgp_ar')])
+}
+
+#
+# Check for correlation between SGP and PC1
+#
+if (exists('pca_m')){
+  imbcr_df <- check_correlation_matrix(var='ag_sgp_ar', x_correlation_matrix=x_correlation_matrix, imbcr_df=imbcr_df)
+  imbcr_df <- check_correlation_matrix(var='ag_mgp_ar', x_correlation_matrix=x_correlation_matrix, imbcr_df=imbcr_df)
+}
+# drop roads from consideration
+imbcr_df@siteCovs <- imbcr_df@siteCovs[ , !grepl(colnames(imbcr_df@siteCovs), pattern="rd_ar")]
 
 # update our detection covariates in-case they were dropped from the PCA
 # due to missingness and our habitat covariates to account for the PCA
@@ -961,7 +1015,7 @@ allDetCovs <- get_detection_covs(imbcr_df)
 #
 
 K <- unlist(lapply(
-    seq(0.8, 2.5, by=0.1),
+    seq(0.9, 2.5, by=0.1),
     FUN=function(x) calc_k(imbcr_df, multiplier=x)
   ))
 
@@ -970,7 +1024,7 @@ cat(
    " alternative (habitat PCA) models\n"
   )
 
-intercept_m_pois_aic <- gdistsamp_find_optimal_k(
+m_pois_aic <- gdistsamp_find_optimal_k(
     df=imbcr_df,
     allHabitatCovs=allHabitatCovs,
     allDetCovs=allDetCovs,
@@ -978,22 +1032,22 @@ intercept_m_pois_aic <- gdistsamp_find_optimal_k(
   )
 
 
-K_pois <- intercept_m_pois_aic$K
-intercept_m_pois_aic <- intercept_m_pois_aic$AIC
+K_pois <- m_pois_aic$K
+pois_aic <- m_pois_aic$AIC
 
-system.time(intercept_m_negbin_aic <- gdistsamp_find_optimal_k(
+m_negbin_aic <- gdistsamp_find_optimal_k(
     df=imbcr_df,
     allHabitatCovs=allHabitatCovs,
     allDetCovs=allDetCovs,
     mixture="NB"
-  ))
+  )
 
-K_negbin <- intercept_m_negbin_aic$K
-intercept_m_negbin_aic <- intercept_m_negbin_aic$AIC
+K_negbin <- m_negbin_aic$K
+negbin_aic <- m_negbin_aic$AIC
 
 # accept the lower AIC as our preferred mixture and
 # keep the results for later review
-if( diff(c(intercept_m_negbin_aic,intercept_m_pois_aic)) > 2 ){
+if( diff(c(negbin_aic,pois_aic)) > 2 ){
   mixture_dist <- "NB"
   K <- K_negbin
 # if we don't gain more than 2 AIC units of improvement from the mixture,
@@ -1046,9 +1100,9 @@ all_covs_m <- unmarked::gdistsamp(
 #
 
 model_selection_table <- OpenIMBCR:::allCombinations_dAIC(
-  siteCovs=allHabitatCovs,
+  siteCovs=c(allHabitatCovs, "poly(lat,2)", "poly(lon,2)", "log(lat)", "log(lon)"),
   detCovs=c("doy","starttime"),
-  step=100,
+  step=500,
   umdf=imbcr_df,
   umFunction=unmarked::gdistsamp,
   mixture=mixture_dist,
@@ -1058,7 +1112,6 @@ model_selection_table <- OpenIMBCR:::allCombinations_dAIC(
   keyfun="halfnorm",
   offset="offset(log(effort))"
 )
-
 
 #
 # now calculate some akaike weights from our run table
@@ -1080,10 +1133,11 @@ save(
            "model_selection_table",
            "imbcr_df_original",
            "imbcr_df",
-           "intercept_m_negbin_aic",
-           "intercept_m_pois_aic",
+           "negbin_aic",
+           "pois_aic",
            "mixture_dist",
            "K",
+           "x_correlation_matrix",
            "intercept_m",
            "pca_m",
            "all_covs_m"),
