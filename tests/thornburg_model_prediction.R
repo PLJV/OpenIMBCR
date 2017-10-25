@@ -168,7 +168,7 @@ akaike_predict <- function(
   mod_sel_tab=NULL, 
   train_data=NULL,
   pred_data=NULL, 
-  daic_cutoff=2, 
+  daic_cutoff=4,
   K=NULL, 
   mixture=NULL){
   keep <- mod_sel_tab$AIC < min(mod_sel_tab$AIC) + daic_cutoff

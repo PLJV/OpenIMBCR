@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="7ffd2664-4be4-4a4c-91d1-e6ab9b7168eb" name="Default" comment="cleaning-up akaike model averaging implementation">
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/.idea/dictionaries/ktaylora.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/OpenIMBCR.iml" afterPath="$PROJECT_DIR$/.idea/OpenIMBCR.iml" />
+    <list default="true" id="7ffd2664-4be4-4a4c-91d1-e6ab9b7168eb" name="Default" comment="">
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/tests/thornburg_model_fitting.R" afterPath="$PROJECT_DIR$/tests/thornburg_model_fitting.R" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/tests/thornburg_model_prediction.R" afterPath="$PROJECT_DIR$/tests/thornburg_model_prediction.R" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -32,8 +31,8 @@
       <file leaf-file-name="thornburg_model_fitting.R" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/tests/thornburg_model_fitting.R">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="279">
-              <caret line="978" column="0" lean-forward="true" selection-start-line="978" selection-start-column="0" selection-end-line="978" selection-end-column="0" />
+            <state relative-caret-position="758">
+              <caret line="1109" column="0" lean-forward="true" selection-start-line="1109" selection-start-column="0" selection-end-line="1109" selection-end-column="0" />
               <folding />
             </state>
           </provider>
@@ -42,7 +41,7 @@
       <file leaf-file-name="thornburg_vector_operations.R" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/tests/thornburg_vector_operations.R">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="1575">
+            <state relative-caret-position="830">
               <caret line="105" column="14" lean-forward="false" selection-start-line="105" selection-start-column="14" selection-end-line="105" selection-end-column="14" />
               <folding />
             </state>
@@ -52,8 +51,8 @@
       <file leaf-file-name="thornburg_model_prediction.R" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/tests/thornburg_model_prediction.R">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="5655">
-              <caret line="377" column="34" lean-forward="false" selection-start-line="377" selection-start-column="34" selection-end-line="377" selection-end-column="34" />
+            <state relative-caret-position="367">
+              <caret line="165" column="0" lean-forward="true" selection-start-line="165" selection-start-column="0" selection-end-line="165" selection-end-column="0" />
               <folding />
             </state>
           </provider>
@@ -67,6 +66,11 @@
       <find>step_through_model_prediction</find>
       <find>step_through_model_predictions</find>
       <find>scrub_imbcr_df</find>
+      <find>total_area</find>
+      <find>pca_recons</find>
+      <find>pca_re</find>
+      <find>gdistsamp_find_optimal_k</find>
+      <find>gdistsamp_find_optimal_k(</find>
     </findStrings>
     <replaceStrings>
       <replace>step_through_model_predictions</replace>
@@ -85,13 +89,13 @@
   <component name="IdeDocumentHistory">
     <option name="CHANGED_PATHS">
       <list>
-        <option value="$PROJECT_DIR$/tests/thornburg_model_prediction.R" />
         <option value="$PROJECT_DIR$/tests/imbcr_model_builder.py" />
+        <option value="$PROJECT_DIR$/tests/thornburg_model_prediction.R" />
         <option value="$PROJECT_DIR$/tests/thornburg_model_fitting.R" />
       </list>
     </option>
   </component>
-  <component name="ProjectFrameBounds" extendedState="6">
+  <component name="ProjectFrameBounds" extendedState="7">
     <option name="x" value="144" />
     <option name="y" value="41" />
     <option name="width" value="1444" />
@@ -188,22 +192,30 @@
       <option name="project" value="LOCAL" />
       <updated>1508615388582</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="house keeping">
+      <created>1508950833196</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1508950833196</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="65" y="41" width="1615" height="1017" extended-state="6" />
+    <frame x="65" y="41" width="1615" height="1017" extended-state="7" />
+    <editor active="true" />
     <layout>
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="10" side_tool="false" content_ui="tabs" />
-      <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32865497" sideWeight="0.5" order="0" side_tool="true" content_ui="tabs" />
+      <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3277027" sideWeight="0.5" order="0" side_tool="true" content_ui="tabs" />
       <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3295325" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Python Console" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
-      <window_info id="Project" active="true" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.12794398" sideWeight="0.5" order="1" side_tool="false" content_ui="combo" />
+      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.12794398" sideWeight="0.5" order="1" side_tool="false" content_ui="combo" />
       <window_info id="R Packages" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32957393" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="R Graphics" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32957393" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
-      <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.16804583" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
+      <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.16804583" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3297619" sideWeight="0.5" order="0" side_tool="true" content_ui="tabs" />
       <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Data View" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32957393" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
@@ -248,7 +260,8 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="cleaning-up for the day" />
     <MESSAGE value="cleaning-up akaike model averaging implementation" />
-    <option name="LAST_COMMIT_MESSAGE" value="cleaning-up akaike model averaging implementation" />
+    <MESSAGE value="house keeping" />
+    <option name="LAST_COMMIT_MESSAGE" value="house keeping" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -345,22 +358,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/tests/thornburg_model_prediction.R">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="5655">
-          <caret line="377" column="34" lean-forward="false" selection-start-line="377" selection-start-column="34" selection-end-line="377" selection-end-column="34" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/tests/thornburg_vector_operations.R">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1575">
-          <caret line="105" column="14" lean-forward="false" selection-start-line="105" selection-start-column="14" selection-end-line="105" selection-end-column="14" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/tests/imbcr_model_builder.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="2130">
@@ -369,10 +366,26 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/tests/thornburg_vector_operations.R">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="830">
+          <caret line="105" column="14" lean-forward="false" selection-start-line="105" selection-start-column="14" selection-end-line="105" selection-end-column="14" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/tests/thornburg_model_prediction.R">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="367">
+          <caret line="165" column="0" lean-forward="true" selection-start-line="165" selection-start-column="0" selection-end-line="165" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/tests/thornburg_model_fitting.R">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="279">
-          <caret line="978" column="0" lean-forward="true" selection-start-line="978" selection-start-column="0" selection-end-line="978" selection-end-column="0" />
+        <state relative-caret-position="758">
+          <caret line="1109" column="0" lean-forward="true" selection-start-line="1109" selection-start-column="0" selection-end-line="1109" selection-end-column="0" />
           <folding />
         </state>
       </provider>
