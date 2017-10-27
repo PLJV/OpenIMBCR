@@ -757,11 +757,13 @@ calc_k <- function(df=NULL, multiplier=1){
 #' of K values and selects the smallest K value for which a decrease in AIC is no
 #' longer observed. Might also consider checking for stability in the beta parameters
 #' for this as well.
-gdistsamp_find_optimal_k <- function(df=NULL, allHabitatCovs=NULL, allDetCovs=NULL, mixture=NULL, keyfun="halfnorm"){
-  K <- unlist(lapply(
-    seq(0.9, 2, by=0.1),
-    FUN=function(x) calc_k(df, multiplier=x)
-  ))
+gdistsamp_find_optimal_k <- function(df=NULL, allHabitatCovs=NULL, allDetCovs=NULL, mixture=NULL, keyfun="halfnorm", K=NULL, multiple=1){
+  if(is.null(K)){
+    K <- unlist(lapply(
+        seq(1, 2, by=0.15),
+        FUN=function(x) calc_k(df, multiplier=x)
+      ))
+  }
   all_covs_m <- unlist(lapply(
      K,
      FUN=function(x){
@@ -789,6 +791,21 @@ gdistsamp_find_optimal_k <- function(df=NULL, allHabitatCovs=NULL, allDetCovs=NU
        }
      }
   ))
+  # bug-fix : did we not find a single valid K parameter?
+  if(all(is.na(all_covs_m))){
+    stop(
+        "couldn't find convergence for any K parameters in our sequence -- this shouldn't happen. Maybe there's",
+        "zero-inflation of our input data set?"
+      )
+  # bug-fix : did we only find one working value? Use it
+  } else if( sum(!is.na(all_covs_m)) == 1 ){
+    return(
+      list(
+        K=K[which(!is.na(all_covs_m))],
+        AIC=all_covs_m[which(!is.na(all_covs_m))]
+      )
+    )
+  }
   # bug-fix swap out our NA values with noise that
   # our second derivative won't settle on
   if(any(is.na(all_covs_m))){
@@ -798,7 +815,12 @@ gdistsamp_find_optimal_k <- function(df=NULL, allHabitatCovs=NULL, allDetCovs=NU
   # at what array position does the change in AIC start to bottom out?
   tail <- quantile(abs(round(diff(diff(all_covs_m)),3)), p=0.6) # median, but more tail-ey
   min_k <- min(which(abs(round(diff(diff(all_covs_m)),2)) < tail))
-  return(list(K=K[min_k], AIC=all_covs_m[min_k]))
+  return(
+    list(
+      K=K[min_k],
+      AIC=all_covs_m[min_k]
+    )
+  )
 }
 
 check_correlation_matrix <- function(
@@ -810,14 +832,59 @@ check_correlation_matrix <- function(
   correlation <- x_correlation_matrix[var,'PC1']
   # is this positive correlation? It shouldn't be
   if (correlation > 0) {
-    warning("positive correlation observed between our SGP variable and our fragmentation metric. They should be the",
-    "inverse of each other. Consider -1*PCA transformation")
+    warning(
+      paste(
+        "positive correlation observed between",var,"and our fragmentation metric. They should be the",
+        "inverse of each other. Consider -1*PCA transformation")
+    )
   }
   if (abs(correlation) > correlation_threshold){
-      warning("dropping sgp_ar variable -- it's strongly correlated with our fragmentation PCA")
+      warning(paste("dropping",var,"-- it's strongly correlated with our fragmentation PCA"))
       imbcr_df@siteCovs <- imbcr_df@siteCovs[ , !grepl(colnames(imbcr_df@siteCovs), pattern=var) ]
   }
   return(imbcr_df)
+}
+balance_zero_transects <- function(imbcr_df=NULL, multiple=2){
+  nonzero_transects <- which(rowSums(imbcr_df@y)!=0)
+  zero_transects <- which(rowSums(imbcr_df@y)==0)
+  if(length(zero_transects)/length(nonzero_transects) > multiple){
+    downsample_to <- floor(length(nonzero_transects)*multiple)
+    zero_transects <- sample(zero_transects, size=downsample_to)
+    # resample our input table by throwing out some of our zero transects
+    imbcr_df@y <- imbcr_df@y[c(nonzero_transects,zero_transects) , ]
+    imbcr_df@siteCovs <- imbcr_df@siteCovs[c(nonzero_transects,zero_transects) , ]
+    imbcr_df@tlength <- rep(1, nrow(imbcr_df@y))
+  }
+  return(imbcr_df)
+}
+check_optimal_mixture_dist <- function(imbcr_df=NULL, allHabitatCovs=NULL, allDetCovs=NULL, dist=NULL, K=NULL){
+  mixture <- gdistsamp_find_optimal_k(
+    df=imbcr_df,
+    allHabitatCovs=allHabitatCovs,
+    allDetCovs=allDetCovs,
+    mixture=dist,
+    K=K
+  )
+
+  if(class(mixture) == "try-error"){
+    imbcr_df <- balance_zero_transects(imbcr_df, multiple=0.5)
+    mixture <- try(gdistsamp_find_optimal_k(
+        df=imbcr_df,
+        allHabitatCovs=allHabitatCovs,
+        allDetCovs=allDetCovs,
+        mixture=dist,
+        K=K
+      ))
+    if(class(pois_aic)=="try-error"){
+      warning("poisson:couldn't find an optimal K value, even after downsampling over-abundant zeros")
+    } else {
+      K_pois <- pois_aic$K
+      pois_aic <- pois_aic$AIC
+    }
+  } else {
+    K_pois <- pois_aic$K
+    pois_aic <- pois_aic$AIC
+  }
 }
 #
 # MAIN
@@ -920,6 +987,8 @@ habitat_vars_summary_statistics <- rbind(
   )
 )
 
+cat(" -- prepping input unmarked data.frame and performing PCA\n")
+
 imbcr_observations@data[,c('starttime','doy','lat','lon')] <-
   scale(imbcr_observations@data[,c('starttime','doy','lat','lon')])
 
@@ -949,8 +1018,8 @@ imbcr_df <- scrub_unmarked_dataframe(
       prune_cutoff=0.1  # drop variables with low variance?
     )
 
-cat(" -- prepping input unmarked data.frame and performing PCA\n")
 
+# figure out an initial list of habitat covariates
 allHabitatCovs <- get_habitat_covs(imbcr_df)
 
 # drop the luke george version of habitat covariates
@@ -987,7 +1056,8 @@ x_correlation_matrix <- round(cor(imbcr_df@siteCovs),2)
 # Check for positive correlation between SGP and MGP
 #
 
-if ( abs(x_correlation_matrix['doy','lat'])-abs(x_correlation_matrix['ag_mgp_ar','ag_sgp_ar']) < 0.25){
+
+if ( abs(x_correlation_matrix['ag_mgp_ar','ag_sgp_ar']) > 0.5){
     warning("found a relatively high level of correlation between spg and mgp area -- favoring sgp and dropping mgp")
     imbcr_df@siteCovs[,!grepl(colnames(imbcr_df@siteCovs), pattern="_sgp")]
     #imbcr_df@siteCovs[,'grass_ar'] <- rowSums(imbcr_df@siteCovs[, c('ag_sgp_ar','lg_sgp_ar')])
@@ -1011,68 +1081,101 @@ allHabitatCovs <- get_habitat_covs(imbcr_df)
 allDetCovs <- get_detection_covs(imbcr_df)
 
 #
-# Determine a reasonable K from our input table
+# Determine a reasonable K from our input table and find
+# minimum AIC values for both the Poisson and Negative Binomial
+# that we can compare against to select an optimal mixture
+# distribution
 #
 
-K <- unlist(lapply(
-    seq(0.9, 2.5, by=0.1),
-    FUN=function(x) calc_k(imbcr_df, multiplier=x)
-  ))
 
 cat(
-   " -- estimating a good 'K' parameter and building null (intercept-only) and",
+   " -- estimating a good 'K' parameter and building null (intercept-only) and ",
    " alternative (habitat PCA) models\n"
   )
 
-m_pois_aic <- gdistsamp_find_optimal_k(
+K <- unlist(lapply(
+    seq(1, 2.5, by=0.15),
+    FUN=function(x) calc_k(imbcr_df, multiplier=x)
+  ))
+
+# if we have too many zeros in our dataset, our model will never
+# converge -- if this happens, try randomly downsampling our number
+# over zero transects to some 'multiple' of the number of non-zero
+# transects
+
+pois_aic <- try(gdistsamp_find_optimal_k(
     df=imbcr_df,
     allHabitatCovs=allHabitatCovs,
     allDetCovs=allDetCovs,
-    mixture="P"
-  )
+    mixture="P",
+    K=K
+  ))
 
-
-K_pois <- m_pois_aic$K
-pois_aic <- m_pois_aic$AIC
-
-m_negbin_aic <- gdistsamp_find_optimal_k(
-    df=imbcr_df,
-    allHabitatCovs=allHabitatCovs,
-    allDetCovs=allDetCovs,
-    mixture="NB"
-  )
-
-K_negbin <- m_negbin_aic$K
-negbin_aic <- m_negbin_aic$AIC
-
-# accept the lower AIC as our preferred mixture and
-# keep the results for later review
-if( diff(c(negbin_aic,pois_aic)) > 2 ){
-  mixture_dist <- "NB"
-  K <- K_negbin
-# if we don't gain more than 2 AIC units of improvement from the mixture,
-# let's favor the simpler mixture distribution
+if (class(pois_aic) == "try-error"){
+    imbcr_df <- balance_zero_transects(imbcr_df, multiple=0.75)
+    pois_aic <- try(gdistsamp_find_optimal_k(
+        df=imbcr_df,
+        allHabitatCovs=allHabitatCovs,
+        allDetCovs=allDetCovs,
+        mixture="P",
+        K=K
+      ))
+    # if downsampling didn't help -- quit with an error. We don't
+    # want to try to interpret a model with questionable data.
+    if (class(pois_aic)=="try-error"){
+      stop("poisson : couldn't find an optimal K value,",
+           "even after downsampling over-abundant zeros")
+    } else {
+      K_pois <- pois_aic$K
+      pois_aic <- pois_aic$AIC
+    }
 } else {
-  mixture_dist <- "P"
-  K <- K_pois
+  K_pois <- pois_aic$K
+  pois_aic <- pois_aic$AIC
 }
 
-intercept_m <- unmarked::gdistsamp(
-    as.formula(paste(
-      "~",
-      "1",
-      "+offset(log(effort))",
-      sep=""
-    )),
-    ~1,
-    as.formula(paste("~",paste(allDetCovs, collapse="+"))),
-    data=imbcr_df,
-    keyfun="halfnorm",
-    mixture=mixture_dist,
-    unitsOut="kmsq",
-    se=T,
+negbin_aic <- try(gdistsamp_find_optimal_k(
+    df=imbcr_df,
+    allHabitatCovs=allHabitatCovs,
+    allDetCovs=allDetCovs,
+    mixture="NB",
     K=K
-  )
+  ))
+
+if (class(negbin_aic) == "try-error"){
+    # this will do nothing if we've already downsampled to 'multiple'
+    # for the Poisson mixture
+    imbcr_df <- balance_zero_transects(imbcr_df, multiple=0.75)
+    pois_aic <- try(gdistsamp_find_optimal_k(
+        df=imbcr_df,
+        allHabitatCovs=allHabitatCovs,
+        allDetCovs=allDetCovs,
+        mixture="NB",
+        K=K
+      ))
+    # if downsampling didn't help -- quit with an error. We don't
+    # want to try to interpret a model with questionable data.
+    if (class(negbin_aic)=="try-error"){
+      stop("poisson : couldn't find an optimal K value,",
+           "even after downsampling over-abundant zeros")
+    } else {
+      K_negbin <- negbin_aic$K
+      pois_aic <- negbin_aic$AIC
+    }
+} else {
+  K_negbin <- negbin_aic$K
+  negbin_aic <- negbin_aic$AIC
+}
+
+if(diff(c(negbin_aic, pois_aic)) > 4){
+  K <- K_negbin
+  mixture_dist <- "NB"
+  # if we don't see a large improvement in AIC from using the
+  # negative binomial, favor the simpler Poisson mixture
+} else {
+  K <- K_pois
+  mixture_dist <- "P"
+}
 
 # test : build a model where fragmentation metrics were collapsed into a
 # single covariate and all of our remaining habitat variables were not
@@ -1099,10 +1202,15 @@ all_covs_m <- unmarked::gdistsamp(
 # now for some model selection
 #
 
+# we are going to test for lat/lon with polynomials and log transformations
+# explicitly, so let's drop them here
+
+allHabitatCovs <- allHabitatCovs[!grepl(allHabitatCovs, pattern="lat|lon")]
+
 model_selection_table <- OpenIMBCR:::allCombinations_dAIC(
   siteCovs=c(allHabitatCovs, "poly(lat,2)", "poly(lon,2)", "log(lat)", "log(lon)"),
   detCovs=c("doy","starttime"),
-  step=500,
+  step=100,
   umdf=imbcr_df,
   umFunction=unmarked::gdistsamp,
   mixture=mixture_dist,
