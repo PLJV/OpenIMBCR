@@ -872,7 +872,7 @@ balance_zero_transects <- function(imbcr_df=NULL, multiple=2){
 #' a lot of zeros in our input dataset. This function will attempt
 #' a sequence of different downsampling densities to get around the
 #' zero-inflation problem
-gdistsamp_find_optimal_mixture_dist <- function(
+gdistsamp_find_optimal_k_with_transect_downsampling <- function(
   imbcr_df=NULL,
   allHabitatCovs=NULL,
   allDetCovs=NULL,
@@ -886,10 +886,21 @@ gdistsamp_find_optimal_mixture_dist <- function(
       ))
   }
 
-  get_optim_k_aic <- function(x=NULL){
+  get_optim_k_aic <- function(
+    x=NULL,
+    imbcr_df=NULL,
+    allHabitatCovs=NULL,
+    allDetCovs=NULL,
+    dist=NULL)
+  {
+     if(is.null(x)){
+       downsample <- imbcr_df
+     } else {
+       downsample <- balance_zero_transects(imbcr_df, multiple=x)
+     }
      # try to find an optimal K
      mixture_aic <- try(gdistsamp_find_optimal_k(
-        df=imbcr_df,
+        df=downsample,
         allHabitatCovs=allHabitatCovs,
         allDetCovs=allDetCovs,
         mixture=dist,
@@ -898,28 +909,15 @@ gdistsamp_find_optimal_mixture_dist <- function(
      # if we failed, try and downsample to nonzero*multiple density
      # and see if we can converge
      if (class(mixture_aic) == "try-error"){
-       downsample <- balance_zero_transects(imbcr_df, multiple=x)
-       mixture_aic <- try(gdistsamp_find_optimal_k(
-           df=downsample,
-           allHabitatCovs=allHabitatCovs,
-           allDetCovs=allDetCovs,
-           mixture=dist,
-           K=K
-         ))
-       # if downsampling didn't help -- quit with an error. We don't
-       # want to try to interpret a model with questionable data.
-       if (class(mixture_aic)=="try-error"){
-         return(NA)
-       } else {
-         return(mixture_aic)
-       }
+       return(NA)
      } else {
        return(mixture_aic)
      }
   }
 
-  multiple <- seq(from=0.9,to=0.3,by=-0.1)
-  mixture <- get_optim_k_aic(x=2)
+  # default : will attempt to find an optimal K without
+  # downsampling first
+  mixture <- get_optim_k_aic(x=NULL, imbcr_df, allHabitatCovs, allDetCovs, dist)
 
   if(is.na(mixture)){
     # generate a sequence of downsampling
@@ -929,14 +927,15 @@ gdistsamp_find_optimal_mixture_dist <- function(
     multiple <- seq(from=0.9,to=0.3,by=-0.1)
     m <- lapply(
       X=multiple,
-      FUN=get_optim_k_aic
+      FUN=function(x) get_optim_k_aic(x, imbcr_df, allHabitatCovs, allDetCovs, dist)
     )
     if(all(unlist(lapply(m, is.na)))){
       stop(
-        "we failed to find convergence from a number of",
+        "we failed to find convergence from a number of ",
         "different multiples -- quitting"
         )
     } else {
+      multiple <- multiple[!unlist(lapply(m, is.na))]
       m <- m[!unlist(lapply(m, is.na))]
     }
     lowest_aic <- which.min(
@@ -1157,7 +1156,7 @@ allDetCovs <- get_detection_covs(imbcr_df)
 
 cat(
    " -- estimating a good 'K' parameter and building null (intercept-only) and ",
-   "alternative (habitat PCA) models\n"
+   "alternative (habitat) models\n"
   )
 
 K <- unlist(lapply(
@@ -1170,9 +1169,10 @@ K <- unlist(lapply(
 # over zero transects to some 'multiple' of the number of non-zero
 # transects
 
-# This needs some debugging because it isn't working
+# This needs some debugging because it isn't working --
 # probably something to do with scope
-# pois_aic <- gdistsamp_find_optimal_mixture_dist(
+#
+# test <- gdistsamp_find_optimal_k_with_transect_downsampling(
 #     imbcr_df,
 #     allHabitatCovs,
 #     allDetCovs,
