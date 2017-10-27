@@ -379,7 +379,7 @@ build_unmarked_gds <- function(df=NULL,
   # bug fix : drop entries with NA values before attempting PCA or quantile pruning
   if(drop_na_values){
     transects <- transects[ !as.vector(rowSums(is.na(transects)) > 0) , ]
-    transects <- transects[ , !grepl(colnames(transects), pattern="_NA")]
+    transects <- transects[ ,!grepl(colnames(transects), pattern="_NA")]
   }
   # build our unmarked frame and return to user
   return(unmarked::unmarkedFrameGDS(
@@ -757,10 +757,17 @@ calc_k <- function(df=NULL, multiplier=1){
 #' of K values and selects the smallest K value for which a decrease in AIC is no
 #' longer observed. Might also consider checking for stability in the beta parameters
 #' for this as well.
-gdistsamp_find_optimal_k <- function(df=NULL, allHabitatCovs=NULL, allDetCovs=NULL, mixture=NULL, keyfun="halfnorm", K=NULL, multiple=1){
+gdistsamp_find_optimal_k <- function(
+  df=NULL,
+  allHabitatCovs=NULL,
+  allDetCovs=NULL,
+  mixture=NULL,
+  keyfun="halfnorm",
+  K=NULL)
+{
   if(is.null(K)){
     K <- unlist(lapply(
-        seq(1, 2, by=0.15),
+        seq(1, 2.5, by=0.25),
         FUN=function(x) calc_k(df, multiplier=x)
       ))
   }
@@ -795,7 +802,7 @@ gdistsamp_find_optimal_k <- function(df=NULL, allHabitatCovs=NULL, allDetCovs=NU
   if(all(is.na(all_covs_m))){
     stop(
         "couldn't find convergence for any K parameters in our sequence -- this shouldn't happen. Maybe there's",
-        "zero-inflation of our input data set?"
+        " zero-inflation of our input data set?"
       )
   # bug-fix : did we only find one working value? Use it
   } else if( sum(!is.na(all_covs_m)) == 1 ){
@@ -822,7 +829,7 @@ gdistsamp_find_optimal_k <- function(df=NULL, allHabitatCovs=NULL, allDetCovs=NU
     )
   )
 }
-
+#' testing :
 check_correlation_matrix <- function(
   var=NULL,
   x_correlation_matrix=NULL,
@@ -844,6 +851,7 @@ check_correlation_matrix <- function(
   }
   return(imbcr_df)
 }
+#' testing :
 balance_zero_transects <- function(imbcr_df=NULL, multiple=2){
   nonzero_transects <- which(rowSums(imbcr_df@y)!=0)
   zero_transects <- which(rowSums(imbcr_df@y)==0)
@@ -857,35 +865,95 @@ balance_zero_transects <- function(imbcr_df=NULL, multiple=2){
   }
   return(imbcr_df)
 }
-check_optimal_mixture_dist <- function(imbcr_df=NULL, allHabitatCovs=NULL, allDetCovs=NULL, dist=NULL, K=NULL){
-  mixture <- gdistsamp_find_optimal_k(
-    df=imbcr_df,
-    allHabitatCovs=allHabitatCovs,
-    allDetCovs=allDetCovs,
-    mixture=dist,
-    K=K
-  )
+#' testing : given a user-specified mixture distribution, try
+#' and find an optimal K value from a sequence of possible K
+#' values describing the upper-bounds of an integration (using
+#' gdistsamp_find_optimal_k()). Often this will fail if we have
+#' a lot of zeros in our input dataset. This function will attempt
+#' a sequence of different downsampling densities to get around the
+#' zero-inflation problem
+gdistsamp_find_optimal_mixture_dist <- function(
+  imbcr_df=NULL,
+  allHabitatCovs=NULL,
+  allDetCovs=NULL,
+  dist=NULL,
+  K=NULL)
+{
+  if(is.null(K)){
+    K <- unlist(lapply(
+        seq(from=1,to=2.5,by=0.15),
+        FUN=function(x) calc_k(imbcr_df, multiplier=x)
+      ))
+  }
 
-  if(class(mixture) == "try-error"){
-    imbcr_df <- balance_zero_transects(imbcr_df, multiple=0.5)
-    mixture <- try(gdistsamp_find_optimal_k(
+  get_optim_k_aic <- function(x=NULL){
+     # try to find an optimal K
+     mixture_aic <- try(gdistsamp_find_optimal_k(
         df=imbcr_df,
         allHabitatCovs=allHabitatCovs,
         allDetCovs=allDetCovs,
         mixture=dist,
         K=K
       ))
-    if(class(pois_aic)=="try-error"){
-      warning("poisson:couldn't find an optimal K value, even after downsampling over-abundant zeros")
+     # if we failed, try and downsample to nonzero*multiple density
+     # and see if we can converge
+     if (class(mixture_aic) == "try-error"){
+       downsample <- balance_zero_transects(imbcr_df, multiple=x)
+       mixture_aic <- try(gdistsamp_find_optimal_k(
+           df=downsample,
+           allHabitatCovs=allHabitatCovs,
+           allDetCovs=allDetCovs,
+           mixture=dist,
+           K=K
+         ))
+       # if downsampling didn't help -- quit with an error. We don't
+       # want to try to interpret a model with questionable data.
+       if (class(mixture_aic)=="try-error"){
+         return(NA)
+       } else {
+         return(mixture_aic)
+       }
+     } else {
+       return(mixture_aic)
+     }
+  }
+
+  multiple <- seq(from=0.9,to=0.3,by=-0.1)
+  mixture <- get_optim_k_aic(x=2)
+
+  if(is.na(mixture)){
+    # generate a sequence of downsampling
+    # densities and take the one that has
+    # the lowest AIC -- this can take some
+    # time
+    multiple <- seq(from=0.9,to=0.3,by=-0.1)
+    m <- lapply(
+      X=multiple,
+      FUN=get_optim_k_aic
+    )
+    if(all(unlist(lapply(m, is.na)))){
+      stop(
+        "we failed to find convergence from a number of",
+        "different multiples -- quitting"
+        )
     } else {
-      K_pois <- pois_aic$K
-      pois_aic <- pois_aic$AIC
+      m <- m[!unlist(lapply(m, is.na))]
     }
+    lowest_aic <- which.min(
+        unlist(lapply(m, FUN=function(x) return(x$AIC)))
+      )
+    return(list(
+        fit=m[[lowest_aic]],
+        downsample_multiple=multiple[lowest_aic]
+      ))
   } else {
-    K_pois <- pois_aic$K
-    pois_aic <- pois_aic$AIC
+    return(list(
+      fit=mixture,
+      downsample_multiple=NA
+    ))
   }
 }
+
 #
 # MAIN
 #
@@ -1012,12 +1080,11 @@ imbcr_df <- scrub_unmarked_dataframe(
       build_unmarked_gds(
         df=imbcr_df,
         distance_breaks=breaks,
-        drop_na_values=T # here we are dropping all NA values within transects and
+        drop_na_values=T # drop all data with NA values in covs (for PCA)
       ),
       normalize=F,      # we already applied scale() to our input data
       prune_cutoff=0.1  # drop variables with low variance?
     )
-
 
 # figure out an initial list of habitat covariates
 allHabitatCovs <- get_habitat_covs(imbcr_df)
@@ -1090,18 +1157,28 @@ allDetCovs <- get_detection_covs(imbcr_df)
 
 cat(
    " -- estimating a good 'K' parameter and building null (intercept-only) and ",
-   " alternative (habitat PCA) models\n"
+   "alternative (habitat PCA) models\n"
   )
 
 K <- unlist(lapply(
-    seq(1, 2.5, by=0.15),
+    seq(1, 2, by=0.25),
     FUN=function(x) calc_k(imbcr_df, multiplier=x)
   ))
 
-# if we have too many zeros in our dataset, our model will never
+# if we have too many zero transects in our dataset, our model will never
 # converge -- if this happens, try randomly downsampling our number
 # over zero transects to some 'multiple' of the number of non-zero
 # transects
+
+# This needs some debugging because it isn't working
+# probably something to do with scope
+# pois_aic <- gdistsamp_find_optimal_mixture_dist(
+#     imbcr_df,
+#     allHabitatCovs,
+#     allDetCovs,
+#     "P",
+#     K
+#   )
 
 pois_aic <- try(gdistsamp_find_optimal_k(
     df=imbcr_df,
@@ -1112,7 +1189,7 @@ pois_aic <- try(gdistsamp_find_optimal_k(
   ))
 
 if (class(pois_aic) == "try-error"){
-    imbcr_df <- balance_zero_transects(imbcr_df, multiple=0.75)
+    imbcr_df <- balance_zero_transects(imbcr_df, multiple=0.5)
     pois_aic <- try(gdistsamp_find_optimal_k(
         df=imbcr_df,
         allHabitatCovs=allHabitatCovs,
@@ -1177,9 +1254,26 @@ if(diff(c(negbin_aic, pois_aic)) > 4){
   mixture_dist <- "P"
 }
 
-# test : build a model where fragmentation metrics were collapsed into a
-# single covariate and all of our remaining habitat variables were not
-# included in a PCA. Then use AIC to optimize variable inclusion.
+# test : build an over-fit (all covariates) model and an intercept
+# only model for debugging
+
+
+intercept_m <- unmarked::gdistsamp(
+    as.formula(paste(
+      "~",
+      "1",
+      "+offset(log(effort))",
+      sep=""
+    )),
+    ~1,
+    as.formula(paste("~",paste(allDetCovs, collapse="+"))),
+    data=imbcr_df,
+    keyfun="halfnorm",
+    mixture=mixture_dist,
+    unitsOut="kmsq",
+    se=T,
+    K=K
+  )
 
 all_covs_m <- unmarked::gdistsamp(
     as.formula(paste(
@@ -1208,7 +1302,7 @@ all_covs_m <- unmarked::gdistsamp(
 allHabitatCovs <- allHabitatCovs[!grepl(allHabitatCovs, pattern="lat|lon")]
 
 model_selection_table <- OpenIMBCR:::allCombinations_dAIC(
-  siteCovs=c(allHabitatCovs, "poly(lat,2)", "poly(lon,2)", "log(lat)", "log(lon)"),
+  siteCovs=c(allHabitatCovs, "poly(lat,2)", "poly(lon,2)"),
   detCovs=c("doy","starttime"),
   step=100,
   umdf=imbcr_df,
