@@ -1295,12 +1295,10 @@ all_covs_m <- unmarked::gdistsamp(
 # now for some model selection
 #
 
-allHabitatCovs <- allHabitatCovs
-
 model_selection_table <- OpenIMBCR:::allCombinations_dAIC(
   siteCovs=allHabitatCovs,
   detCovs=c("doy","starttime"),
-  step=100,
+  step=500,
   umdf=imbcr_df,
   umFunction=unmarked::gdistsamp,
   mixture=mixture_dist,
@@ -1311,6 +1309,39 @@ model_selection_table <- OpenIMBCR:::allCombinations_dAIC(
   offset="offset(log(effort))"
 )
 
+# testing : do our akaike weights change when we subset using only those variables
+# selected for inclusion in our top models?
+all_variables_within_2aic <- model_selection_table$AIC < min(model_selection_table$AIC)+2
+all_variables_within_2aic <- as.character(model_selection_table[all_variables_within_2aic,]$formula)
+all_variables_within_2aic <- unique(unlist(lapply(
+    all_variables_within_2aic,
+    FUN=function(x) strsplit(strsplit(x, split="~")[[1]][2], split="[+]") )
+  ))
+
+all_variables_within_2aic <- all_variables_within_2aic[
+    !grepl(all_variables_within_2aic, pattern="offset")
+  ]
+
+if(length(all_variables_within_2aic)<length(allHabitatCovs)){
+  cat(
+      " -- some of our variables were not found in models within 2 dAIC of the",
+      " top model. Dropping unimportant variables and re-calculating a model selection",
+      " table\n"
+    )
+  model_selection_table <- OpenIMBCR:::allCombinations_dAIC(
+    siteCovs=all_variables_within_2aic,
+    detCovs=c("doy","starttime"),
+    step=500,
+    umdf=imbcr_df,
+    umFunction=unmarked::gdistsamp,
+    mixture=mixture_dist,
+    unitsOut="kmsq",
+    K=K,
+    se=T,
+    keyfun="halfnorm",
+    offset="offset(log(effort))"
+  )
+}
 #
 # now calculate some akaike weights from our run table
 #
