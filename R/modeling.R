@@ -1,10 +1,20 @@
+# Author: Kyle Taylor <kyle.taylor@pljv.org>
+# Year : 2016
+# Description : various tasks related to fitting models through optimization 
+# or pre-canned modeling interfaces (as provided by 'unmarked').
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 #
-# OpenIMBCR
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 #
-# Author: Kyle Taylor [2016] (kyle.taylor@pljv.org)
-#
-# Please report bugs to Kyle Taylor
-#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #' expit link function
 expit <- function(x) 1/(1+exp(-x))
