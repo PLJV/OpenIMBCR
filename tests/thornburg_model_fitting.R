@@ -340,8 +340,7 @@ pool_by_transect_year <- function(x=NULL, df=NULL, breaks=NULL, covs=NULL,
 }
 #' accepts a formatted IMBCR SpatialPointsDataFrame and builds an
 #' unmarkedFrameGDS data.frame that we can use for modeling with
-#' the unmarked package. Will optionally add latitude and longitude
-#' attributes (WGS84).
+#' the unmarked package. 
 #' @export
 build_unmarked_gds <- function(df=NULL,
                                numPrimary=1,
@@ -1050,14 +1049,14 @@ habitat_vars_summary_statistics <- rbind(
   habitat_vars_summary_statistics,
   calc_table_summary_statistics(
     imbcr_observations@data,
-    vars=c("doy","starttime","bcr","lat","lon")
+    vars=c("doy","starttime","bcr","lat","lon","lat_2","lon_2","ln_lat","ln_lon")
   )
 )
 
 cat(" -- prepping input unmarked data.frame and performing PCA\n")
 
-imbcr_observations@data[,c('starttime','doy','lat','lon')] <-
-  scale(imbcr_observations@data[,c('starttime','doy','lat','lon')])
+imbcr_observations@data[,c('starttime','doy','lat','lon',"lat_2","lon_2","ln_lat","ln_lon")] <-
+  scale(imbcr_observations@data[,c('starttime','doy','lat','lon',"lat_2","lon_2","ln_lat","ln_lon")])
 
 cat(" -- performing spatial join with our training units dataset\n")
 
@@ -1296,13 +1295,10 @@ all_covs_m <- unmarked::gdistsamp(
 # now for some model selection
 #
 
-# we are going to test for lat/lon with polynomials and log transformations
-# explicitly, so let's drop them here
-
-allHabitatCovs <- allHabitatCovs[!grepl(allHabitatCovs, pattern="lat|lon")]
+allHabitatCovs <- allHabitatCovs
 
 model_selection_table <- OpenIMBCR:::allCombinations_dAIC(
-  siteCovs=c(allHabitatCovs, "poly(lat,2)", "poly(lon,2)"),
+  siteCovs=allHabitatCovs,
   detCovs=c("doy","starttime"),
   step=100,
   umdf=imbcr_df,

@@ -99,7 +99,8 @@ imbcrTableToShapefile <- function(filename=NULL,outfile=NULL,
     if(calc_spatial_covs){
      # calculate lat/lon covariates in WGS84
      coords <- sp::spTransform(s,"+init=epsg:4326")@coords
-       colnames(coords) <- c("lon","lat")
+       coords <- cbind(coords, coords^2, log10(coords+361))
+         colnames(coords) <- c("lon","lat","lon_2","lat_2","ln_lon","ln_lat")
      s@data <- cbind(s@data,coords)
        rm(coords)
     }
@@ -430,10 +431,5 @@ monteCarloTemporalHeterogeneity <- function(s=NULL, plot=F, main=NA, ...){
     abline(v=na.omit(detection_density_slopes[likelihood_outlier_detection(detection_density_slopes)]), col="red")
   }
 
-  return(NA)
-}
-#' use Monte Carlo randomization to test for heterogeneity in detection across
-#' within-transect spatial replicates
-monteCarloSpatialHeterogeneity <- function(s=NULL){
   return(NA)
 }

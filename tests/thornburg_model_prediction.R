@@ -262,8 +262,8 @@ centroids <- rgeos::gCentroid(
       ,'SpatialPolygons'),
     byid=T
   )@coords
-
-colnames(centroids) <- c("lon", "lat")
+centroids <- cbind(centroids, centroids^2, log10(centroids+361))
+  colnames(centroids) <- c("lon","lat","lon_2","lat_2","ln_lon","ln_lat")
 units@data <- cbind(units@data, centroids)
 
 # are the ranges of conditions we are predicting into wildly different
