@@ -228,6 +228,16 @@ top_model_formula <- gsub(
     replacement=""
   )
 
+top_spatial_model_formula <- gsub(
+    as.character(
+      spatial_model_selection_table$formula[
+          which.min(spatial_model_selection_table$AIC)
+        ]
+    ),
+    pattern=" ",
+    replacement=""
+  )
+
 # bug fix : drop spatial variables?
 # final_model_formula <- gsub(
 #   final_model_formula, pattern="[+]lon|[+]lat", replacement=""
@@ -242,8 +252,22 @@ top_model_m <- refit_model(
     mixture=mixture_dist
   )
 
+top_spatial_m <- refit_model(
+    top_model_formula,
+    intercept_m@data,
+    K=K,
+    mixture=mixture_dist
+  )
+
 akaike_models_m <- akaike_predict(
     model_selection_table, 
+    train_data = intercept_m@data, 
+    K=K, 
+    mixture = mixture_dist
+  )
+
+spatial_akaike_models_m <- akaike_predict(
+    spatial_model_selection_table, 
     train_data = intercept_m@data, 
     K=K, 
     mixture = mixture_dist
@@ -303,8 +327,14 @@ if(using_fragmentation_metric){
 units@data$effort <- mean(top_model_m@data@siteCovs$effort)
 
 cat(" -- predicting against top model\n")
-predicted_density_top_model <- par_unmarked_predict(units, top_model_m)
-
+predicted_density_top_model <- par_unmarked_predict(
+    units, 
+    top_model_m
+  )
+predicted_density_spatial_top_spatial_model <- par_unmarked_predict(
+    units, 
+    top_spatial_m
+  )
 if(length(akaike_models_m)>1){
     cat(" -- model averaging against akaike-weighted selection of models\n")
     predicted_density_akaike_models <- lapply(
@@ -321,6 +351,28 @@ if(length(akaike_models_m)>1){
     )
 } else {
     predicted_density <- as.vector(predicted_density_top_model[,1])
+}
+
+cat(" -- predicting against spatial models\n")
+
+if(length(spatial_akaike_models_m)>1){
+    cat(" -- model averaging against akaike-weighted selection of models\n")
+    predicted_density_spatial_akaike_models <- lapply(
+        X=spatial_akaike_models_m,
+        FUN=function(x) {
+        gc() # forces us to drop an old cluster if it's lurking
+        prediction <- par_unmarked_predict(units, x$model)
+        return(list(prediction=prediction, weight=x$weight))
+    })
+    # merge our tables
+    spatial_predicted_density <- akaike_weight_predictions(
+      predicted_density_spatial_akaike_models,
+      col=1 # we're not averaging across stderr here
+    )
+} else {
+    spatial_predicted_density <- as.vector(
+        predicted_density_spatial_top_spatial_model[,1]
+      )
 }
 
 # do some sanity checks and report weird predictions
@@ -347,7 +399,10 @@ cat(
     "\n"
   )
 
+cat(" -- writing to disk\n")
+
 # write our prediction to the attribute table
+
 spp_name <- strsplit(r_data_file[1], split="_")[[1]][1]
 
 units@data[, spp_name] <-
@@ -359,12 +414,27 @@ units@data <- as.data.frame(
 
 colnames(units@data) <- spp_name
 
-cat(" -- writing to disk\n")
-
 rgdal::writeOGR(
   units,
   dsn=".",
   layer=paste(spp_name,"_pred_density_1km", sep=""),
+  driver="ESRI Shapefile",
+  overwrite=T
+)
+
+units@data[, spp_name] <-
+  as.vector(spatial_predicted_density)
+
+units@data <- as.data.frame(
+    units@data[,spp_name ]
+  )
+
+colnames(units@data) <- spp_name
+
+rgdal::writeOGR(
+  units,
+  dsn=".",
+  layer=paste(spp_name,"_spatial_pred_density_1km", sep=""),
   driver="ESRI Shapefile",
   overwrite=T
 )
