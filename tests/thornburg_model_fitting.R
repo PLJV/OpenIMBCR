@@ -1146,6 +1146,13 @@ allHabitatCovs <- get_habitat_covs(imbcr_df)
 allDetCovs <- get_detection_covs(imbcr_df)
 
 #
+# Testing : only include a subset of our spatial covariates
+#
+
+allHabitatCovs <- allHabitatCovs[!grepl(allHabitatCovs, pattern="lat|lon")]
+  allHabitatCovs <- c(allHabitatCovs,"lat_2","lon_2")
+
+#
 # Determine a reasonable K from our input table and find
 # minimum AIC values for both the Poisson and Negative Binomial
 # that we can compare against to select an optimal mixture

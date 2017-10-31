@@ -16,8 +16,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#' built-in (hidden) function that will accept the full path of a shapefile and parse the string into something that
-#' rgdal can understand (DSN + Layer).
+#' built-in (hidden) function that will accept the full path of a shapefile 
+#' and parse the string into something that rgdal can understand (DSN + Layer).
 parseLayerDsn <- function(x=NULL){
   path <- unlist(strsplit(x, split="/"))
     layer <- gsub(path[length(path)],pattern=".shp",replacement="")
