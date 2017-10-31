@@ -331,10 +331,11 @@ predicted_density_top_model <- par_unmarked_predict(
     units, 
     top_model_m
   )
-predicted_density_spatial_top_spatial_model <- par_unmarked_predict(
+predicted_density_spatial_top_model <- par_unmarked_predict(
     units, 
     top_spatial_m
   )
+  
 if(length(akaike_models_m)>1){
     cat(" -- model averaging against akaike-weighted selection of models\n")
     predicted_density_akaike_models <- lapply(
@@ -371,7 +372,7 @@ if(length(spatial_akaike_models_m)>1){
     )
 } else {
     spatial_predicted_density <- as.vector(
-        predicted_density_spatial_top_spatial_model[,1]
+        predicted_density_spatial_top_model[,1]
       )
 }
 
@@ -453,9 +454,10 @@ save(
            "akaike_models_m",
            "mixture_dist",
            "model_selection_table",
+           "spatial_model_selection_table"
            "pca_m",
            "predicted_density",
-           "predicted_density"),
+           "spatial_predicted_density"),
     file=paste(
       tolower(r_data_file[1]),
       sep="")
