@@ -1147,10 +1147,12 @@ allDetCovs <- get_detection_covs(imbcr_df)
 
 #
 # Testing : only include a subset of our spatial covariates
+# build a seperate model for spatial covs that we will overlay
+# later
 #
 
+allSpatialCovs <- allHabitatCovs[grepl(allHabitatCovs, pattern="lat|lon")]
 allHabitatCovs <- allHabitatCovs[!grepl(allHabitatCovs, pattern="lat|lon")]
-  allHabitatCovs <- c(allHabitatCovs,"lat_2","lon_2")
 
 #
 # Determine a reasonable K from our input table and find
@@ -1349,6 +1351,22 @@ if(length(all_variables_within_2aic)<length(allHabitatCovs)){
     offset="offset(log(effort))"
   )
 }
+
+spatial_model_selection_table <- OpenIMBCR:::allCombinations_dAIC(
+  siteCovs=allSpatialCovs,
+  detCovs=c("doy","starttime"),
+  step=500,
+  umdf=imbcr_df,
+  umFunction=unmarked::gdistsamp,
+  mixture=mixture_dist,
+  unitsOut="kmsq",
+  K=K,
+  se=T,
+  keyfun="halfnorm",
+  offset="offset(log(effort))"
+)
+
+
 #
 # now calculate some akaike weights from our run table
 #
@@ -1356,6 +1374,11 @@ if(length(all_variables_within_2aic)<length(allHabitatCovs)){
 model_selection_table$weight <- OpenIMBCR:::akaike_weights(
     model_selection_table$AIC
   )
+
+spatial_model_selection_table$weight <- OpenIMBCR:::akaike_weights(
+    spatial_model_selection_table$AIC
+  )
+
 
 cat("\n")
 cat(" -- species:", argv[2], "\n")
@@ -1367,6 +1390,7 @@ save(
     list=c("argv",
            "habitat_vars_summary_statistics",
            "model_selection_table",
+           "spatial_model_selection_table",
            "imbcr_df_original",
            "imbcr_df",
            "negbin_aic",
