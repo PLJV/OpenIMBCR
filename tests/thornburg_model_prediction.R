@@ -402,7 +402,11 @@ cat(
 
 #
 # test various ensembles of our spatial models and our habitat models
-# KT thinks the ensemble mean is the only one of these that has any merit
+#
+# KT thinks the ensemble mean is the only one of these that has any merit.
+# We might consider ensembling annual habitat models for 2016 and 2017 to see
+# if that works better. Or do multi-year detection pooling. Really we need 
+# a multi-season model (and multiple years of data).
 #
 
 ensemble_min <- apply(cbind(
@@ -423,24 +427,11 @@ ensemble_mean <- apply(cbind(
     na.rm=T
   )
 
-predicted_density_censored <- predicted_density
-predicted_density_censored[
-    predicted_density_censored > K
-  ] <- NA
-  
-spatial_predicted_density_censored <- spatial_predicted_density
-spatial_predicted_density_censored[
-    spatial_predicted_density_censored > K
-  ] <- NA
-  
-ensemble_na_mean <- apply(cbind(
-      predicted_density,
-      spatial_predicted_density_censored
-    ),
-    MARGIN=1,
-    FUN=mean,
-    na.rm=T
-  )
+k_max_censored <- predicted_density
+
+k_max_censored[
+    k_max_censored > K
+  ] <- K
 
 cat(" -- writing to disk\n")
 
@@ -486,10 +477,10 @@ units@data <-
   data.frame(cbind(
     as.vector(ensemble_min),
     as.vector(ensemble_mean),
-    as.vector(ensemble_na_mean)
+    as.vector(k_max_censored)
   ))
 
-colnames(units@data) <- c("ens_min","ens_mn","ens_na_mn")
+colnames(units@data) <- c("ens_min","ens_mn","k_max_cens")
 
 rgdal::writeOGR(
   units,
