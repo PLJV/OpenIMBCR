@@ -246,7 +246,7 @@ top_spatial_model_formula <- gsub(
 cat(" -- re-fitting our top model (selected by minimum AIC) and our series of Akaike weighted models\n")
 
 top_model_m <- refit_model(
-    top_model_formula,
+    top_spatial_model_formula,
     intercept_m@data,
     K=K,
     mixture=mixture_dist
@@ -400,6 +400,48 @@ cat(
     "\n"
   )
 
+#
+# test various ensembles of our spatial models and our habitat models
+# KT thinks the ensemble mean is the only one of these that has any merit
+#
+
+ensemble_min <- apply(cbind(
+      predicted_density,
+      spatial_predicted_density
+    ),
+    MARGIN=1,
+    FUN=min,
+    na.rm=T
+  )
+
+ensemble_mean <- apply(cbind(
+      predicted_density,
+      spatial_predicted_density
+    ),
+    MARGIN=1,
+    FUN=mean,
+    na.rm=T
+  )
+
+predicted_density_censored <- predicted_density
+predicted_density_censored[
+    predicted_density_censored > K
+  ] <- NA
+  
+spatial_predicted_density_censored <- spatial_predicted_density
+spatial_predicted_density_censored[
+    spatial_predicted_density_censored > K
+  ] <- NA
+  
+ensemble_na_mean <- apply(cbind(
+      predicted_density,
+      spatial_predicted_density_censored
+    ),
+    MARGIN=1,
+    FUN=mean,
+    na.rm=T
+  )
+
 cat(" -- writing to disk\n")
 
 # write our prediction to the attribute table
@@ -440,6 +482,23 @@ rgdal::writeOGR(
   overwrite=T
 )
 
+units@data <-
+  data.frame(cbind(
+    as.vector(ensemble_min),
+    as.vector(ensemble_mean),
+    as.vector(ensemble_na_mean)
+  ))
+
+colnames(units@data) <- c("ens_min","ens_mn","ens_na_mn")
+
+rgdal::writeOGR(
+  units,
+  dsn=".",
+  layer=paste(spp_name,"_ensemble_pred_density_1km", sep=""),
+  driver="ESRI Shapefile",
+  overwrite=T
+)
+
 save(
     compress=T,
     list=c("all_covs_m",
@@ -454,9 +513,12 @@ save(
            "akaike_models_m",
            "mixture_dist",
            "model_selection_table",
-           "spatial_model_selection_table"
+           "spatial_model_selection_table",
            "pca_m",
            "predicted_density",
+           "ensemble_min",
+           "ensemble_mean",
+           "ensemble_na_mean",
            "spatial_predicted_density"),
     file=paste(
       tolower(r_data_file[1]),
