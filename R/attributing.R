@@ -156,3 +156,17 @@ pool_by_transect_year <- function(x=NULL, df=NULL, breaks=NULL, covs=NULL,
   }
   return(transect_year_summaries)
 }
+#' shorthand vector extraction function that performs a spatial join attributes
+#' vector features in x with overlapping features in y. Will automatically
+#' reproject to a consistent CRS.
+spatial_join <- function(x=NULL, y=NULL){
+  over <- sp::over(
+      x = sp::spTransform(
+          x,
+          sp::CRS(raster::projection(y))
+        ),
+      y = y
+    )
+  x@data <- cbind(x@data, over)
+  return(x)
+}

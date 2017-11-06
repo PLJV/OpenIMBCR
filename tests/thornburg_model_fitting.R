@@ -12,9 +12,7 @@ require(OpenIMBCR)
 stopifnot(grepl(
     tolower(.Platform$OS.type), pattern = "unix"
   ))
-
 system("clear")
-
 #' pavlacky fragmentation pca
 pca_reconstruction <- function(x,
                                frag_covs=NULL,
@@ -290,21 +288,6 @@ quantile_pcr <- function(imbcr_df=NULL, siteCovs=NULL, threshold=0.7, K=NULL){
       K=K
     )
 }
-#' shorthand vector extraction function that performs a spatial join attributes
-#' vector features in x with overlapping features in y. Will automatically
-#' reproject to a consistent CRS.
-#'
-spatial_join <- function(x=NULL, y=NULL){
-  over <- sp::over(
-      x = sp::spTransform(
-          x,
-          sp::CRS(raster::projection(y))
-        ),
-      y = y
-    )
-  x@data <- cbind(x@data, over)
-  return(x)
-}
 #' negative heurisitc filter against potential habitat variables -- dig through
 #' everything in an unmarked data.frame's siteCovs slot and drop those variables
 #' that we know are not habitat related. Return filtered vector to user for
@@ -342,6 +325,8 @@ calc_table_summary_statistics <- function(x=NULL, vars=NULL){
   )
   return(training_dataset_variable_ranges)
 }
+#' calculate a combined total area metric from a series of input total area
+#' metrics
 calc_total_area <- function(table=NULL,
                             total_area_filter=NULL,
                             total_area_suffix="_ar$"){
@@ -365,218 +350,9 @@ calc_total_area <- function(table=NULL,
       na.rm=T
     )))
 }
-#' estimates a K parameter (upper-bound of integration) as a pre-cursor for
-#' various count-based mixture models (e.g., poisson and negative binomial)
-calc_k <- function(df=NULL, multiplier=1){
-  return(floor(max(
-      rowSums(unmarked:::getY(df)))*multiplier
-    ))
-}
-#' there is some ambiguity in selecting a good upper-bounds for integration
-#' in gdistamp (the K parameter). This builds an intercept model around a range
-#' of K values and selects the smallest K value for which a decrease in AIC is no
-#' longer observed. Might also consider checking for stability in the beta parameters
-#' for this as well.
-gdistsamp_find_optimal_k <- function(
-  df=NULL,
-  allHabitatCovs=NULL,
-  allDetCovs=NULL,
-  mixture=NULL,
-  keyfun="halfnorm",
-  K=NULL)
-{
-  if(is.null(K)){
-    K <- unlist(lapply(
-        seq(1, 2.5, by=0.25),
-        FUN=function(x) calc_k(df, multiplier=x)
-      ))
-  }
-  all_covs_m <- unlist(lapply(
-     K,
-     FUN=function(x){
-       m <- try(suppressMessages(unmarked::gdistsamp(
-          # abundance
-          as.formula(paste(
-            "~",
-            paste(allHabitatCovs, collapse="+"),
-            "+offset(log(effort))",
-            sep=""
-          )),
-          ~1, # availability
-          as.formula(paste("~",paste(allDetCovs, collapse="+"))), # detection
-          data=imbcr_df,
-          keyfun="halfnorm",
-          mixture=mixture,
-          unitsOut="kmsq",
-          se=T,
-          K=x
-         )))
-       if(class(m) == "try-error"){
-           return(NA)
-       } else {
-           return(OpenIMBCR:::AIC(m))
-       }
-     }
-  ))
-  # bug-fix : did we not find a single valid K parameter?
-  if(all(is.na(all_covs_m))){
-    stop(
-        "couldn't find convergence for any K parameters in our sequence -- this shouldn't happen. Maybe there's",
-        " zero-inflation of our input data set?"
-      )
-  # bug-fix : did we only find one working value? Use it
-  } else if( sum(!is.na(all_covs_m)) == 1 ){
-    return(
-      list(
-        K=K[which(!is.na(all_covs_m))],
-        AIC=all_covs_m[which(!is.na(all_covs_m))]
-      )
-    )
-  }
-  # bug-fix swap out our NA values with noise that
-  # our second derivative won't settle on
-  if(any(is.na(all_covs_m))){
-    all_covs_m[is.na(all_covs_m)] <-
-      which(is.na(all_covs_m)) * 2 * max(all_covs_m, na.rm=T)
-  }
-  # at what array position does the change in AIC start to bottom out?
-  tail <- quantile(abs(round(diff(diff(all_covs_m)),3)), p=0.6) # median, but more tail-ey
-  min_k <- min(which(abs(round(diff(diff(all_covs_m)),2)) < tail))
-  return(
-    list(
-      K=K[min_k],
-      AIC=all_covs_m[min_k]
-    )
-  )
-}
-#' testing :
-check_correlation_matrix <- function(
-  var=NULL,
-  x_correlation_matrix=NULL,
-  imbcr_df=NULL,
-  correlation_threshold=0.5)
-{
-  correlation <- x_correlation_matrix[var,'PC1']
-  # is this positive correlation? It shouldn't be
-  if (correlation > 0) {
-    warning(
-      paste(
-        "positive correlation observed between",var,"and our fragmentation metric. They should be the",
-        "inverse of each other. Consider -1*PCA transformation")
-    )
-  }
-  if (abs(correlation) > correlation_threshold){
-      warning(paste("dropping",var,"-- it's strongly correlated with our fragmentation PCA"))
-      imbcr_df@siteCovs <- imbcr_df@siteCovs[ , !grepl(colnames(imbcr_df@siteCovs), pattern=var) ]
-  }
-  return(imbcr_df)
-}
-#' testing :
-balance_zero_transects <- function(imbcr_df=NULL, multiple=2){
-  nonzero_transects <- which(rowSums(imbcr_df@y)!=0)
-  zero_transects <- which(rowSums(imbcr_df@y)==0)
-  if(length(zero_transects)/length(nonzero_transects) > multiple){
-    downsample_to <- floor(length(nonzero_transects)*multiple)
-    zero_transects <- sample(zero_transects, size=downsample_to)
-    # resample our input table by throwing out some of our zero transects
-    imbcr_df@y <- imbcr_df@y[c(nonzero_transects,zero_transects) , ]
-    imbcr_df@siteCovs <- imbcr_df@siteCovs[c(nonzero_transects,zero_transects) , ]
-    imbcr_df@tlength <- rep(1, nrow(imbcr_df@y))
-  }
-  return(imbcr_df)
-}
-#' testing : given a user-specified mixture distribution, try
-#' and find an optimal K value from a sequence of possible K
-#' values describing the upper-bounds of an integration (using
-#' gdistsamp_find_optimal_k()). Often this will fail if we have
-#' a lot of zeros in our input dataset. This function will attempt
-#' a sequence of different downsampling densities to get around the
-#' zero-inflation problem
-gdistsamp_find_optimal_k_with_transect_downsampling <- function(
-  imbcr_df=NULL,
-  allHabitatCovs=NULL,
-  allDetCovs=NULL,
-  dist=NULL,
-  K=NULL)
-{
-  if(is.null(K)){
-    K <- unlist(lapply(
-        seq(from=1,to=2.5,by=0.15),
-        FUN=function(x) calc_k(imbcr_df, multiplier=x)
-      ))
-  }
-
-  get_optim_k_aic <- function(
-    x=NULL,
-    imbcr_df=NULL,
-    allHabitatCovs=NULL,
-    allDetCovs=NULL,
-    dist=NULL)
-  {
-     if(is.null(x)){
-       downsample <- imbcr_df
-     } else {
-       downsample <- balance_zero_transects(imbcr_df, multiple=x)
-     }
-     # try to find an optimal K
-     mixture_aic <- try(gdistsamp_find_optimal_k(
-        df=downsample,
-        allHabitatCovs=allHabitatCovs,
-        allDetCovs=allDetCovs,
-        mixture=dist,
-        K=K
-      ))
-     # if we failed, try and downsample to nonzero*multiple density
-     # and see if we can converge
-     if (class(mixture_aic) == "try-error"){
-       return(NA)
-     } else {
-       return(mixture_aic)
-     }
-  }
-
-  # default : will attempt to find an optimal K without
-  # downsampling first
-  mixture <- get_optim_k_aic(x=NULL, imbcr_df, allHabitatCovs, allDetCovs, dist)
-
-  if(is.na(mixture)){
-    # generate a sequence of downsampling
-    # densities and take the one that has
-    # the lowest AIC -- this can take some
-    # time
-    multiple <- seq(from=0.9,to=0.3,by=-0.1)
-    m <- lapply(
-      X=multiple,
-      FUN=function(x) get_optim_k_aic(x, imbcr_df, allHabitatCovs, allDetCovs, dist)
-    )
-    if(all(unlist(lapply(m, is.na)))){
-      stop(
-        "we failed to find convergence from a number of ",
-        "different multiples -- quitting"
-        )
-    } else {
-      multiple <- multiple[!unlist(lapply(m, is.na))]
-      m <- m[!unlist(lapply(m, is.na))]
-    }
-    lowest_aic <- which.min(
-        unlist(lapply(m, FUN=function(x) return(x$AIC)))
-      )
-    return(list(
-        fit=m[[lowest_aic]],
-        downsample_multiple=multiple[lowest_aic]
-      ))
-  } else {
-    return(list(
-      fit=mixture,
-      downsample_multiple=NA
-    ))
-  }
-}
-
 #
 # MAIN
 #
-
 argv <- commandArgs(trailingOnly=T)
 stopifnot(length(argv)>1)
 
