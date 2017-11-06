@@ -1320,7 +1320,8 @@ model_selection_table <- OpenIMBCR:::allCombinations_dAIC(
 
 # testing : do our akaike weights change when we subset using only those variables
 # selected for inclusion in our top models?
-all_variables_within_2aic <- model_selection_table$AIC < min(model_selection_table$AIC)+2
+all_variables_within_2aic <- 
+  model_selection_table$AIC < min(model_selection_table$AIC)+2
 all_variables_within_2aic <- as.character(model_selection_table[all_variables_within_2aic,]$formula)
 all_variables_within_2aic <- unique(unlist(lapply(
     all_variables_within_2aic,

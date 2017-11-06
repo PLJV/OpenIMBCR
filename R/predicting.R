@@ -1,7 +1,7 @@
 # Author: Kyle Taylor <kyle.taylor@pljv.org>
 # Year : 2017
-# Description : various tasks related to formatting and parsing raw IMBCR data
-# into Spatial* and Unmarked* objects.
+# Description : various tasks related to model weighting, averaging, and
+# prediction for large model sets.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by

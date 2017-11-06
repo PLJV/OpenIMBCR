@@ -246,14 +246,14 @@ top_spatial_model_formula <- gsub(
 cat(" -- re-fitting our top model (selected by minimum AIC) and our series of Akaike weighted models\n")
 
 top_model_m <- refit_model(
-    top_spatial_model_formula,
+    top_model_formula,
     intercept_m@data,
     K=K,
     mixture=mixture_dist
   )
 
 top_spatial_m <- refit_model(
-    top_model_formula,
+    top_spatial_model_formula,
     intercept_m@data,
     K=K,
     mixture=mixture_dist
@@ -509,7 +509,7 @@ save(
            "predicted_density",
            "ensemble_min",
            "ensemble_mean",
-           "ensemble_na_mean",
+           "k_max_censored",
            "spatial_predicted_density"),
     file=paste(
       tolower(r_data_file[1]),
