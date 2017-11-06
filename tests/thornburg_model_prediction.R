@@ -6,28 +6,7 @@ r_data_file <- commandArgs(trailingOnly=T)
 
 stopifnot(file.exists(r_data_file))
 
-#' re-fit a model specified by a formula object
-refit_model <- function(formula=NULL, imbcr_df=NULL, K=NULL, mixture=NULL){
-  formula <- unlist(strsplit(formula, split="~"))
-  return(unmarked::gdistsamp(
-      lambdaformula=as.formula(paste(
-        "~",
-        formula[2],
-        sep=""
-      )),
-      phiformula=~1,
-      pformula=as.formula(paste(
-        "~",
-        formula[4]
-      )),
-      data=imbcr_df,
-      keyfun="halfnorm",
-      mixture=mixture,
-      unitsOut="kmsq",
-      se=T,
-      K=K
-    ))
-}
+#' calculate a total area metric from a Spatial* or Unmarked* data.frame
 calc_total_area <- function(table=NULL,
                             total_area_filter=NULL,
                             total_area_suffix="_ar$"){
@@ -113,113 +92,11 @@ calc_fragmentation_metric <- function(table=NULL,
     ]
   return(table)
 }
-#' testing : attempt to scale a dataset using the mean-variance
-#' of a previously recorded dataset
-recenter_input_table <- function(table=NULL, summary_table=NULL){
-  vars_to_recenter <- colnames(table)
-  # bug-fix don't re-center a PC score if we
-  # are using fragmentation
-  vars_to_recenter <- vars_to_recenter[
-      !grepl(vars_to_recenter, pattern="PC")
-    ]
-  for(var in vars_to_recenter){
-    table[,var] <- as.vector(scale(
-      table[,var],
-      center=summary_table[var,'mean'],
-      scale=summary_table[var,'sd']
-    ))
-  }
-  return(table)
-}
-#' testing: use the parallel package to predict across a large input
-#' table (with unmarked) using chunking.
-par_unmarked_predict <- function(run_table=NULL, m=NULL){
-
-      steps <- seq(0, nrow(run_table), by=100)
-  run_table <- data.frame(run_table@data)
-
-  if(steps[length(steps)] != nrow(run_table)){
-    steps <- append(steps, nrow(run_table))
-  }
-
-  cl <- parallel::makeCluster(parallel::detectCores()-1)
-
-  parallel::clusterExport(
-      cl,
-      varlist=c("run_table","m","steps"),
-      envir=environment()
-    )
-
-  predicted_density <- parallel::parLapply(
-    cl=cl,
-    X=1:(length(steps)-1),
-    fun=function(x){
-      unmarked::predict(
-        m,
-        newdata=run_table[(steps[x]+1):steps[x+1],],
-        type="lambda"
-      )
-    }
-  )
-  # bind list results and return table to user
-  return(do.call(rbind, predicted_density))
-}
-
-akaike_predict <- function(
-  mod_sel_tab=NULL, 
-  train_data=NULL,
-  pred_data=NULL, 
-  daic_cutoff=2,
-  K=NULL, 
-  mixture=NULL){
-  keep <- mod_sel_tab$AIC < min(mod_sel_tab$AIC) + daic_cutoff
-  mod_sel_tab <- mod_sel_tab[keep,]
-  models <- lapply(
-    X=as.character(mod_sel_tab$formula),
-    FUN=function(x){
-        refit_model(
-            formula = x, 
-            imbcr_df = train_data, 
-            K = K, 
-            mixture = mixture
-        )
-      }
-  )
-  return(lapply(
-      X=1:nrow(mod_sel_tab), 
-      function(x) list(model=models[[x]], weight=mod_sel_tab$weight[x])
-    ))
-}
-
-akaike_weight_predictions <- function(akaike_list=NULL, col=1){
-    table <- (do.call(cbind, lapply(
-        X=akaike_list,
-        FUN=function(x){
-            x$prediction[,col]
-        }
-    )))
-    weights <- unlist(lapply(
-        X=akaike_list,
-        FUN=function(x){
-            x$weight
-        }
-    ))
-    return(apply(
-        table,
-        MARGIN=1,
-        FUN=weighted.mean,
-        w=weights
-    ))
-}
-
 #
 # MAIN
 #
-
 load(r_data_file)
-
 # find the minimum model from the random walk table
-
 top_model_formula <- gsub(
     as.character(
       model_selection_table$formula[which.min(model_selection_table$AIC)]
@@ -227,7 +104,6 @@ top_model_formula <- gsub(
     pattern=" ",
     replacement=""
   )
-
 top_spatial_model_formula <- gsub(
     as.character(
       spatial_model_selection_table$formula[
@@ -237,48 +113,35 @@ top_spatial_model_formula <- gsub(
     pattern=" ",
     replacement=""
   )
-
-# bug fix : drop spatial variables?
-# final_model_formula <- gsub(
-#   final_model_formula, pattern="[+]lon|[+]lat", replacement=""
-# )
-
 cat(" -- re-fitting our top model (selected by minimum AIC) and our series of Akaike weighted models\n")
-
-top_model_m <- refit_model(
+top_model_m <- OpenIMBCR:::gdistsamp_refit_model(
     top_model_formula,
     intercept_m@data,
     K=K,
     mixture=mixture_dist
   )
-
-top_spatial_m <- refit_model(
+top_spatial_m <- OpenIMBCR:::gdistsamp_refit_model(
     top_spatial_model_formula,
     intercept_m@data,
     K=K,
     mixture=mixture_dist
   )
-
 akaike_models_m <- akaike_predict(
     model_selection_table, 
     train_data = intercept_m@data, 
     K=K, 
     mixture = mixture_dist
   )
-
 spatial_akaike_models_m <- akaike_predict(
     spatial_model_selection_table, 
     train_data = intercept_m@data, 
     K=K, 
     mixture = mixture_dist
   )
-
 cat(" -- reading our input vector data containing covariates for predict()\n")
-
 units <- OpenIMBCR:::readOGRfromPath(
     "/global_workspace/thornburg/vector/units_attributed.shp"
   )
-
 cat(" -- calculating centroids for each USNG unit\n")
 centroids <- rgeos::gCentroid(
     as(
@@ -295,18 +158,14 @@ units@data <- cbind(units@data, centroids)
 
 # scale our input table and then pass-off our configuration metrics
 # to our pca model for re-scaling if needed
-
 cat(
     " -- mean-variance centering our input dataset so it's consistent with",
     "model training data\n")
-
-
 using_fragmentation_metric <- grepl(
     paste(unlist(lapply(akaike_models_m,
     FUN=function(x) as.character(x$model@formula))), collapse=" "),
     pattern="PC"
   )
-
 if(using_fragmentation_metric){
   cat(" -- calculating a fragmentation metric from our input configuration data\n")
   units@data <- calc_fragmentation_metric(units, total_area_filter="_rd_")
@@ -321,11 +180,9 @@ if(using_fragmentation_metric){
   units@data <- units@data[,unlist(lapply(units@data[1,], is.numeric))]
   units@data <- data.frame(scale(units@data), stringsAsFactors=F)
 }
-
 # append a fake effort offset that assumes each unit was sampled
 # across all stations
 units@data$effort <- mean(top_model_m@data@siteCovs$effort)
-
 cat(" -- predicting against top model\n")
 predicted_density_top_model <- par_unmarked_predict(
     units, 
@@ -335,7 +192,6 @@ predicted_density_spatial_top_model <- par_unmarked_predict(
     units, 
     top_spatial_m
   )
-  
 if(length(akaike_models_m)>1){
     cat(" -- model averaging against akaike-weighted selection of models\n")
     predicted_density_akaike_models <- lapply(
@@ -353,9 +209,7 @@ if(length(akaike_models_m)>1){
 } else {
     predicted_density <- as.vector(predicted_density_top_model[,1])
 }
-
 cat(" -- predicting against spatial models\n")
-
 if(length(spatial_akaike_models_m)>1){
     cat(" -- model averaging against akaike-weighted selection of models\n")
     predicted_density_spatial_akaike_models <- lapply(
@@ -375,9 +229,7 @@ if(length(spatial_akaike_models_m)>1){
         predicted_density_spatial_top_model[,1]
       )
 }
-
 # do some sanity checks and report weird predictions
-
 if(mean(predicted_density, na.rm=T)>top_model_m@K){ # outliers dragging our PI past K?
   warning(
     "mean prediction is larger than K -- censoring, but this ",
@@ -386,20 +238,17 @@ if(mean(predicted_density, na.rm=T)>top_model_m@K){ # outliers dragging our PI p
   nonsense_filter <- median(predicted_density)*3
   predicted_density[predicted_density>nonsense_filter] <- NA
 }
-
 cat(paste(
     " -- ", 
     sum(predicted_density > (2*top_model_m@K), na.rm=T)/length(predicted_density),
     "% of our predictions were more than 2X the K upper-bounds of our integration", 
     sep=""
   ), "\n")
-
 cat(
     " -- total number of predicted birds across the JV:", 
     sum(predicted_density, na.rm = T),
     "\n"
   )
-
 #
 # test various ensembles of our spatial models and our habitat models
 #
@@ -408,7 +257,6 @@ cat(
 # if that works better. Or do multi-year detection pooling. Really we need 
 # a multi-season model (and multiple years of data).
 #
-
 ensemble_min <- apply(cbind(
       predicted_density,
       spatial_predicted_density
@@ -417,7 +265,6 @@ ensemble_min <- apply(cbind(
     FUN=min,
     na.rm=T
   )
-
 ensemble_mean <- apply(cbind(
       predicted_density,
       spatial_predicted_density
@@ -426,28 +273,19 @@ ensemble_mean <- apply(cbind(
     FUN=mean,
     na.rm=T
   )
-
 k_max_censored <- predicted_density
-
 k_max_censored[
     k_max_censored > K
   ] <- K
-
 cat(" -- writing to disk\n")
-
 # write our prediction to the attribute table
-
 spp_name <- strsplit(r_data_file[1], split="_")[[1]][1]
-
 units@data[, spp_name] <-
   as.vector(predicted_density)
-
 units@data <- as.data.frame(
     units@data[,spp_name ]
   )
-
 colnames(units@data) <- spp_name
-
 rgdal::writeOGR(
   units,
   dsn=".",
@@ -455,16 +293,12 @@ rgdal::writeOGR(
   driver="ESRI Shapefile",
   overwrite=T
 )
-
 units@data[, spp_name] <-
   as.vector(spatial_predicted_density)
-
 units@data <- as.data.frame(
     units@data[,spp_name ]
   )
-
 colnames(units@data) <- spp_name
-
 rgdal::writeOGR(
   units,
   dsn=".",
@@ -472,16 +306,13 @@ rgdal::writeOGR(
   driver="ESRI Shapefile",
   overwrite=T
 )
-
 units@data <-
   data.frame(cbind(
     as.vector(ensemble_min),
     as.vector(ensemble_mean),
     as.vector(k_max_censored)
   ))
-
 colnames(units@data) <- c("ens_min","ens_mn","k_max_cens")
-
 rgdal::writeOGR(
   units,
   dsn=".",
@@ -489,7 +320,6 @@ rgdal::writeOGR(
   driver="ESRI Shapefile",
   overwrite=T
 )
-
 save(
     compress=T,
     list=c("all_covs_m",

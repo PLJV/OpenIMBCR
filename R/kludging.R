@@ -16,6 +16,29 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#
+# Define some useful local functions for manipulating IMBCR data
+#
+#' hidden function that greps for four-letter-codes
+birdcode_fieldname <- function(df=NULL){
+  return(names(df)[grepl(tolower(names(df)),pattern="^bird")])
+}
+#' hidden function that greps for four-letter-codes
+commonname_fieldname <- function(df=NULL){
+  return(names(df)[grepl(tolower(names(df)),pattern="^c.*.[.]n.*.")])
+}
+#' hidden function that greps for the distance field name
+distance_fieldname <- function(df=NULL){
+  return(names(df)[grepl(tolower(names(df)),pattern="^rad")])
+}
+#' hidden function that greps for the transect field name
+transect_fieldname <- function(df=NULL){
+  return(names(df)[grepl(tolower(names(df)),pattern="^tran")])
+}
+#' hidden function that greps for the timeperiod field name
+timeperiod_fieldname <- function(df=NULL){
+  return(names(df)[grepl(tolower(names(df)),pattern="^tim")])
+}
 #' built-in (hidden) function that will accept the full path of a shapefile 
 #' and parse the string into something that rgdal can understand (DSN + Layer).
 parseLayerDsn <- function(x=NULL){
@@ -305,53 +328,6 @@ extractByTransect <- function(s=NULL,r=NULL,fun=NULL){
   s <- sp::spTransform(s,orig_crs)
   return(s)
 }
-# THIS FUNCTION'S LOGIC IS HIDEOUS
-#' Re-build an IMBCR dataframe for a focal species so that all transect / stations
-#' are represented with their distances or NA values so that the observations
-#' are comprehensible by unmarked. This function is currently in testing.
-#' @export
-rebuildImbcrTable <- function(s=NULL, spp=NULL){
-  # local function builds an NA-filled template of what a full
-  # transect should look like
-  make_transect_template <- function(x=NULL,spp=NULL,years=NULL){
-    return(data.frame(
-      common.name=spp,
-      transectnum=x,
-      radialdistance=rep(NA,6*16),
-      point=unlist(lapply(1:16,FUN=function(x) rep(x,6))),
-      timeperiod=rep(1:6,16),
-      year=unlist(lapply(years,function(x){rep(x,6*16)}))
-    ))
-  }
-  colnames(s@data) <- tolower(colnames(s@data))
-  target_table <- do.call(
-    rbind,
-    lapply(
-        as.character(unique(s$transectnum)),
-        FUN=make_transect_template,spp=spp,years=unique(s$year)
-      )
-  )
-  # merge produces x/y duplicates here, with x occuring first
-  target_table <- merge(
-    x=s@data[tolower(s@data$common.name) == tolower(spp),],
-    y=target_table,
-    by=c("transectnum","point","timeperiod","year","common.name","radialdistance"),
-    all=T
-  )
-  # allow duplicated station/timeperiod/year entries, but drop
-  # NA values from the table if we have actual observations to work with
-  duplicated_na_values <- duplicated(
-      target_table[,c("transectnum","point","timeperiod","year")]
-    ) & is.na(target_table$radialdistance)
-  target_table <- target_table[!duplicated_na_values,]
-  return(target_table)
-}
-#' validate transect-level habitat metadata vs. LANDFIRE
-#'
-#' @export
-validateTransectMetadata <- function(s){
-  focal <- s[s$transectnum == transect_habitat_covs$transect[1],][!duplicated(s[s$transectnum == transect_habitat_covs$transect[1],]$point),]
-}
 #' accepts a named raster stack of covariates, an IMBCR SpatialPointsDataFrame,
 #' and a species common name and returns a formatted unmarked distance data.frame
 #' that can be used for model fitting with unmarked.
@@ -391,63 +367,221 @@ buildUnmarkedDistanceDf <- function(r=NULL, s=NULL, spp=NULL,
   # format our training data as umf
   return(unmarked::unmarkedFrameDS(y=as.matrix(y), siteCovs=stateCovariates, survey="point", dist.breaks=d, unitsIn="m"))
 }
-#' Validates a raw IMBCR data table for a user-specified species,
-#' NA-filling temporal (minutes) and spatial (station) replicates across
-#' transects where the species was not observed
-validateTransectsForSpecies <- function(s=NULL, spp=NULL){
-  return(NA)
+#' kludging to back-fill any transect stations in an imbcr data.frame
+#' that were sampled, but where a focal species wasn't observed, with
+#' NA values
+#' @export
+scrub_imbcr_df <- function(df,
+                           allow_duplicate_timeperiods=F,
+                           four_letter_code=NULL,
+                           back_fill_all_na=F,
+                           drop_na="none"){
+  # throw-out any lurking 88 values, count before start values, and
+  # -1 distance observations
+  df <- df[!df@data[, timeperiod_fieldname(df)] == 88, ]
+  df <- df[!df@data[, timeperiod_fieldname(df)] == -1, ]
+  df <- df[!df@data[, distance_fieldname(df)]   == -1, ]
+  # build a dataframe for our detections
+  detected <- toupper(df@data[, birdcode_fieldname(df)]) ==
+    toupper(four_letter_code)
+  # define a pool of potential non-detections
+  not_detected <- df[!detected, ]
+  not_detected@data[, distance_fieldname(df)] <- NA
+  not_detected@data[, birdcode_fieldname(df)] <- toupper(four_letter_code)
+  not_detected@data[, commonname_fieldname(df)] <-
+    as.character(df@data[which(detected == T)[1],commonname_fieldname(df)])
+  not_detected@data[, 'cl_count']             <- 0 # not used, but stay honest
+  # allow a single NA value for each station, but only keep the NA values
+  # if we didn't observe the bird at that point -- by default, don't allow
+  # duplicate NA's within a time-period
+  not_detected <- not_detected[!duplicated(not_detected@data[,
+                    c(transect_fieldname(not_detected), "year", "point",
+                      if (allow_duplicate_timeperiods)
+                        timeperiod_fieldname(not_detected)
+                      else NULL
+                    )
+                  ]), ]
+  # allow multiple detections at stations
+  detected <- df[detected, ]
+  # take the merge of detections and non-duplicated, non-detections as
+  # our new data.frame
+  transect_heuristic <- function(x=NULL){
+    x <- x@data[, c(transect_fieldname(df), 'year', 'point')]
+    return(round(sqrt(as.numeric(x[,1])) + sqrt(x[,2]) + sqrt(x[,3]),5))
+  }
+  not_detected <- not_detected[
+      !transect_heuristic(not_detected) %in%
+      transect_heuristic(detected),
+    ]
+  df <- rbind(y=detected, x=not_detected)
+  # zero-inflation fix (1) : don't drop any transects
+  if(grepl(tolower(drop_na), pattern="none")){
+      df <- sp:::rbind.SpatialPointsDataFrame(detected, not_detected)
+  }
+  # zero-inflation fix (2) : drop transects without at least one detection
+  else if(grepl(tolower(drop_na),pattern="some")){
+    valid_transects <- unique(detected@data[,transect_fieldname(df)])
+    df <- df[df@data[,transect_fieldname(df)] %in% valid_transects,]
+  }
+  # zero-inflation fix (3) : drop all NA values
+  else if(grep(tolower(drop_na), pattern="all")){
+    df <- detected
+  }
+  df[order(sqrt(as.numeric(df$transectnum))+sqrt(df$year)+sqrt(df$point)),]
 }
-#' use Monte Carlo randomization to test for heterogeneity in detection across
-#' within-transect temporal replicates
-monteCarloTemporalHeterogeneity <- function(s=NULL, plot=F, main=NA, ...){
-  t <- s@data
-  calc_detection_density_by_transect_year <- function(x=NULL,year=NULL){
-    focal  <- t$transectnum == x & t$year == year
-    points <- t[focal, "timeperiod"]
-    density <- !is.na(
-        t[focal,'radialdistance']
+#' accepts a formatted IMBCR SpatialPointsDataFrame and builds an
+#' unmarkedFrameGDS data.frame that we can use for modeling with
+#' the unmarked package. 
+#' @export
+build_unmarked_gds <- function(df=NULL,
+                               numPrimary=1,
+                               distance_breaks=NULL,
+                               covs=NULL,
+                               unitsIn="m",
+                               summary_fun=median,
+                               drop_na_values=T
+                               ){
+  if(inherits(df, "Spatial")){
+    df <- df@data
+  }
+  # determine distance breaks / classes, if needed
+  if(is.null(distance_breaks)){
+    distance_breaks  = df$distance_breaks
+    distance_classes = append(sort(as.numeric(unique(
+                            df$dist_class))),
+                            NA
+                          )
+  } else {
+    distance_classes = append(1:length(distance_breaks)-1, NA)
+  }
+  # parse our imbcr data.frame into transect-level summaries
+  # with unmarked::gdistsamp comprehension
+  transects <- unique(df[,transect_fieldname(df)])
+  # pool our transect-level observations
+  transects <- do.call(rbind,
+      lapply(
+          transects,
+          FUN=pool_by_transect_year,
+          df=df, breaks=distance_breaks,
+          covs=covs
+        )
+    )
+  # bug fix : drop entries with NA values before attempting PCA or quantile pruning
+  if(drop_na_values){
+    transects <- transects[ !as.vector(rowSums(is.na(transects)) > 0) , ]
+    transects <- transects[ ,!grepl(colnames(transects), pattern="_NA")]
+  }
+  # build our unmarked frame and return to user
+  return(unmarked::unmarkedFrameGDS(
+      # distance bins
+      y=transects[,grepl(names(transects),pattern="distance_")],
+      # covariates that vary at the site (transect) level
+      siteCovs=transects[,!grepl(colnames(transects),pattern="distance_")],
+      # not used (covariates at the site-year level)
+      yearlySiteCovs=NULL,
+      survey="point",
+      unitsIn=unitsIn,
+      dist.breaks=distance_breaks,
+      numPrimary=numPrimary # should be kept at 1 (no within-season visits)
+    ))
+}
+#' hidden function used to clean-up an unmarked data.frame (umdf) by dropping
+#' any NA columns attributed by scrub_imbcr_df(), mean-center (scale) our site
+#' covariates (but not sampling effort!), and do some optional quantile filtering
+#' that drops covariates with low variance, which is a useful 'significance
+#' pruning' precursor for principal components analysis. Prefer dropping the NA
+#' bin here (rather than in scrub_imbcr_df), so that we still have an accurate
+#' account of total sampling effort to attribute in scrub_unmarked_dataframe().
+scrub_unmarked_dataframe <- function(x=NULL, normalize=T, prune_cutoff=NULL){
+  row.names(x@y) <- NULL
+  row.names(x@siteCovs) <- NULL
+  x@y <- x@y[,!grepl(colnames(x@y), pattern="_NA")]
+  x@obsToY <- matrix(x@obsToY[,1:ncol(x@y)],nrow=1)
+  # do some quantile pruning of our input data, selectively dropping
+  # an arbitrary number of variables based on a user-specified
+  # low-variance threshold
+  if(!is.null(prune_cutoff)){
+    # e.g., what is the total variance for each cov across all sites?
+    # drop those standardized variables with < prune_cutoff=0.05 variance
+    effort_field <- ifelse(
+        sum(grepl(colnames(x@siteCovs), pattern="effort")),
+        "effort",
+        NULL
       )
-    if(sum(density)==0){
-      return(list(density=0,mids=0))
-    } else {
-      return(hist(
-        points[density],breaks=0:7,plot=F)[c("density","mids")]
+    vars_to_scale <- colnames(x@siteCovs)[
+        !grepl(tolower(colnames(x@siteCovs)), pattern="effort")
+      ]
+    # bug-fix : only try to prune numeric variables
+    is_numeric <- apply(
+        x@siteCovs[1,vars_to_scale],
+        MARGIN=2,
+        FUN=function(x) !is.na(suppressWarnings(as.numeric(x)))
       )
+    if(length(vars_to_scale)!=sum(is_numeric)){
+      warning(paste(
+          "the following input variables are not numeric and cannot be",
+          "filtered by quantile and will not be pruned:",
+          paste(
+              vars_to_scale[!is_numeric],
+              collapse=", "
+            )
+        ))
+      vars_to_scale <- vars_to_scale[is_numeric]
+    }
+    # calculate relative variance across all sites for each variable (column)
+    variance <- apply(
+      x@siteCovs[,vars_to_scale],
+      MARGIN=2,
+      FUN=function(x) ( (x - min(x)) / (max(x)-min(x)) ) # quick min-max normalize
+    )
+    # min-max will return NA on no variance (e.g., divide by zero)
+    variance[is.na(variance)] <- 0
+    variance <- apply(
+        variance,
+        MARGIN=2,
+        FUN=var
+      )
+    # drop variables that don't meet our a priori variance threshold
+    dropped <- as.vector(variance < quantile(variance, p=prune_cutoff))
+    if(sum(dropped)>0){
+      warning(paste(
+        "prune_cutoff dropped these variables due to very small variance: ",
+        paste(colnames(x@siteCovs[,vars_to_scale])[dropped], collapse=", "),
+        sep=""
+      ))
+      keep <- unique(c(
+        names(is_numeric[!is_numeric]),
+        effort_field,
+        vars_to_scale[!dropped]
+      ))
+      x@siteCovs <- x@siteCovs[, keep]
     }
   }
-  likelihood_outlier_detection <- function(slopes=NULL, alpha=0.95){
-    # likelihood-based outlier detection
-    mean_slope <- mean(na.omit(slopes))
-      sd_slope <- sd(na.omit(slopes))
-
-    outliers <- pnorm(slopes,mean=mean_slope,sd=sd_slope)
-      outliers <- outliers > (alpha + ((1-alpha)/2)) |
-                  outliers < (1-alpha)/2
-    return(outliers)
+  # normalize our site covariates?
+  if(normalize){
+    # don't try to normalize non-numeric values -- drop these as site covs
+    x@siteCovs <-
+      x@siteCovs[ , as.vector(unlist(lapply(x@siteCovs[1,], FUN=is.numeric)))]
+    # don't normalize the "effort" field
+    vars_to_scale <- colnames(x@siteCovs)[
+        !grepl(tolower(colnames(x@siteCovs)), pattern="effort")
+      ]
+    # scaling call
+    x@siteCovs[,vars_to_scale] <- as.data.frame(
+        scale(x@siteCovs[,vars_to_scale])
+      )
+    # sanity check : do some variable pruning based on variance
+    # from our normalization step -- drop variables with low variance
+    # from consideration and report dropped variables to user
+    dropped <- as.vector(unlist(lapply(x@siteCovs[1,], FUN=is.na)))
+    if(sum(dropped)>0){
+      warning(paste(
+        "scale() dropped these variables due to very small variance: ",
+        paste(colnames(x@siteCovs)[dropped], collapse=", "),
+        sep=""
+      ))
+      x@siteCovs <- x@siteCovs[,!dropped]
+    }
   }
-  monte_carlo_outlier_detection <- function(slopes=NULL){
-    return(NA)
-  }
-  # calculate per-transect detection density for a given year
-  detection_densities <- lapply(
-      X=unique(t$transectnum), FUN=calc_detection_density_by_transect_year,
-      year=2011
-    )
-  # slope of the line for our detection density vs. time
-  detection_densities <- lapply(X=detection_densities, FUN=function(x){return(
-      coefficients(lm("density~mids",data=as.data.frame(x)))[2]
-    )})
-  # slope of detections vs. time
-  detection_density_slopes <- as.vector(unlist(detection_densities))
-  # plot
-  if(plot){
-    dev.new()
-    hist(detection_density_slopes,
-         breaks=20, col="DarkGrey", border="DarkGray",
-         main=main, xlab="slope (detection density~minute period [1-6])")
-    grid()
-    abline(v=na.omit(detection_density_slopes[likelihood_outlier_detection(detection_density_slopes)]), col="red")
-  }
-
-  return(NA)
+  return(x)
 }

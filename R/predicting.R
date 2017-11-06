@@ -15,3 +15,92 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+#' testing: use the parallel package to predict across a large input
+#' table (with unmarked) using chunking.
+#' @export
+par_unmarked_predict <- function(run_table=NULL, m=NULL){
+
+      steps <- seq(0, nrow(run_table), by=100)
+  run_table <- data.frame(run_table@data)
+
+  if(steps[length(steps)] != nrow(run_table)){
+    steps <- append(steps, nrow(run_table))
+  }
+
+  cl <- parallel::makeCluster(parallel::detectCores()-1)
+
+  parallel::clusterExport(
+      cl,
+      varlist=c("run_table","m","steps"),
+      envir=environment()
+    )
+
+  predicted_density <- parallel::parLapply(
+    cl=cl,
+    X=1:(length(steps)-1),
+    fun=function(x){
+      unmarked::predict(
+        m,
+        newdata=run_table[(steps[x]+1):steps[x+1],],
+        type="lambda"
+      )
+    }
+  )
+  # bind list results and return table to user
+  return(do.call(rbind, predicted_density))
+}
+#' testing : us Akaike weights to predict across a series of models
+#' defined in a user-specified model selection table
+#' @export
+akaike_predict <- function(
+  mod_sel_tab=NULL, 
+  train_data=NULL,
+  pred_data=NULL, 
+  daic_cutoff=2,
+  K=NULL, 
+  mixture=NULL){
+  keep <- mod_sel_tab$AIC < min(mod_sel_tab$AIC) + daic_cutoff
+  mod_sel_tab <- mod_sel_tab[keep,]
+  models <- lapply(
+    X=as.character(mod_sel_tab$formula),
+    FUN=function(x){
+        OpenIMBCR:::gdistsamp_refit_model(
+            formula = x, 
+            imbcr_df = train_data, 
+            K = K, 
+            mixture = mixture
+        )
+      }
+  )
+  return(lapply(
+      X=1:nrow(mod_sel_tab), 
+      function(x) list(model=models[[x]], weight=mod_sel_tab$weight[x])
+    ))
+}
+#' testing : accepts a list of akaike predictions (as returned by akaike_predict
+#' ) and uses the corresponding $weight list-item for each model to build
+#' a data.frame of weighted-average predictions. 
+#' @param col column of the prediction table to average. Typically there are th
+#' ree columns from predict, specifying prediction, upper-bound, and lower-bound
+#' @export
+akaike_weight_predictions <- function(akaike_list=NULL, col=1){
+    table <- (do.call(cbind, lapply(
+        X=akaike_list,
+        FUN=function(x){
+            x$prediction[,col]
+        }
+    )))
+    weights <- unlist(lapply(
+        X=akaike_list,
+        FUN=function(x){
+            x$weight
+        }
+    ))
+    return(apply(
+        table,
+        MARGIN=1,
+        FUN=weighted.mean,
+        w=weights
+    ))
+}

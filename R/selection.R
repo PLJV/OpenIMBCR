@@ -20,11 +20,13 @@
 #' or Euclidean distance function (see: the 'FNN'package). This function is 
 #' in testing.
 #' @export
-downsample_by_quantile <- function(distances=NULL,
-                                   p=0.1,
-                                   lte=F,
-                                   gte=F,
-                                   byid=F){
+downsample_by_quantile <- function(
+  distances=NULL,
+  p=0.1,
+  lte=F,
+  gte=F,
+  byid=F)
+{
 
   if(lte)
     ret <- distances < quantile(distances,p=p)
