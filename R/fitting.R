@@ -99,6 +99,117 @@ gdistsamp_refit_model <- function(formula=NULL, imbcr_df=NULL, K=NULL, mixture=N
       K=K
     ))
 }
+#' fit the single-season distance model of Royle (2004) to pooled (station-level)
+#' IMBCR data
+#' @param habitatCovs vector of habitat covariates to fit
+#' @param detCovs detection covariates to fit
+#' @export
+imbcr_single_season_pooled_1km_distance <- function(
+    habitatCovs=NULL, 
+    detCovs=NULL, 
+    imbcr_df=NULL
+  )
+{
+  K <- unlist(lapply(
+      X=seq(1, 2, by=0.25),
+      FUN=function(x) OpenIMBCR:::calc_k(imbcr_df, multiplier=x)
+    ))
+  #
+  # Testing : select an optimal detection function
+  #
+  key_function <- c("halfnorm","hazard","exp","uniform")
+  # test AIC for a sequence of K values for the Poisson mixture distribution
+  pois_aic <- try(OpenIMBCR:::gdistsamp_find_optimal_k(
+      df=imbcr_df,
+      allHabitatCovs=habitatCovs,
+      allDetCovs=detCovs,
+      mixture="P",
+      K=K
+    ))
+  # if there is zero-inflation, K selection may fail. Try to downsample our
+  # zeros to something managable and see if we still fail to fit a model
+  if (class(pois_aic) == "try-error"){
+      imbcr_df <- OpenIMBCR:::balance_zero_transects(imbcr_df, multiple=0.5)
+      pois_aic <- try(OpenIMBCR:::gdistsamp_find_optimal_k(
+          df=imbcr_df,
+          allHabitatCovs=habitatCovs,
+          allDetCovs=detCovs,
+          mixture="P",
+          K=K
+        ))
+      # if downsampling didn't help -- quit with an error. We don't
+      # want to try to interpret a model with questionable data.
+      if (class(pois_aic)=="try-error"){
+        stop("poisson : couldn't find an optimal K value,",
+             "even after downsampling over-abundant zeros")
+      } else {
+        K_pois <- pois_aic$K
+        pois_aic <- pois_aic$AIC
+      }
+  } else {
+    K_pois <- pois_aic$K
+    pois_aic <- pois_aic$AIC
+  }
+  # now try the same thing for the negative-binomial mixture distribution
+  negbin_aic <- try(OpenIMBCR:::gdistsamp_find_optimal_k(
+      df=imbcr_df,
+      allHabitatCovs=habitatCovs,
+      allDetCovs=detCovs,
+      mixture="NB",
+      K=K
+    ))
+  # did we fail because of zero-inflation? Try to re-fit.
+  if (class(negbin_aic) == "try-error"){
+      # this will do nothing if we've already downsampled to 'multiple'
+      # for the Poisson mixture
+      imbcr_df <- OpenIMBCR:::balance_zero_transects(imbcr_df, multiple=0.75)
+      pois_aic <- try(OpenIMBCR:::gdistsamp_find_optimal_k(
+          df=imbcr_df,
+          allHabitatCovs=habitatCovs,
+          allDetCovs=detCovs,
+          mixture="NB",
+          K=K
+        ))
+      # if downsampling didn't help -- quit with an error. We don't
+      # want to try to interpret a model with questionable data.
+      if (class(negbin_aic)=="try-error"){
+        stop("poisson : couldn't find an optimal K value,",
+             "even after downsampling over-abundant zeros")
+      } else {
+        K_negbin <- negbin_aic$K
+        pois_aic <- negbin_aic$AIC
+      }
+  } else {
+    K_negbin <- negbin_aic$K
+    negbin_aic <- negbin_aic$AIC
+  }
+  # is there support for the negative binomial being a superior mixture dist
+  # to the poisson?
+  if(diff(c(negbin_aic, pois_aic)) > 4){
+    K <- K_negbin
+    mixture_dist <- "NB"
+    # if we don't see a large improvement in AIC from using the
+    # negative binomial, favor the simpler Poisson mixture
+  } else {
+    K <- K_pois
+    mixture_dist <- "P"
+  }
+  # do model selection for our input covariates
+  model_selection_table <- OpenIMBCR:::allCombinations_dAIC(
+    siteCovs=habitatCovs,
+    detCovs=detCovs,
+    step=500,
+    umdf=imbcr_df,
+    umFunction=unmarked::gdistsamp,
+    mixture=mixture_dist,
+    unitsOut="kmsq",
+    K=K,
+    se=T,
+    keyfun="halfnorm",
+    offset="offset(log(effort))"
+  )
+
+}
 #' Fit a single-season occupancy model  assumes a constant probability of species
 #' detection across transects, which is probably inappropriate for IMBCR data and will
 #' lead to inaccurate predictions of occupancy. This is "model m0" from the literature

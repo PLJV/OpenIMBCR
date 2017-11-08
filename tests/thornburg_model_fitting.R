@@ -261,7 +261,7 @@ pca_dim_reduction <- function(x,
 #' of components that explain some threshold of variance
 quantile_pcr <- function(imbcr_df=NULL, siteCovs=NULL, threshold=0.7, K=NULL){
   if(is.null(K)){
-    K <- calc_k(imbcr_df)
+    K <- OpenIMBCR:::calc_k(imbcr_df)
   }
   pca_m <- pca_dim_reduction(
       x=imbcr_df,
@@ -382,7 +382,7 @@ habitat_covs <- colnames(units@data)
       habitat_covs, pattern= c("_ar$|_dst$|_ct$")
     )]
 
-# bug-fix : back-fill any units where no patches occur with NA values
+# back-fill any units where no patches occur with NA values
 units$inp_dst[units$inp_dst == 9999] <- NA
 
 # calculate a total_area metric for a potential PCA (before mean-centering!)
@@ -403,7 +403,7 @@ units@data[,habitat_covs] <- scale(units@data[, habitat_covs])
 cat(" -- reading IMBCR data and parsing focal species observations\n")
 # this returns an IMBCR SpatialPointsDataFrame
 imbcr_observations <-
-  scrub_imbcr_df(OpenIMBCR::imbcrTableToShapefile(
+  OpenIMBCR:::scrub_imbcr_df(OpenIMBCR::imbcrTableToShapefile(
     list.files("/global_workspace/imbcr_number_crunching/",
          pattern="RawData_PLJV_IMBCR_20161201.csv$",
          recursive=T,
@@ -428,15 +428,15 @@ breaks <- append(0,as.numeric(quantile(as.numeric(
     na.rm=T,
     probs=seq(0.05,0.90,length.out=9))
   ))
-imbcr_observations <- calc_dist_bins(
+imbcr_observations <- OpenIMBCR:::calc_dist_bins(
     imbcr_observations,
     breaks=breaks
   )[[2]]
 
 cat(" -- calculating detection covariates\n")
 
-imbcr_observations <- calc_day_of_year(imbcr_observations)
-imbcr_observations <- calc_transect_effort(imbcr_observations)
+imbcr_observations <- OpenIMBCR:::calc_day_of_year(imbcr_observations)
+imbcr_observations <- OpenIMBCR:::calc_transect_effort(imbcr_observations)
 
 # append detection covariate summary statistics to our
 # habitat summary table so we can go-back from mean-variance
@@ -446,7 +446,10 @@ habitat_vars_summary_statistics <- rbind(
   habitat_vars_summary_statistics,
   calc_table_summary_statistics(
     imbcr_observations@data,
-    vars=c("doy","starttime","bcr","lat","lon","lat_2","lon_2","ln_lat","ln_lon")
+    vars=c(
+        "doy","starttime","bcr","lat","lon",
+        "lat_2","lon_2","ln_lat","ln_lon"
+      )
   )
 )
 
@@ -457,7 +460,7 @@ imbcr_observations@data[,c('starttime','doy','lat','lon',"lat_2","lon_2","ln_lat
 
 cat(" -- performing spatial join with our training units dataset\n")
 
-imbcr_df <- spatial_join(
+imbcr_df <- OpenIMBCR:::spatial_join(
     imbcr_observations,
     units
   )
@@ -471,8 +474,8 @@ cat(
 # to an unmarkedFrameGDS so we can fit our model with
 # the unmarked package.
 
-imbcr_df <- scrub_unmarked_dataframe(
-      build_unmarked_gds(
+imbcr_df <- OpenIMBCR:::scrub_unmarked_dataframe(
+      OpenIMBCR:::build_unmarked_gds(
         df=imbcr_df,
         distance_breaks=breaks,
         drop_na_values=T # drop all data with NA values in covs (for PCA)
@@ -529,8 +532,8 @@ if ( abs(x_correlation_matrix['ag_mgp_ar','ag_sgp_ar']) > 0.5){
 # Check for correlation between SGP and PC1
 #
 if (exists('pca_m')){
-  imbcr_df <- check_correlation_matrix(var='ag_sgp_ar', x_correlation_matrix=x_correlation_matrix, imbcr_df=imbcr_df)
-  imbcr_df <- check_correlation_matrix(var='ag_mgp_ar', x_correlation_matrix=x_correlation_matrix, imbcr_df=imbcr_df)
+  imbcr_df <- OpenIMBCR:::check_correlation_matrix(var='ag_sgp_ar', x_correlation_matrix=x_correlation_matrix, imbcr_df=imbcr_df)
+  imbcr_df <- OpenIMBCR:::check_correlation_matrix(var='ag_mgp_ar', x_correlation_matrix=x_correlation_matrix, imbcr_df=imbcr_df)
 }
 # drop roads from consideration
 imbcr_df@siteCovs <- imbcr_df@siteCovs[ , !grepl(colnames(imbcr_df@siteCovs), pattern="rd_ar")]
@@ -552,21 +555,26 @@ allSpatialCovs <- allHabitatCovs[grepl(allHabitatCovs, pattern="lat|lon")]
 allHabitatCovs <- allHabitatCovs[!grepl(allHabitatCovs, pattern="lat|lon")]
 
 #
+# Testing : select an optimal detection function
+#
+
+key_function <- c("halfnorm","hazard","exp","uniform")
+
+#
 # Determine a reasonable K from our input table and find
 # minimum AIC values for both the Poisson and Negative Binomial
 # that we can compare against to select an optimal mixture
 # distribution
 #
 
-
 cat(
-   " -- estimating a good 'K' parameter and building null (intercept-only) and ",
-   "alternative (habitat) models\n"
+   " -- estimating a good 'K' parameter and building null ",
+   "(intercept-only) and alternative (habitat) models\n"
   )
 
 K <- unlist(lapply(
     seq(1, 2, by=0.25),
-    FUN=function(x) calc_k(imbcr_df, multiplier=x)
+    FUN=function(x) OpenIMBCR:::calc_k(imbcr_df, multiplier=x)
   ))
 
 # if we have too many zero transects in our dataset, our model will never
@@ -577,7 +585,7 @@ K <- unlist(lapply(
 # This needs some debugging because it isn't working --
 # probably something to do with scope
 #
-# test <- gdistsamp_find_optimal_k_with_transect_downsampling(
+# test <- OpenIMBCR:::gdistsamp_find_optimal_k_with_transect_downsampling(
 #     imbcr_df,
 #     allHabitatCovs,
 #     allDetCovs,
@@ -585,7 +593,7 @@ K <- unlist(lapply(
 #     K
 #   )
 
-pois_aic <- try(gdistsamp_find_optimal_k(
+pois_aic <- try(OpenIMBCR:::gdistsamp_find_optimal_k(
     df=imbcr_df,
     allHabitatCovs=allHabitatCovs,
     allDetCovs=allDetCovs,
@@ -594,8 +602,8 @@ pois_aic <- try(gdistsamp_find_optimal_k(
   ))
 
 if (class(pois_aic) == "try-error"){
-    imbcr_df <- balance_zero_transects(imbcr_df, multiple=0.5)
-    pois_aic <- try(gdistsamp_find_optimal_k(
+    imbcr_df <- OpenIMBCR:::balance_zero_transects(imbcr_df, multiple=0.5)
+    pois_aic <- try(OpenIMBCR:::gdistsamp_find_optimal_k(
         df=imbcr_df,
         allHabitatCovs=allHabitatCovs,
         allDetCovs=allDetCovs,
@@ -616,7 +624,7 @@ if (class(pois_aic) == "try-error"){
   pois_aic <- pois_aic$AIC
 }
 
-negbin_aic <- try(gdistsamp_find_optimal_k(
+negbin_aic <- try(OpenIMBCR:::gdistsamp_find_optimal_k(
     df=imbcr_df,
     allHabitatCovs=allHabitatCovs,
     allDetCovs=allDetCovs,
@@ -627,8 +635,8 @@ negbin_aic <- try(gdistsamp_find_optimal_k(
 if (class(negbin_aic) == "try-error"){
     # this will do nothing if we've already downsampled to 'multiple'
     # for the Poisson mixture
-    imbcr_df <- balance_zero_transects(imbcr_df, multiple=0.75)
-    pois_aic <- try(gdistsamp_find_optimal_k(
+    imbcr_df <- OpenIMBCR:::balance_zero_transects(imbcr_df, multiple=0.75)
+    pois_aic <- try(OpenIMBCR:::gdistsamp_find_optimal_k(
         df=imbcr_df,
         allHabitatCovs=allHabitatCovs,
         allDetCovs=allDetCovs,

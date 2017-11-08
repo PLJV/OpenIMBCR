@@ -566,6 +566,17 @@ gdistsamp_find_optimal_k <- function(
     )
   )
 }
+gdistsamp_find_optimal_key_func <- function(x=NULL){
+  return(NA)
+}
+#' accepts a variable name an an input data.frame and 
+#' conducts a Pearson's product moment correlation test
+#' against all variables in the data.frame. 
+#' @param x data.frame or matrix containing covariates to test
+#' @param var variable name (as.character)
+check_peasons_product_moment <- function(x=NULL, var=NULL){
+
+}
 #' testing :
 check_correlation_matrix <- function(
   var=NULL,
@@ -578,13 +589,17 @@ check_correlation_matrix <- function(
   if (correlation > 0) {
     warning(
       paste(
-        "positive correlation observed between",var,"and our fragmentation metric. They should be the",
+        "positive correlation observed between",var,
+        "and our fragmentation metric. They should be the",
         "inverse of each other. Consider -1*PCA transformation")
     )
   }
   if (abs(correlation) > correlation_threshold){
-      warning(paste("dropping",var,"-- it's strongly correlated with our fragmentation PCA"))
-      imbcr_df@siteCovs <- imbcr_df@siteCovs[ , !grepl(colnames(imbcr_df@siteCovs), pattern=var) ]
+      warning(paste("dropping",var,
+        "-- it's strongly correlated with our fragmentation PCA")
+      )
+      imbcr_df@siteCovs <- imbcr_df@siteCovs[ , 
+        !grepl(colnames(imbcr_df@siteCovs), pattern=var) ]
   }
   return(imbcr_df)
 }
