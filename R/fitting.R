@@ -210,7 +210,7 @@ imbcr_single_season_pooled_1km_distance <- function(
   )
 
 }
-#' Fit a single-season occupancy model  assumes a constant probability of species
+#' testing: fit a single-season occupancy model  assumes a constant probability of species
 #' detection across transects, which is probably inappropriate for IMBCR data and will
 #' lead to inaccurate predictions of occupancy. This is "model m0" from the literature
 #' and loosely follows Andy Royle's (2008) model specification. It is designed so that
@@ -287,7 +287,7 @@ singleSeasonOccupancy <- function(det_parameters=NULL, occ_parameters=NULL, p=NU
   }
   sum(-1*likelihood)
 }
-#' fit the single-season, two-state occupancy model of Royle-Nichols (the "RN" model) to IMBCR data. This model can account for abundance-induced heterogeneity of detection and capitalize
+#' testing : fit the single-season, two-state occupancy model of Royle-Nichols (the "RN" model) to IMBCR data. This model can account for abundance-induced heterogeneity of detection and capitalize
 #' on replicate observations of abundance within sampling units. Royle first implemented the algorithm for use with BBS data, but we can theoretically extend the model
 #' within-season repeat observations made at IMBCR stations. Requires the user specify an upper_bound parameter for density within each 1-km transect. Like the single-season occupancy model (model m0), the RN model
 #' does not allow for heterogeneity in detection within sites, which may result in biased estimates of detection in instances where an observer detects a species early in the sampling process.
@@ -366,42 +366,5 @@ singleSeasonRN <- function(det_parameters=NULL, occ_parameters=NULL, p=NULL, upp
     likelihood[i] <- sum(focal*gN)
  }
   sum(-1*likelihood)
-}
-#' fit a distance model to IMBCR station data (still testing; doesn't export into namespace yet)
-singleSeasonDistance <- function(x=NULL, psi_params=NULL, sigma_params=NULL, as_radial_distance=T, link="half_normal"){
-  # detection functions
-      uniform <- function(u){ 1/u }
-  half_normal <- function(u){ (2*pi*u) * (exp(-(u^2)/sigma2)) / (pi*x_max^2)  }
-  hazard_rate <- function(u){ 1 - exp( -(u/a)^(-b) ) }
-  nz<-500 # transects where species was not observed
-  sigma2 <- exp(sigma_params[2])
-  if(as_radial_distance){
-    # x = r*sin(theta)
-    x <- x * sin( (angle/360)*(2*pi) )
-    x <- x/100 # format units as meters/100 for our detection function
-  }
-  x_max <- ceiling(max(x))
-  nind<-length(x)
-  y<-c(rep(1,nind),rep(0,nz))
-  x<-c(x,rep(NA,nz)) # NA fill for our 0 capture
-
-  lik <- function(parms){
-    psi <- expit(parms[1])
-    picap <- integrate(half_normal,0,x_max)$value # marginal probability of encounter
-    #part1 <- sum(log(psi*exp(-(x[1:nind]^2)/sigma2) ) )
-    part1 <- sum(log(half_normal(x[1:nind]))) # half-normal distance detection function (modified for point count survey)
-    #part2 <-  nz*log( 1-psi*picap)
-    part2 <- nz*log(1-picap)
-    part3 <- 0
-    -1*(part1+part2+part3) # log of a product is the sum of the log factors
-  }
-
-  out<-nlm(lik,c(logit(175/(nz+nind)),log(1.2) ),hessian=TRUE)
-  print(out)
-
-  psihat<- expit(out$estimate[1])
-  N <-psihat*( nind+nz )
-  D<- N/48
-  cat("MLE Density: ",D,fill=TRUE)
 }
 

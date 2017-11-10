@@ -522,7 +522,7 @@ gdistsamp_find_optimal_k <- function(
           ~1, # availability
           as.formula(paste("~",paste(allDetCovs, collapse="+"))), # detection
           data=imbcr_df,
-          keyfun="halfnorm",
+          keyfun=keyfun,
           mixture=mixture,
           unitsOut="kmsq",
           se=T,
@@ -566,8 +566,36 @@ gdistsamp_find_optimal_k <- function(
     )
   )
 }
-gdistsamp_find_optimal_key_func <- function(x=NULL){
-  return(NA)
+#' testing: attempt to fit a series of different detection functions using a user-specified list of detection
+#' covariates. Return the name of the key function that minimizes AIC.
+gdistsamp_find_optimal_key_func <- function(imbcr_df=NULL, allDetCovs=NULL){
+  key_function <- c("halfnorm","hazard","exp","uniform")
+  return(key_function[which.min(sapply(
+      X=key_function,
+      FUN=function(x){
+        ret <- suppressMessages(try(unmarked::gdistsamp(
+          as.formula(paste(
+            "~",
+            "1",
+            "+offset(log(effort))",
+            sep=""
+          )),
+          ~1,
+          as.formula(paste("~",paste(allDetCovs, collapse="+"))),
+          data=imbcr_df,
+          keyfun=x,
+          mixture="NB",
+          unitsOut="kmsq",
+          se=T,
+          K=OpenIMBCR:::calc_k(imbcr_df)
+        )))
+        if(class(ret) == "try-error"){
+          return(NA)
+        } else {
+          return(ret@AIC)
+        }
+      })
+    )])
 }
 #' accepts a variable name an an input data.frame and 
 #' conducts a Pearson's product moment correlation test

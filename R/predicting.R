@@ -18,7 +18,6 @@
 
 #' testing: use the parallel package to predict across a large input
 #' table (with unmarked) using chunking.
-#' @export
 par_unmarked_predict <- function(run_table=NULL, m=NULL){
 
       steps <- seq(0, nrow(run_table), by=100)
@@ -52,7 +51,6 @@ par_unmarked_predict <- function(run_table=NULL, m=NULL){
 }
 #' testing : us Akaike weights to predict across a series of models
 #' defined in a user-specified model selection table
-#' @export
 akaike_predict <- function(
   mod_sel_tab=NULL, 
   train_data=NULL,
@@ -83,7 +81,6 @@ akaike_predict <- function(
 #' a data.frame of weighted-average predictions. 
 #' @param col column of the prediction table to average. Typically there are th
 #' ree columns from predict, specifying prediction, upper-bound, and lower-bound
-#' @export
 akaike_weight_predictions <- function(akaike_list=NULL, col=1){
     table <- (do.call(cbind, lapply(
         X=akaike_list,

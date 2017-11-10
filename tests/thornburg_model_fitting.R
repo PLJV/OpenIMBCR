@@ -297,9 +297,17 @@ get_habitat_covs <- function(x){
   # heuristic -- drop anything wonky from the IMBCR dataset
   allHabitatCovs <- allHabitatCovs[!(
     allHabitatCovs %in%
-    c("starttime","bcr","doy","effort","id","eightyeight","year",
-      "date","stratum","observer","common.name","birdcode","sex","mgmtentity",
-      "mgmtregion","mgmtunit","county","state","primaryhabitat","transectnum")
+    c(
+      "starttime","bcr","doy",
+      "endtime","sky_st","sky_end",
+      "wind_st","wind_end","temp_st",
+      "temp_end","effort","id",
+      "eightyeight","year","date",
+      "stratum","observer","common.name",
+      "birdcode","sex","mgmtentity",
+      "mgmtregion","mgmtunit","county",
+      "state","primaryhabitat","transectnum"
+    )
   )]
   return(allHabitatCovs)
 }
@@ -311,7 +319,12 @@ get_detection_covs <- function(x){
   allDetCovs <- colnames(x@siteCovs)
   allDetCovs <- allDetCovs[(
     allDetCovs %in%
-    c("starttime","bcr","doy")
+    c(
+      "starttime","bcr","doy",
+      "endtime","sky_st","sky_end",
+      "wind_st","wind_end","temp_st",
+      "temp_end"
+    )
   )]
   return(allDetCovs)
 }
@@ -435,6 +448,23 @@ imbcr_observations <- OpenIMBCR:::calc_dist_bins(
 
 cat(" -- calculating detection covariates\n")
 
+# merge-in supplemental detection covariates
+detection_metadata <- read.csv(
+    "/global_workspace/imbcr_number_crunching/PLJV_IMBCR_SiteData_byPoint_2016-2017.csv"
+  )
+colnames(detection_metadata) <- tolower(colnames(detection_metadata))
+imbcr_observations@data <- merge(
+    imbcr_observations@data,
+    detection_metadata,
+    by=c("transectnum","point","year")
+  )
+
+# expand our ordinal 'sky' and 'wind' variables
+imbcr_observations$sky_st <- (imbcr_observations$sky_st+1)^2
+imbcr_observations$sky_end <- (imbcr_observations$sky_end+1)^2
+imbcr_observations$wind_st <- (imbcr_observations$wind_st+1)^2
+imbcr_observations$wind_end <- (imbcr_observations$wind_end+1)^2
+
 imbcr_observations <- OpenIMBCR:::calc_day_of_year(imbcr_observations)
 imbcr_observations <- OpenIMBCR:::calc_transect_effort(imbcr_observations)
 
@@ -446,17 +476,53 @@ habitat_vars_summary_statistics <- rbind(
   habitat_vars_summary_statistics,
   calc_table_summary_statistics(
     imbcr_observations@data,
-    vars=c(
-        "doy","starttime","bcr","lat","lon",
-        "lat_2","lon_2","ln_lat","ln_lon"
-      )
+    vars=
+    c(
+      "starttime","bcr","doy",
+      "endtime","sky_st","sky_end",
+      "wind_st","wind_end","temp_st",
+      "temp_end","lat","lon",
+      "lat_2","lon_2","ln_lat","ln_lon"
+    )
   )
 )
 
 cat(" -- prepping input unmarked data.frame and performing PCA\n")
 
-imbcr_observations@data[,c('starttime','doy','lat','lon',"lat_2","lon_2","ln_lat","ln_lon")] <-
-  scale(imbcr_observations@data[,c('starttime','doy','lat','lon',"lat_2","lon_2","ln_lat","ln_lon")])
+imbcr_observations@data[,
+  c(
+    'starttime',
+    'endtime',
+    'sky_st',
+    "sky_end",
+    'wind_st',
+    'wind_end',
+    'temp_st',
+    'temp_end',
+    'doy',
+    'lat',
+    'lon',
+    "lat_2",
+    "lon_2",
+    "ln_lat",
+     "ln_lon")] <-
+  scale(imbcr_observations@data[,
+    c(
+    'starttime',
+    'endtime',
+    'sky_st',
+    "sky_end",
+    'wind_st',
+    'wind_end',
+    'temp_st',
+    'temp_end',
+    'doy',
+    'lat',
+    'lon',
+    "lat_2",
+    "lon_2",
+    "ln_lat",
+     "ln_lon")])
 
 cat(" -- performing spatial join with our training units dataset\n")
 
@@ -544,6 +610,7 @@ imbcr_df@siteCovs <- imbcr_df@siteCovs[ , !grepl(colnames(imbcr_df@siteCovs), pa
 
 allHabitatCovs <- get_habitat_covs(imbcr_df)
 allDetCovs <- get_detection_covs(imbcr_df)
+  allDetCovs <- allDetCovs[!grepl(allDetCovs, pattern="bcr")]
 
 #
 # Testing : only include a subset of our spatial covariates
@@ -558,8 +625,7 @@ allHabitatCovs <- allHabitatCovs[!grepl(allHabitatCovs, pattern="lat|lon")]
 # Testing : select an optimal detection function
 #
 
-key_function <- c("halfnorm","hazard","exp","uniform")
-
+key_function <- OpenIMBCR:::gdistsamp_find_optimal_key_func(imbcr_df, allDetCovs)
 #
 # Determine a reasonable K from our input table and find
 # minimum AIC values for both the Poisson and Negative Binomial
@@ -598,6 +664,7 @@ pois_aic <- try(OpenIMBCR:::gdistsamp_find_optimal_k(
     allHabitatCovs=allHabitatCovs,
     allDetCovs=allDetCovs,
     mixture="P",
+    keyfun=key_function,
     K=K
   ))
 
@@ -607,6 +674,7 @@ if (class(pois_aic) == "try-error"){
         df=imbcr_df,
         allHabitatCovs=allHabitatCovs,
         allDetCovs=allDetCovs,
+        keyfun=key_function,
         mixture="P",
         K=K
       ))
@@ -628,6 +696,7 @@ negbin_aic <- try(OpenIMBCR:::gdistsamp_find_optimal_k(
     df=imbcr_df,
     allHabitatCovs=allHabitatCovs,
     allDetCovs=allDetCovs,
+    keyfun=key_function,
     mixture="NB",
     K=K
   ))
@@ -640,6 +709,7 @@ if (class(negbin_aic) == "try-error"){
         df=imbcr_df,
         allHabitatCovs=allHabitatCovs,
         allDetCovs=allDetCovs,
+        keyfun=key_function,
         mixture="NB",
         K=K
       ))
@@ -681,7 +751,7 @@ intercept_m <- unmarked::gdistsamp(
     ~1,
     as.formula(paste("~",paste(allDetCovs, collapse="+"))),
     data=imbcr_df,
-    keyfun="halfnorm",
+    keyfun=key_function,
     mixture=mixture_dist,
     unitsOut="kmsq",
     se=T,
@@ -698,7 +768,7 @@ all_covs_m <- unmarked::gdistsamp(
     ~1,
     as.formula(paste("~",paste(allDetCovs, collapse="+"))),
     data=imbcr_df,
-    keyfun="halfnorm",
+    keyfun=key_function,
     mixture=mixture_dist,
     unitsOut="kmsq",
     se=T,
@@ -711,7 +781,7 @@ all_covs_m <- unmarked::gdistsamp(
 
 model_selection_table <- OpenIMBCR:::allCombinations_dAIC(
   siteCovs=allHabitatCovs,
-  detCovs=c("doy","starttime"),
+  detCovs=allDetCovs,
   step=500,
   umdf=imbcr_df,
   umFunction=unmarked::gdistsamp,
@@ -719,7 +789,7 @@ model_selection_table <- OpenIMBCR:::allCombinations_dAIC(
   unitsOut="kmsq",
   K=K,
   se=T,
-  keyfun="halfnorm",
+  keyfun=key_function,
   offset="offset(log(effort))"
 )
 
@@ -745,7 +815,7 @@ if(length(all_variables_within_2aic)<length(allHabitatCovs)){
     )
   model_selection_table <- OpenIMBCR:::allCombinations_dAIC(
     siteCovs=all_variables_within_2aic,
-    detCovs=c("doy","starttime"),
+    detCovs=allDetCovs,
     step=500,
     umdf=imbcr_df,
     umFunction=unmarked::gdistsamp,
@@ -753,14 +823,14 @@ if(length(all_variables_within_2aic)<length(allHabitatCovs)){
     unitsOut="kmsq",
     K=K,
     se=T,
-    keyfun="halfnorm",
+    keyfun=key_function,
     offset="offset(log(effort))"
   )
 }
 
 spatial_model_selection_table <- OpenIMBCR:::allCombinations_dAIC(
   siteCovs=allSpatialCovs,
-  detCovs=c("doy","starttime"),
+  detCovs=allDetCovs,
   step=500,
   umdf=imbcr_df,
   umFunction=unmarked::gdistsamp,
