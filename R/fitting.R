@@ -78,7 +78,7 @@ permutations <- function(n){
    }
 }
 #' re-fit a model specified by a formula object
-gdistsamp_refit_model <- function(formula=NULL, imbcr_df=NULL, K=NULL, mixture=NULL){
+gdistsamp_refit_model <- function(formula=NULL, imbcr_df=NULL, K=NULL, mixture=NULL, keyfun=NULL){
   formula <- unlist(strsplit(formula, split="~"))
   return(unmarked::gdistsamp(
       lambdaformula=as.formula(paste(
@@ -92,7 +92,7 @@ gdistsamp_refit_model <- function(formula=NULL, imbcr_df=NULL, K=NULL, mixture=N
         formula[4]
       )),
       data=imbcr_df,
-      keyfun="halfnorm",
+      keyfun=keyfun,
       mixture=mixture,
       unitsOut="kmsq",
       se=T,

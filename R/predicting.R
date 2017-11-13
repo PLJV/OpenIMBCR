@@ -57,7 +57,8 @@ akaike_predict <- function(
   pred_data=NULL, 
   daic_cutoff=2,
   K=NULL, 
-  mixture=NULL){
+  mixture=NULL,
+  keyfun=NULL){
   keep <- mod_sel_tab$AIC < min(mod_sel_tab$AIC) + daic_cutoff
   mod_sel_tab <- mod_sel_tab[keep,]
   models <- lapply(
@@ -67,7 +68,8 @@ akaike_predict <- function(
             formula = x, 
             imbcr_df = train_data, 
             K = K, 
-            mixture = mixture
+            mixture = mixture,
+            keyfun=keyfun
         )
       }
   )

@@ -118,25 +118,29 @@ top_model_m <- OpenIMBCR:::gdistsamp_refit_model(
     top_model_formula,
     intercept_m@data,
     K=K,
-    mixture=mixture_dist
+    mixture=mixture_dist,
+    keyfun=key_function
   )
 top_spatial_m <- OpenIMBCR:::gdistsamp_refit_model(
     top_spatial_model_formula,
     intercept_m@data,
     K=K,
-    mixture=mixture_dist
+    mixture=mixture_dist,
+    keyfun=key_function
   )
-akaike_models_m <- akaike_predict(
+akaike_models_m <- OpenIMBCR:::akaike_predict(
     model_selection_table, 
     train_data = intercept_m@data, 
     K=K, 
-    mixture = mixture_dist
+    mixture = mixture_dist,
+    keyfun=key_function
   )
-spatial_akaike_models_m <- akaike_predict(
+spatial_akaike_models_m <- OpenIMBCR:::akaike_predict(
     spatial_model_selection_table, 
     train_data = intercept_m@data, 
     K=K, 
-    mixture = mixture_dist
+    mixture=mixture_dist,
+    keyfun=key_function
   )
 cat(" -- reading our input vector data containing covariates for predict()\n")
 units <- OpenIMBCR:::readOGRfromPath(
@@ -333,12 +337,11 @@ save(
            "top_model_m",
            "akaike_models_m",
            "mixture_dist",
+           "key_function",
            "model_selection_table",
            "spatial_model_selection_table",
            "pca_m",
            "predicted_density",
-           "ensemble_min",
-           "ensemble_mean",
            "k_max_censored",
            "spatial_predicted_density"),
     file=paste(

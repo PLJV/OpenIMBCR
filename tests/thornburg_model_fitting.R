@@ -838,7 +838,7 @@ spatial_model_selection_table <- OpenIMBCR:::allCombinations_dAIC(
   unitsOut="kmsq",
   K=K,
   se=T,
-  keyfun="halfnorm",
+  keyfun=key_function,
   offset="offset(log(effort))"
 )
 
@@ -855,12 +855,6 @@ spatial_model_selection_table$weight <- OpenIMBCR:::akaike_weights(
     spatial_model_selection_table$AIC
   )
 
-
-cat("\n")
-cat(" -- species:", argv[2], "\n")
-cat(" -- dAIC (null - habitat):", intercept_m@AIC-all_covs_m@AIC, "\n")
-cat("\n")
-
 save(
     compress=T,
     list=c("argv",
@@ -872,6 +866,7 @@ save(
            "negbin_aic",
            "pois_aic",
            "mixture_dist",
+           "key_function",
            "K",
            "x_correlation_matrix",
            "intercept_m",
