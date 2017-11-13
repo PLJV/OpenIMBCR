@@ -610,7 +610,10 @@ imbcr_df@siteCovs <- imbcr_df@siteCovs[ , !grepl(colnames(imbcr_df@siteCovs), pa
 
 allHabitatCovs <- get_habitat_covs(imbcr_df)
 allDetCovs <- get_detection_covs(imbcr_df)
-  allDetCovs <- allDetCovs[!grepl(allDetCovs, pattern="bcr")]
+# post-hoc drop some of our detection covariates to keep from overfitting
+allDetCovs <- allDetCovs[
+    !grepl(allDetCovs, pattern="bcr|starttime|endtime|temp_end|sky_st|wind_st")
+  ]
 
 #
 # Testing : only include a subset of our spatial covariates
