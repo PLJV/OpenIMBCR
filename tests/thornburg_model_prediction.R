@@ -253,30 +253,6 @@ cat(
     sum(predicted_density, na.rm = T),
     "\n"
   )
-#
-# test various ensembles of our spatial models and our habitat models
-#
-# KT thinks the ensemble mean is the only one of these that has any merit.
-# We might consider ensembling annual habitat models for 2016 and 2017 to see
-# if that works better. Or do multi-year detection pooling. Really we need 
-# a multi-season model (and multiple years of data).
-#
-ensemble_min <- apply(cbind(
-      predicted_density,
-      spatial_predicted_density
-    ),
-    MARGIN=1,
-    FUN=min,
-    na.rm=T
-  )
-ensemble_mean <- apply(cbind(
-      predicted_density,
-      spatial_predicted_density
-    ),
-    MARGIN=1,
-    FUN=mean,
-    na.rm=T
-  )
 k_max_censored <- predicted_density
 k_max_censored[
     k_max_censored > K
@@ -311,16 +287,14 @@ rgdal::writeOGR(
   overwrite=T
 )
 units@data <-
-  data.frame(cbind(
-    as.vector(ensemble_min),
-    as.vector(ensemble_mean),
+  data.frame(
     as.vector(k_max_censored)
   ))
-colnames(units@data) <- c("ens_min","ens_mn","k_max_cens")
+colnames(units@data) <- c("k_max_cens")
 rgdal::writeOGR(
   units,
   dsn=".",
-  layer=paste(spp_name,"_ensemble_pred_density_1km", sep=""),
+  layer=paste(spp_name,"_pred_density_kmax_cens_1km", sep=""),
   driver="ESRI Shapefile",
   overwrite=T
 )
