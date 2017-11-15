@@ -183,9 +183,12 @@ randomWalk_dAIC <- function(
   offset=NULL,
   depth=1,
   umFunction=unmarked::distsamp,
-  nCores=NULL, ...){
+  nCores=NULL, ...)
+{
   # define our workspace and set-up parallel
-  if(!require(unmarked)){ stop("function requires the unmarked package is installed") }
+  if(!require(unmarked)){ 
+      stop("function requires the unmarked package is installed") 
+  }
   nCores <- ifelse(
       is.null(nCores),
       parallel::detectCores()-1,
@@ -323,7 +326,8 @@ allCombinations_dAIC <- function(
   ic=OpenIMBCR:::AICc,
   umFunction=unmarked::distsamp,
   nCores=NULL,
-  ...){
+  ...)
+{
   # define our workspace and set-up parallel
   if(!require(unmarked)){ stop("function requires the unmarked package is installed") }
   nCores <- ifelse(

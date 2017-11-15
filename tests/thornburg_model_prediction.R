@@ -336,6 +336,7 @@ save(
            "K",
            "top_model_m",
            "akaike_models_m",
+           "x_correlation_matrix",
            "mixture_dist",
            "key_function",
            "model_selection_table",
