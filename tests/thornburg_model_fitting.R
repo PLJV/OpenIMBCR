@@ -620,10 +620,12 @@ allDetCovs <- allDetCovs[
 # build a seperate model for spatial covs that we will overlay
 # later
 #
-
 allSpatialCovs <- allHabitatCovs[grepl(allHabitatCovs, pattern="lat|lon")]
+# testing : add our first order and log terms to the habitat models
+# for model selection -- but not our polynomial terms. Leave those for the 
+# spatial models only
 allHabitatCovs <- allHabitatCovs[!grepl(allHabitatCovs, pattern="lat|lon")]
-
+  allHabitatCovs <- append(allHabitatCovs, c("lat","lon","ln_lat","ln_lon"))
 #
 # Testing : select an optimal detection function
 #

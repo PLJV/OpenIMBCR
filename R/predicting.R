@@ -58,9 +58,18 @@ akaike_predict <- function(
   daic_cutoff=2,
   K=NULL, 
   mixture=NULL,
-  keyfun=NULL){
+  keyfun=NULL,
+  drop_intercept_m=T)
+{
   keep <- mod_sel_tab$AIC < min(mod_sel_tab$AIC) + daic_cutoff
   mod_sel_tab <- mod_sel_tab[keep,]
+  # sometimes an intercept only model shows up within 2AIC of the top model --
+  # by default, let's not use it for model averaging
+  if(drop_intercept_m){
+    mod_sel_tab <- mod_sel_tab[
+        !grepl(as.character(mod_sel_tab[,1]), pattern="~1+offset") , 
+      ]
+  }
   models <- lapply(
     X=as.character(mod_sel_tab$formula),
     FUN=function(x){
