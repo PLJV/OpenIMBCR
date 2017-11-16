@@ -104,15 +104,15 @@ top_model_formula <- gsub(
     pattern=" ",
     replacement=""
   )
-top_spatial_model_formula <- gsub(
-    as.character(
-      spatial_model_selection_table$formula[
-          which.min(spatial_model_selection_table$AIC)
-        ]
-    ),
-    pattern=" ",
-    replacement=""
-  )
+# top_spatial_model_formula <- gsub(
+#     as.character(
+#       spatial_model_selection_table$formula[
+#           which.min(spatial_model_selection_table$AIC)
+#         ]
+#     ),
+#     pattern=" ",
+#     replacement=""
+#   )
 cat(" -- re-fitting our top model (selected by minimum AIC) and our series of Akaike weighted models\n")
 top_model_m <- OpenIMBCR:::gdistsamp_refit_model(
     top_model_formula,
@@ -121,27 +121,27 @@ top_model_m <- OpenIMBCR:::gdistsamp_refit_model(
     mixture=mixture_dist,
     keyfun=key_function
   )
-top_spatial_m <- OpenIMBCR:::gdistsamp_refit_model(
-    top_spatial_model_formula,
-    intercept_m@data,
-    K=K,
-    mixture=mixture_dist,
-    keyfun=key_function
-  )
+# top_spatial_m <- OpenIMBCR:::gdistsamp_refit_model(
+#     top_spatial_model_formula,
+#     intercept_m@data,
+#     K=K,
+#     mixture=mixture_dist,
+#     keyfun=key_function
+#   )
 akaike_models_m <- OpenIMBCR:::akaike_predict(
-    model_selection_table, 
-    train_data = intercept_m@data, 
-    K=K, 
+    model_selection_table,
+    train_data = intercept_m@data,
+    K=K,
     mixture = mixture_dist,
     keyfun=key_function
   )
-spatial_akaike_models_m <- OpenIMBCR:::akaike_predict(
-    spatial_model_selection_table, 
-    train_data = intercept_m@data, 
-    K=K, 
-    mixture=mixture_dist,
-    keyfun=key_function
-  )
+# spatial_akaike_models_m <- OpenIMBCR:::akaike_predict(
+#     spatial_model_selection_table,
+#     train_data = intercept_m@data,
+#     K=K,
+#     mixture=mixture_dist,
+#     keyfun=key_function
+#   )
 cat(" -- reading our input vector data containing covariates for predict()\n")
 units <- OpenIMBCR:::readOGRfromPath(
     "/global_workspace/thornburg/vector/units_attributed.shp"
@@ -189,13 +189,13 @@ if(using_fragmentation_metric){
 units@data$effort <- mean(top_model_m@data@siteCovs$effort)
 cat(" -- predicting against top model\n")
 predicted_density_top_model <- par_unmarked_predict(
-    units, 
+    units,
     top_model_m
   )
-predicted_density_spatial_top_model <- par_unmarked_predict(
-    units, 
-    top_spatial_m
-  )
+# predicted_density_spatial_top_model <- par_unmarked_predict(
+#     units,
+#     top_spatial_m
+#   )
 if(length(akaike_models_m)>1){
     cat(" -- model averaging against akaike-weighted selection of models\n")
     predicted_density_akaike_models <- lapply(
@@ -213,26 +213,26 @@ if(length(akaike_models_m)>1){
 } else {
     predicted_density <- as.vector(predicted_density_top_model[,1])
 }
-cat(" -- predicting against spatial models\n")
-if(length(spatial_akaike_models_m)>1){
-    cat(" -- model averaging against akaike-weighted selection of models\n")
-    predicted_density_spatial_akaike_models <- lapply(
-        X=spatial_akaike_models_m,
-        FUN=function(x) {
-        gc() # forces us to drop an old cluster if it's lurking
-        prediction <- par_unmarked_predict(units, x$model)
-        return(list(prediction=prediction, weight=x$weight))
-    })
-    # merge our tables
-    spatial_predicted_density <- akaike_weight_predictions(
-      predicted_density_spatial_akaike_models,
-      col=1 # we're not averaging across stderr here
-    )
-} else {
-    spatial_predicted_density <- as.vector(
-        predicted_density_spatial_top_model[,1]
-      )
-}
+# cat(" -- predicting against spatial models\n")
+# if(length(spatial_akaike_models_m)>1){
+#     cat(" -- model averaging against akaike-weighted selection of models\n")
+#     predicted_density_spatial_akaike_models <- lapply(
+#         X=spatial_akaike_models_m,
+#         FUN=function(x) {
+#         gc() # forces us to drop an old cluster if it's lurking
+#         prediction <- par_unmarked_predict(units, x$model)
+#         return(list(prediction=prediction, weight=x$weight))
+#     })
+#     # merge our tables
+#     spatial_predicted_density <- akaike_weight_predictions(
+#       predicted_density_spatial_akaike_models,
+#       col=1 # we're not averaging across stderr here
+#     )
+# } else {
+#     spatial_predicted_density <- as.vector(
+#         predicted_density_spatial_top_model[,1]
+#       )
+# }
 # do some sanity checks and report weird predictions
 if(mean(predicted_density, na.rm=T)>top_model_m@K){ # outliers dragging our PI past K?
   warning(
@@ -243,13 +243,13 @@ if(mean(predicted_density, na.rm=T)>top_model_m@K){ # outliers dragging our PI p
   predicted_density[predicted_density>nonsense_filter] <- NA
 }
 cat(paste(
-    " -- ", 
+    " -- ",
     sum(predicted_density > (2*top_model_m@K), na.rm=T)/length(predicted_density),
-    "% of our predictions were more than 2X the K upper-bounds of our integration", 
+    "% of our predictions were more than 2X the K upper-bounds of our integration",
     sep=""
   ), "\n")
 cat(
-    " -- total number of predicted birds across the JV:", 
+    " -- total number of predicted birds across the JV:",
     sum(predicted_density, na.rm = T),
     "\n"
   )
@@ -273,19 +273,19 @@ rgdal::writeOGR(
   driver="ESRI Shapefile",
   overwrite=T
 )
-units@data[, spp_name] <-
-  as.vector(spatial_predicted_density)
-units@data <- as.data.frame(
-    units@data[,spp_name ]
-  )
-colnames(units@data) <- spp_name
-rgdal::writeOGR(
-  units,
-  dsn=".",
-  layer=paste(spp_name,"_spatial_pred_density_1km", sep=""),
-  driver="ESRI Shapefile",
-  overwrite=T
-)
+# units@data[, spp_name] <-
+#   as.vector(spatial_predicted_density)
+# units@data <- as.data.frame(
+#     units@data[,spp_name ]
+#   )
+# colnames(units@data) <- spp_name
+# rgdal::writeOGR(
+#   units,
+#   dsn=".",
+#   layer=paste(spp_name,"_spatial_pred_density_1km", sep=""),
+#   driver="ESRI Shapefile",
+#   overwrite=T
+# )
 units@data <-
   data.frame(
     as.vector(k_max_censored)
@@ -314,11 +314,11 @@ save(
            "mixture_dist",
            "key_function",
            "model_selection_table",
-           "spatial_model_selection_table",
+           # "spatial_model_selection_table",
            "pca_m",
            "predicted_density",
            "k_max_censored",
-           "spatial_predicted_density"),
+           # "spatial_predicted_density"),
     file=paste(
       tolower(r_data_file[1]),
       sep="")

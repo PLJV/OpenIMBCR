@@ -622,10 +622,10 @@ allDetCovs <- allDetCovs[
 #
 allSpatialCovs <- allHabitatCovs[grepl(allHabitatCovs, pattern="lat|lon")]
 # testing : add our first order and log terms to the habitat models
-# for model selection -- but not our polynomial terms. Leave those for the 
+# for model selection -- but not our polynomial terms. Leave those for the
 # spatial models only
 allHabitatCovs <- allHabitatCovs[!grepl(allHabitatCovs, pattern="lat|lon")]
-  allHabitatCovs <- append(allHabitatCovs, c("lat","lon","ln_lat","ln_lon"))
+  allHabitatCovs <- append(allHabitatCovs, c("ln_lat","ln_lon"))
 #
 # Testing : select an optimal detection function
 #
@@ -800,7 +800,7 @@ model_selection_table <- OpenIMBCR:::allCombinations_dAIC(
 
 # testing : do our akaike weights change when we subset using only those variables
 # selected for inclusion in our top models?
-all_variables_within_2aic <- 
+all_variables_within_2aic <-
   model_selection_table$AIC < min(model_selection_table$AIC)+2
 all_variables_within_2aic <- as.character(model_selection_table[all_variables_within_2aic,]$formula)
 all_variables_within_2aic <- unique(unlist(lapply(
@@ -833,19 +833,19 @@ if(length(all_variables_within_2aic)<length(allHabitatCovs)){
   )
 }
 
-spatial_model_selection_table <- OpenIMBCR:::allCombinations_dAIC(
-  siteCovs=allSpatialCovs,
-  detCovs=allDetCovs,
-  step=500,
-  umdf=imbcr_df,
-  umFunction=unmarked::gdistsamp,
-  mixture=mixture_dist,
-  unitsOut="kmsq",
-  K=K,
-  se=T,
-  keyfun=key_function,
-  offset="offset(log(effort))"
-)
+# spatial_model_selection_table <- OpenIMBCR:::allCombinations_dAIC(
+#   siteCovs=allSpatialCovs,
+#   detCovs=allDetCovs,
+#   step=500,
+#   umdf=imbcr_df,
+#   umFunction=unmarked::gdistsamp,
+#   mixture=mixture_dist,
+#   unitsOut="kmsq",
+#   K=K,
+#   se=T,
+#   keyfun=key_function,
+#   offset="offset(log(effort))"
+# )
 
 
 #
@@ -856,16 +856,16 @@ model_selection_table$weight <- OpenIMBCR:::akaike_weights(
     model_selection_table$AIC
   )
 
-spatial_model_selection_table$weight <- OpenIMBCR:::akaike_weights(
-    spatial_model_selection_table$AIC
-  )
+# spatial_model_selection_table$weight <- OpenIMBCR:::akaike_weights(
+#     spatial_model_selection_table$AIC
+#   )
 
 save(
     compress=T,
     list=c("argv",
            "habitat_vars_summary_statistics",
            "model_selection_table",
-           "spatial_model_selection_table",
+           # "spatial_model_selection_table",
            "imbcr_df_original",
            "imbcr_df",
            "negbin_aic",
