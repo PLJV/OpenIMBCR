@@ -106,7 +106,6 @@ pca_reconstruction <- function(x,
     scores_matrix <- pca$x[,keep_components]
     cross_product <- matrix(apply(
         scores_matrix,
-        #pca$x[, keep_components] %*% t(pca$rotation[,keep_components]),
         MARGIN=1,
         FUN=prod
       ))
@@ -163,7 +162,11 @@ pca_reconstruction <- function(x,
         !grepl(
           colnames(
             x@siteCovs),
-            pattern=ifelse(drop_total_area,"mn_p_ar$|pat_ct$|inp_dst$|total_area","mn_p_ar$|pat_ct$|inp_dst$")
+            pattern=ifelse(
+                drop_total_area,
+                "mn_p_ar$|pat_ct$|inp_dst$|total_area",
+                "mn_p_ar$|pat_ct$|inp_dst$"
+            )
         )
       ]
     # return unmarked df and pca model to user
@@ -383,6 +386,25 @@ if (nchar(argv[2])!=4){
   argv[2] <- toupper(argv[2])
 }
 
+cat(" -- reading IMBCR data and parsing focal species observations\n")
+# this returns an IMBCR SpatialPointsDataFrame
+imbcr_observations <-
+  OpenIMBCR:::scrub_imbcr_df(OpenIMBCR::imbcrTableToShapefile(
+    list.files("/global_workspace/imbcr_number_crunching/",
+         pattern="RawData_PLJV_IMBCR_20161201.csv$",
+         recursive=T,
+         full.names=T
+       )[1]
+    ),
+    four_letter_code=argv[2],
+    drop_na="none"  # keep aLL NA values
+  )
+
+# sanity-check: do we have enough observations of our bird to make a model?
+if( sum(!is.na(imbcr_observations$radialdistance)) < 80){
+  stop("we have fewer than 80 distance observations for ", argv[2])
+}
+
 cat(" -- reading habitat training data and mean-centering\n")
 
 units <- OpenIMBCR:::readOGRfromPath(argv[1])
@@ -412,25 +434,6 @@ habitat_vars_summary_statistics <- calc_table_summary_statistics(
 
 # now mean-variance center our data
 units@data[,habitat_covs] <- scale(units@data[, habitat_covs])
-
-cat(" -- reading IMBCR data and parsing focal species observations\n")
-# this returns an IMBCR SpatialPointsDataFrame
-imbcr_observations <-
-  OpenIMBCR:::scrub_imbcr_df(OpenIMBCR::imbcrTableToShapefile(
-    list.files("/global_workspace/imbcr_number_crunching/",
-         pattern="RawData_PLJV_IMBCR_20161201.csv$",
-         recursive=T,
-         full.names=T
-       )[1]
-    ),
-    four_letter_code=argv[2],
-    drop_na="none"  # keep aLL NA values
-  )
-
-# sanity-check: do we have enough observations of our bird to make a model?
-if( sum(!is.na(imbcr_observations$radialdistance)) < 80){
-  stop("we have fewer than 80 distance observations for ", argv[2])
-}
 
 cat(" -- calculating distance bins\n")
 
@@ -598,11 +601,20 @@ if ( abs(x_correlation_matrix['ag_mgp_ar','ag_sgp_ar']) > 0.5){
 # Check for correlation between SGP and PC1
 #
 if (exists('pca_m')){
-  imbcr_df <- OpenIMBCR:::check_correlation_matrix(var='ag_sgp_ar', x_correlation_matrix=x_correlation_matrix, imbcr_df=imbcr_df)
-  imbcr_df <- OpenIMBCR:::check_correlation_matrix(var='ag_mgp_ar', x_correlation_matrix=x_correlation_matrix, imbcr_df=imbcr_df)
+  imbcr_df <- OpenIMBCR:::check_correlation_matrix(
+    var='ag_sgp_ar',
+    x_correlation_matrix=x_correlation_matrix,
+    imbcr_df=imbcr_df
+  )
+  imbcr_df <- OpenIMBCR:::check_correlation_matrix(
+    var='ag_mgp_ar',
+    x_correlation_matrix=x_correlation_matrix,
+    imbcr_df=imbcr_df
+  )
 }
 # drop roads from consideration
-imbcr_df@siteCovs <- imbcr_df@siteCovs[ , !grepl(colnames(imbcr_df@siteCovs), pattern="rd_ar")]
+imbcr_df@siteCovs <-
+  imbcr_df@siteCovs[ , !grepl(colnames(imbcr_df@siteCovs), pattern="rd_ar")]
 
 # update our detection covariates in-case they were dropped from the PCA
 # due to missingness and our habitat covariates to account for the PCA
@@ -630,7 +642,10 @@ allHabitatCovs <- allHabitatCovs[!grepl(allHabitatCovs, pattern="lat|lon")]
 # Testing : select an optimal detection function
 #
 
-key_function <- OpenIMBCR:::gdistsamp_find_optimal_key_func(imbcr_df, allDetCovs)
+key_function <- OpenIMBCR:::gdistsamp_find_optimal_key_func(
+    imbcr_df,
+    allDetCovs
+  )
 #
 # Determine a reasonable K from our input table and find
 # minimum AIC values for both the Poisson and Negative Binomial
@@ -802,7 +817,9 @@ model_selection_table <- OpenIMBCR:::allCombinations_dAIC(
 # selected for inclusion in our top models?
 all_variables_within_2aic <-
   model_selection_table$AIC < min(model_selection_table$AIC)+2
-all_variables_within_2aic <- as.character(model_selection_table[all_variables_within_2aic,]$formula)
+all_variables_within_2aic <- as.character(
+    model_selection_table[all_variables_within_2aic,]$formula
+  )
 all_variables_within_2aic <- unique(unlist(lapply(
     all_variables_within_2aic,
     FUN=function(x) strsplit(strsplit(x, split="~")[[1]][2], split="[+]") )
