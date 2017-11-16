@@ -2,7 +2,7 @@
 % Please edit documentation in R/fitting.R
 \name{singleSeasonOccupancy}
 \alias{singleSeasonOccupancy}
-\title{Fit a single-season occupancy model  assumes a constant probability of species
+\title{testing: fit a single-season occupancy model  assumes a constant probability of species
 detection across transects, which is probably inappropriate for IMBCR data and will
 lead to inaccurate predictions of occupancy. This is "model m0" from the literature
 and loosely follows Andy Royle's (2008) model specification. It is designed so that
@@ -21,7 +21,7 @@ singleSeasonOccupancy(det_parameters = NULL, occ_parameters = NULL,
 occupancy ('b0') and probability of detection ('a0')}
 }
 \description{
-Fit a single-season occupancy model  assumes a constant probability of species
+testing: fit a single-season occupancy model  assumes a constant probability of species
 detection across transects, which is probably inappropriate for IMBCR data and will
 lead to inaccurate predictions of occupancy. This is "model m0" from the literature
 and loosely follows Andy Royle's (2008) model specification. It is designed so that

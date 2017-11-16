@@ -6,7 +6,8 @@
 defined in a user-specified model selection table}
 \usage{
 akaike_predict(mod_sel_tab = NULL, train_data = NULL, pred_data = NULL,
-  daic_cutoff = 2, K = NULL, mixture = NULL)
+  daic_cutoff = 2, K = NULL, mixture = NULL, keyfun = NULL,
+  drop_intercept_m = T)
 }
 \description{
 testing : us Akaike weights to predict across a series of models

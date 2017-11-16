@@ -5,7 +5,7 @@
 \title{re-fit a model specified by a formula object}
 \usage{
 gdistsamp_refit_model(formula = NULL, imbcr_df = NULL, K = NULL,
-  mixture = NULL)
+  mixture = NULL, keyfun = NULL)
 }
 \description{
 re-fit a model specified by a formula object
