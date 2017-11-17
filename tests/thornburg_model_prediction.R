@@ -289,7 +289,7 @@ rgdal::writeOGR(
 units@data <-
   data.frame(
     as.vector(k_max_censored)
-  ))
+  )
 colnames(units@data) <- c("k_max_cens")
 rgdal::writeOGR(
   units,
