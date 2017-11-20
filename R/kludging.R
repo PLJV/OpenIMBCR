@@ -39,7 +39,7 @@ transect_fieldname <- function(df=NULL){
 timeperiod_fieldname <- function(df=NULL){
   return(names(df)[grepl(tolower(names(df)),pattern="^tim")])
 }
-#' built-in (hidden) function that will accept the full path of a shapefile 
+#' built-in (hidden) function that will accept the full path of a shapefile
 #' and parse the string into something that rgdal can understand (DSN + Layer).
 parseLayerDsn <- function(x=NULL){
   path <- unlist(strsplit(x, split="/"))
@@ -50,13 +50,10 @@ parseLayerDsn <- function(x=NULL){
 #' built-in (hidden) function that will accept the full path of a shapefile and read using rgdal::ogr
 #' @param path argument provides the full path to an ESRI Shapefile
 readOGRfromPath <- function(path=NULL, verbose=F){
-  landscapeAnalysis:::include('rgdal')
-  path <- landscapeAnalysis:::parseLayerDsn(path)
-
+  path <- OpenIMBCR:::parseLayerDsn(path)
   layer <- path[1]
     dsn <- path[2]
-
-  return(rgdal::readOGR(dsn,layer,verbose=verbose))
+  return(rgdal:::readOGR(dsn,layer,verbose=verbose))
 }
 #' strip non-essential characters and spaces from a species common name in a field
 stripCommonName <- function(x) tolower(gsub(x,pattern=" |'|-",replacement=""))
@@ -242,57 +239,6 @@ parseStationCountsAsOccupancy <- function(detectionHist,na.rm=F){
   }
   do.call(rbind,detectionHist)
 }
-#' generate plant community composition data from the associated IMBCR metadata
-#' @param attribute_all boolean flag indicating whether to take transect-wide metadata and attribute to points
-#' @export
-parseHabitatMetadataByTransect <- function(s, attribute_all=T){
-  # fetch our source table of habitat associations
-  t <- fetchImbcrToLandfireMetadata()
-  # aggregate by IMBCR habitat codes
-         AG  <- as.vector(t[t$to == "AG",1])
-       TREES <- as.vector(t[t$to == "TR",1])
-    WETLANDS <- as.vector(t[t$to == "WE",1])
-  SHRUBLANDS <- as.vector(t[t$to == "SH",1])
-       GRASS <- as.vector(t[t$to == "GR",1])
-       OTHER <- as.vector(t[t$to == "XX",1])
-  # build a data.frame and return to user
-  transects <- unique(s$transectnum)
-   habitat <- list()
-  for(i in 1:length(transects)){
-    # percent cover of our 1-km2 transect
-    habSummary <- s[s$transectnum == transects[i],]@data$primaryhab
-      habSummary <- as.data.frame(table(habSummary)*100/(length(habSummary)))
-        names(habSummary) <- c("habitat","perc_cover")
-
-    habSummary <-
-    data.frame(perc_ag=sum(habSummary[habSummary$habitat %in% AG, 2]),
-               perc_grass=sum(habSummary[habSummary$habitat %in% GRASS, 2]),
-               perc_shrub=sum(habSummary[habSummary$habitat %in% SHRUBLANDS, 2]),
-               perc_tree=sum(habSummary[habSummary$habitat %in% TREES,2]),
-               perc_playa=habSummary[habSummary$habitat == "PL", 2],
-               perc_wetland=sum(habSummary[habSummary$habitat %in% WETLANDS,2]),
-               perc_urban=habSummary[habSummary$habitat == "UR", 2],
-               perc_other=sum(habSummary[habSummary$habitat %in% OTHER,2])
-               )
-     # merge our output and QA check our composition estimates
-     habitat[[i]] <- cbind(transect=transects[[i]],habSummary)
-     if(sum(habitat[[i]][1,2:ncol(habitat[[i]])]) < 100){
-       warning(paste("transect:",transects[[i]]," % cover only adds up to ",
-               round(sum(habitat[[i]][1,2:ncol(habitat[[i]])])),sep=""))
-     }
-  }
-  # bind our summary statistics by transect identifier
-  t_habitat_metadata <- do.call(rbind,habitat)
-    n <- gsub(names(t_habitat_metadata),pattern="transect",replacement="transectnum")
-      names(t_habitat_metadata) <- n
-  if(attribute_all){
-    # generalize our summary statistics across all point observations
-    s@data <- merge(s@data,t_habitat_metadata,by="transectnum")
-    return(s)
-  } else {
-    return(t_habitat_metadata)
-  }
-}
 #' extract (and optionally, summarize using the fun= argument) raster data across IMBCR transects
 #' @export
 extractByTransect <- function(s=NULL,r=NULL,fun=NULL){
@@ -431,7 +377,7 @@ scrub_imbcr_df <- function(df,
 }
 #' accepts a formatted IMBCR SpatialPointsDataFrame and builds an
 #' unmarkedFrameGDS data.frame that we can use for modeling with
-#' the unmarked package. 
+#' the unmarked package.
 #' @export
 build_unmarked_gds <- function(df=NULL,
                                numPrimary=1,

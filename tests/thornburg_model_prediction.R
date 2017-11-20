@@ -291,6 +291,7 @@ units@data <-
     as.vector(k_max_censored)
   )
 colnames(units@data) <- c("k_max_cens")
+
 rgdal::writeOGR(
   units,
   dsn=".",
@@ -298,6 +299,7 @@ rgdal::writeOGR(
   driver="ESRI Shapefile",
   overwrite=T
 )
+
 save(
     compress=T,
     list=c("all_covs_m",
@@ -317,9 +319,9 @@ save(
            # "spatial_model_selection_table",
            "pca_m",
            "predicted_density",
-           "k_max_censored",
+           "k_max_censored"),
            # "spatial_predicted_density"),
     file=paste(
       tolower(r_data_file[1]),
       sep="")
-    )
+)
