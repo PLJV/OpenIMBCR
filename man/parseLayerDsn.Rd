@@ -2,12 +2,12 @@
 % Please edit documentation in R/kludging.R
 \name{parseLayerDsn}
 \alias{parseLayerDsn}
-\title{built-in (hidden) function that will accept the full path of a shapefile 
+\title{built-in (hidden) function that will accept the full path of a shapefile
 and parse the string into something that rgdal can understand (DSN + Layer).}
 \usage{
 parseLayerDsn(x = NULL)
 }
 \description{
-built-in (hidden) function that will accept the full path of a shapefile 
+built-in (hidden) function that will accept the full path of a shapefile
 and parse the string into something that rgdal can understand (DSN + Layer).
 }
