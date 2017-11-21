@@ -218,6 +218,7 @@ l_buffer_grid_units <- function(units=NULL, radius=1500){
     ))
 }
 #' testing: generalization of buffer_grid_unit with parallel comprehension
+#' @export
 par_buffer_grid_units <- function(units=NULL, radius=1500){
   if (!inherits(units, 'list')){
     units <- lapply(
@@ -227,7 +228,11 @@ par_buffer_grid_units <- function(units=NULL, radius=1500){
       )
   }
   e_cl <- parallel::makeCluster(parallel::detectCores()-1)
-  parallel::clusterExport(cl=e_cl, varlist=c("OpenIMBCR:::buffer_grid_unit"))
+  parallel::clusterExport(
+      cl=e_cl,
+      varlist=c("buffer_grid_unit"),
+      envir=environment()
+    )
   parallel::clusterCall(
       e_cl,
       function(x) {
@@ -239,7 +244,7 @@ par_buffer_grid_units <- function(units=NULL, radius=1500){
   return(parallel::parLapply(
     cl=e_cl,
     X=units,
-    fun=OpenIMBCR:::buffer_grid_unit,
+    fun=buffer_grid_unit,
     radius=radius
   ))
 }
@@ -247,6 +252,7 @@ par_buffer_grid_units <- function(units=NULL, radius=1500){
 #' objects using the parallel package. Avoid passing raster files that are
 #' loaded on a network filesystem. Prefer local cached data, otherwise parallel
 #' may fail unexpectedly.
+#' @export
 extract_by <- function(polygon=NULL, r=NULL){
   if (!inherits(polygon, 'list')){
     return(raster::crop(
@@ -314,8 +320,12 @@ binary_reclassify <- function(x=NULL, from=NULL, nomatch=NA){
 }
 
 #' shorthand total area calculation function
-calc_total_area <- function(x=NULL, area_of_cell = 10^-6){
-   # calculate units of total area in square-kilometers
+#' @export
+calc_total_area <- function(x=NULL, area_of_cell = NULL){
+   if(is.null(area_of_cell)){
+     warning("no area units specified -- will use meters->square-kilometers")
+     area_of_cell <- 10^-6
+   }
    ret <- raster::cellStats(x, stat=sum, na.rm=T) *
           prod(raster::res(x)) * area_of_cell
    if (is.na(ret) | is.null(ret)){
@@ -326,6 +336,7 @@ calc_total_area <- function(x=NULL, area_of_cell = 10^-6){
 }
 #' hidden function that will calculate interpatch distance using the raster::distance
 #' function
+#' @export
 calc_interpatch_distance <- function(x=NULL, stat=mean){
   # if there are no habitat patches (issolation would theoretically be
   # very high), don't try to calc inter-patch distance because distance()
@@ -347,6 +358,7 @@ calc_interpatch_distance <- function(x=NULL, stat=mean){
 }
 #' hidden function that will use SDMTools to calculate the mean patch area
 #' of a given cell
+#' @export
 calc_mean_patch_area <- function(x=NULL, area_of_cell = NULL){
   if(is.null(area_of_cell)){
     warning("no area_of_cell argument supplied -- area will be calulated as square-kilometers")
@@ -365,6 +377,7 @@ calc_mean_patch_area <- function(x=NULL, area_of_cell = NULL){
 }
 #' hidden function that will use SDMTools to calculate the number of unique patches
 #' on a given raster object
+#' @export
 calc_patch_count <- function(x=NULL){
   # if there are no habitat patches don't try to calc
   if (sum(!is.na(raster::values(x))) == 0){
@@ -388,7 +401,11 @@ par_calc_stat <- function(X=NULL, fun=NULL, from=NULL, backfill_missing_w=0){
   e_cl <- parallel::makeCluster(parallel::detectCores()-1)
   # assume our nodes will always need 'raster' and kick-in our
   # copy of the binary_reclassify shorthand while we are at it
-  parallel::clusterExport(e_cl, varlist=c('binary_reclassify'))
+  parallel::clusterExport(
+      e_cl,
+      varlist=c('binary_reclassify'),
+      envir=environment()
+    )
   parallel::clusterCall(
       e_cl,
       function(x) library("raster")
