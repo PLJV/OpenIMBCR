@@ -18,14 +18,6 @@ stopifnot(grepl(
     tolower(.Platform$OS.type), pattern = "unix"
   ))
 
-require(raster)
-require(rgdal)
-require(rgeos)
-require(parallel)
-require(SDMTools)
-
-system("clear")
-
 #' generate a square buffer around a single input feature
 buffer_grid_unit <- function(x=NULL, row=NULL, radius=1500){
   if (!is.null(row)){
@@ -296,9 +288,14 @@ cat(" -- reading input raster/vector datasets\n")
 # subset our input units by a user-defined range, if possible
 argv <- na.omit(as.numeric(commandArgs(trailingOnly = T)))
 
-r <- raster(paste("/gis_data/Landcover/PLJV_Landcover/LD_Landcover/",
-    "PLJV_TX_MORAP_2016_CRP.img", sep=""
+# r <- raster(paste("/gis_data/Landcover/PLJV_Landcover/LD_Landcover/",
+#     "PLJV_TX_MORAP_2016_CRP.img", sep=""
+#   ))
+
+r <- raster(paste("/gis_data/Landcover/NASS/Raster/",
+    "2016_30m_cdls.tif", sep=""
   ))
+
 
 if(length(argv)>1){
   cat(
@@ -342,75 +339,74 @@ usng_extractions_1km <- extract_by(
 )
 
 cat(" -- calculating habitat composition/configuration metrics\n")
-ag_area_statistics <-
+area_statistics <-
   data.frame(
       field_name=c(
-        'ag_sgp_ar',
-        'ag_mgp_ar',
-        'ag_oksg_ar',
-        'ag_pl_ar',
-        'ag_crp_ar',
-        'ag_rd_ar'
+        'grass_ar',
+        'shrub_ar',
+        'wetland_ar'
+        # 'ag_pl_ar',
+        # 'ag_crp_ar',
+        # 'ag_rd_ar'
       ),
       src_raster_value=c(
-        '75',
-        '71',
-        'c(85,87)',
-        '12',
-        '39',
-        'c(44,41)'
+        '176',
+        'c(64,152)',
+        '195'
+        # '12',
+        # '39',
+        # 'c(44,41)'
       )
     )
-lg_area_statistics <-
-  data.frame(
-      field_name=c(
-        'lg_sgp_ar',
-        'lg_mgp_ar',
-        'lg_oksg_ar',
-        'lg_pl_ar',
-        'lg_crp_ar',
-        'lg_rd_ar'
-      ),
-      src_raster_value=c(
-        '75',
-        '71',
-        'c(85,87)',
-        '12',
-        '39',
-        'c(44,41)'
-      )
-    )
+# lg_area_statistics <-
+#   data.frame(
+#       field_name=c(
+#         'lg_sgp_ar',
+#         'lg_mgp_ar',
+#         'lg_oksg_ar',
+#         'lg_pl_ar',
+#         'lg_crp_ar',
+#         'lg_rd_ar'
+#       ),
+#       src_raster_value=c(
+#         '75',
+#         '71',
+#         'c(85,87)',
+#         '12',
+#         '39',
+#         'c(44,41)'
+#       )
+#     )
 configuration_statistics <- c(
     'pat_ct',
     'mn_p_ar',
     'inp_dst'
   )
 
-for(i in 1:nrow(lg_area_statistics)){
-  units@data[, as.character(lg_area_statistics[i, 1])] <-
-    par_calc_stat(
-      # using our 1 km unit raster extractions
-      X=usng_extractions_1km,
-      fun = calc_total_area,
-      # using these PLJV landcover cell values in the reclassification
-      from = eval(parse(text=as.character(lg_area_statistics[i, 2])))
-    )
-  units@data[, as.character(ag_area_statistics[i, 1])] <-
+for(i in 1:nrow(area_statistics)){
+  # units@data[, as.character(area_statistics[i, 1])] <-
+  #   par_calc_stat(
+  #     # using our 1 km unit raster extractions
+  #     X=usng_extractions_1km,
+  #     fun = calc_total_area,
+  #     # using these PLJV landcover cell values in the reclassification
+  #     from = eval(parse(text=as.character(area_statistics[i, 2])))
+  #   )
+  units@data[, as.character(area_statistics[i, 1])] <-
     par_calc_stat(
       # using our 3x3 buffered unit raster extractions
       X=usng_extractions_9km,
       fun = calc_total_area,
       # using these PLJV landcover cell values in the reclassification
-      from = eval(parse(text=as.character(ag_area_statistics[i, 2])))
+      from = eval(parse(text=as.character(area_statistics[i, 2])))
     )
 }
 
-# within-unit patch metric calculations [Short, Mixed,
-# shin oak/sand sage, CRP(?)]
+# within-unit patch metric calculations [NASS Grass]
 cat(" -- building a habitat/not-habitat raster surfaces\n")
 valid_habitat_values <- eval(parse(
-    text=paste("c(",paste(lg_area_statistics$src_raster_value[
-      !grepl(lg_area_statistics$field_name, pattern="rd_ar")
+    text=paste("c(",paste(area_statistics$src_raster_value[
+      !grepl(area_statistics$field_name, pattern="rd_ar")
     ], collapse = ","), ")", sep="")
   ))
 cat(" -- calculating patch configuration metrics\n")

@@ -319,9 +319,10 @@ save(
            # "spatial_model_selection_table",
            "pca_m",
            "predicted_density",
-           "k_max_censored"),
-           # "spatial_predicted_density"),
+           "k_max_censored"
+    ),
     file=paste(
       tolower(r_data_file[1]),
-      sep="")
+      sep=""
+    )
 )
