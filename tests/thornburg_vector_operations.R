@@ -292,7 +292,7 @@ argv <- na.omit(as.numeric(commandArgs(trailingOnly = T)))
 #     "PLJV_TX_MORAP_2016_CRP.img", sep=""
 #   ))
 
-r <- raster(paste("/gis_data/Landcover/NASS/Raster/",
+r <- raster::raster(paste("/gis_data/Landcover/NASS/Raster/",
     "2016_30m_cdls.tif", sep=""
   ))
 
