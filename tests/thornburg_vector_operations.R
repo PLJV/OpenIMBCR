@@ -19,78 +19,78 @@ stopifnot(grepl(
   ))
 
 #' generate a square buffer around a single input feature
-buffer_grid_unit <- function(x=NULL, row=NULL, radius=1500){
-  if (!is.null(row)){
-    x <- x[row, ]
-  } else {
-    x <- unlist(x)[1, ]
-  }
-  # bogart a centroid for the enclosing grid square
-  centroid <- rgeos::gCentroid(
-      x,
-      byid = F
-    )@coords
-  # build a single square polygon
-  square <- sp::Polygon(
-        coords = matrix(
-          data=
-            c(centroid[1]+radius, # x1
-              centroid[1]-radius, # x2
-              centroid[1]-radius, # x3
-              centroid[1]+radius, # x4
-              centroid[2]+radius, # y1
-              centroid[2]+radius, # y2
-              centroid[2]-radius, # y3
-              centroid[2]-radius),# y4
-          ncol=2
-        ),
-        hole=F
-    )
-    # return as a SpatialPolygons object that Raster can comprehend
-    return(sp::SpatialPolygons(
-        Srl=list(
-          sp::Polygons(list(square),
-          ID=ifelse(is.null(row), 1, row)
-        )),
-        proj4string=sp::CRS(raster::projection(x))
-      ))
-}
+# buffer_grid_unit <- function(x=NULL, row=NULL, radius=1500){
+#   if (!is.null(row)){
+#     x <- x[row, ]
+#   } else {
+#     x <- unlist(x)[1, ]
+#   }
+#   # bogart a centroid for the enclosing grid square
+#   centroid <- rgeos::gCentroid(
+#       x,
+#       byid = F
+#     )@coords
+#   # build a single square polygon
+#   square <- sp::Polygon(
+#         coords = matrix(
+#           data=
+#             c(centroid[1]+radius, # x1
+#               centroid[1]-radius, # x2
+#               centroid[1]-radius, # x3
+#               centroid[1]+radius, # x4
+#               centroid[2]+radius, # y1
+#               centroid[2]+radius, # y2
+#               centroid[2]-radius, # y3
+#               centroid[2]-radius),# y4
+#           ncol=2
+#         ),
+#         hole=F
+#     )
+#     # return as a SpatialPolygons object that Raster can comprehend
+#     return(sp::SpatialPolygons(
+#         Srl=list(
+#           sp::Polygons(list(square),
+#           ID=ifelse(is.null(row), 1, row)
+#         )),
+#         proj4string=sp::CRS(raster::projection(x))
+#       ))
+# }
 #' testing: generalization of the buffer_grid_units function that uses
 #' lapply to buffer across all grid features in an input units
 #' data.frame. Parallel implementations for this function are difficult,
 #' because you have to push a copy of units onto each node
-l_buffer_grid_units <- function(units=NULL, radius=1500){
-  return(lapply(
-      X=1:nrow(units),
-      FUN=function(x) buffer_grid_unit(row=x, x=units, radius=radius)
-    ))
-}
+# l_buffer_grid_units <- function(units=NULL, radius=1500){
+#   return(lapply(
+#       X=1:length(units@polygons),
+#       FUN=function(x) buffer_grid_unit(row=x, x=units, radius=radius)
+#     ))
+# }
 #' testing: generalization of buffer_grid_unit with parallel comprehension
-par_buffer_grid_units <- function(units=NULL, radius=1500){
-  if (!inherits(units, 'list')){
-    units <- lapply(
-        X=split(units, 1:nrow(units)),
-        FUN=as,
-        'SpatialPolygons'
-      )
-  }
-  e_cl <- parallel::makeCluster(parallel::detectCores()-1)
-  clusterExport(cl=e_cl, varlist=c("buffer_grid_unit"))
-  parallel::clusterCall(
-      e_cl,
-      function(x) {
-        library("rgeos");
-        library("sp");
-        library("raster");
-      }
-    )
-  return(parallel::parLapply(
-    cl=e_cl,
-    X=units,
-    fun=buffer_grid_unit,
-    radius=radius
-  ))
-}
+# par_buffer_grid_units <- function(units=NULL, radius=1500){
+#   if (!inherits(units, 'list')){
+#     units <- lapply(
+#         X=sp::split(units, 1:length(units@polygons)),
+#         FUN=as,
+#         'SpatialPolygons'
+#       )
+#   }
+#   e_cl <- parallel::makeCluster(parallel::detectCores()-1)
+#   clusterExport(cl=e_cl, varlist=c("buffer_grid_unit"))
+#   parallel::clusterCall(
+#       e_cl,
+#       function(x) {
+#         library("rgeos");
+#         library("sp");
+#         library("raster");
+#       }
+#     )
+#   return(parallel::parLapply(
+#     cl=e_cl,
+#     X=units,
+#     fun=buffer_grid_unit,
+#     radius=radius
+#   ))
+# }
 #' extract an input raster dataset using polygon feature(s). Bulk process list
 #' objects using the parallel package. Avoid passing raster files that are
 #' loaded on a network filesystem. Prefer local cached data, otherwise parallel
@@ -118,7 +118,7 @@ extract_by <- function(polygon=NULL, r=NULL){
       )
   }
   e_cl <- parallel::makeCluster(parallel::detectCores()-1)
-  clusterExport(cl=e_cl, varlist=c("r"))
+  parallel::clusterExport(cl=e_cl, varlist=c("r"))
   ret <- parallel::parLapply(
       e_cl,
       X=polygon,
@@ -156,7 +156,7 @@ binary_reclassify <- function(x=NULL, from=NULL, nomatch=NA){
           table=from,
           nomatch=nomatch
         ),
-        FUN=calc,
+        FUN=raster::calc,
         fun=function(x,na.rm=F){x>=1}
       ))
 }
@@ -165,6 +165,7 @@ binary_reclassify <- function(x=NULL, from=NULL, nomatch=NA){
 #' scalar value attributable to each grid unit. Will optionally
 #' reclassify each input raster to a binary using binary_reclassify() if a
 #' non-null value is passed to from=
+#
 par_calc_stat <- function(X=NULL, fun=NULL, from=NULL, backfill_missing_w=0){
   stopifnot(inherits(fun, 'function'))
   e_cl <- parallel::makeCluster(parallel::detectCores()-1)
@@ -316,7 +317,7 @@ if(length(argv)>1){
   units <-
     sp::spTransform(rgdal::readOGR(
         "/gis_data/Grids/",
-        "1km_usng_pljv_region_v1.0",
+        "1km_usng_pljv_region_v3.0",
         verbose=F
       ),
       CRSobj=sp::CRS(raster::projection(r))
