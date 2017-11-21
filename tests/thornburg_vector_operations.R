@@ -304,7 +304,7 @@ if(length(argv)>1){
       ")\n", sep = ""
     )
   units <-
-    sp::spTransform(readOGR(
+    sp::spTransform(rgdal::readOGR(
         "/gis_data/Grids/",
         "1km_usng_pljv_region_v3.0",
         verbose=F
@@ -314,7 +314,7 @@ if(length(argv)>1){
 } else {
   argv <- c(NULL,NULL)
   units <-
-    sp::spTransform(readOGR(
+    sp::spTransform(rgdal::readOGR(
         "/gis_data/Grids/",
         "1km_usng_pljv_region_v1.0",
         verbose=F
