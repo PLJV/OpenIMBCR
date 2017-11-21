@@ -75,7 +75,7 @@ stopifnot(grepl(
 #       )
 #   }
 #   e_cl <- parallel::makeCluster(parallel::detectCores()-1)
-#   clusterExport(cl=e_cl, varlist=c("buffer_grid_unit"))
+#   parallel::clusterExport(cl=e_cl, varlist=c("buffer_grid_unit"))
 #   parallel::clusterCall(
 #       e_cl,
 #       function(x) {
