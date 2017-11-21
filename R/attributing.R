@@ -227,7 +227,7 @@ par_buffer_grid_units <- function(units=NULL, radius=1500){
       )
   }
   e_cl <- parallel::makeCluster(parallel::detectCores()-1)
-  parallel::clusterExport(cl=e_cl, varlist=c("buffer_grid_unit"))
+  parallel::clusterExport(cl=e_cl, varlist=c("OpenIMBCR:::buffer_grid_unit"))
   parallel::clusterCall(
       e_cl,
       function(x) {
@@ -239,7 +239,7 @@ par_buffer_grid_units <- function(units=NULL, radius=1500){
   return(parallel::parLapply(
     cl=e_cl,
     X=units,
-    fun=buffer_grid_unit,
+    fun=OpenIMBCR:::buffer_grid_unit,
     radius=radius
   ))
 }
