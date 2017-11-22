@@ -156,7 +156,7 @@ units@data[, as.character(configuration_statistics[3])] <-
   )
 
 # save to disk
-cat(" -- finished: caching metrics to disk")
+cat(" -- finished: caching metrics to disk\n")
 rgdal::writeOGR(
     units,
     dsn=".",

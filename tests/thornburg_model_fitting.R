@@ -598,11 +598,20 @@ if(sum(grepl(colnames(x_correlation_matrix), pattern="sgp_ar|mgp_ar")) > 1)
       #imbcr_df@siteCovs[,'grass_ar'] <- rowSums(imbcr_df@siteCovs[, c('ag_sgp_ar','lg_sgp_ar')])
   }
 }
-
+#
+# if we have a "grass" covariate, say from NASS, check for correlation with PC1
+#
+if(sum(grepl(colnames(x_correlation_matrix), pattern="grass_ar")) > 0)
+  imbcr_df <- OpenIMBCR:::check_correlation_matrix(
+    var='grass_ar',
+    x_correlation_matrix=x_correlation_matrix,
+    imbcr_df=imbcr_df
+  )
+}
 #
 # Check for correlation between SGP and PC1
 #
-if(sum(grepl(colnames(x_correlation_matrix), pattern="sgp_ar|mgp_ar")) > 0)
+if(sum(grepl(colnames(x_correlation_matrix), pattern="sgp_ar|mgp_ar")) > 0) {
   if (exists('pca_m')){
     imbcr_df <- OpenIMBCR:::check_correlation_matrix(
       var='ag_sgp_ar',
@@ -645,7 +654,6 @@ allHabitatCovs <- allHabitatCovs[!grepl(allHabitatCovs, pattern="lat|lon")]
 #
 # Testing : select an optimal detection function
 #
-
 key_function <- OpenIMBCR:::gdistsamp_find_optimal_key_func(
     imbcr_df,
     allDetCovs
