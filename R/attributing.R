@@ -223,8 +223,8 @@ par_buffer_grid_units <- function(units=NULL, radius=1500){
   if (!inherits(units, 'list')){
     units <- lapply(
         X=sp::split(units, 1:length(units@polygons)),
-        FUN=as,
-        'SpatialPolygons'
+        FUN=methods::as,
+        Class='SpatialPolygons'
       )
   }
   e_cl <- parallel::makeCluster(parallel::detectCores()-1)

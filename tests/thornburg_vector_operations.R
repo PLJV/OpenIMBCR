@@ -29,7 +29,7 @@ cat(" -- reading input raster/vector datasets\n")
 
 # read-in US national grid and our source landcover data
 # subset our input units by a user-defined range, if possible
-argv <- na.omit(as.numeric(commandArgs(trailingOnly = T)))
+argv <- na.omit(suppressWarnings(as.numeric(commandArgs(trailingOnly = T))))
 
 # r <- raster(paste("/gis_data/Landcover/PLJV_Landcover/LD_Landcover/",
 #     "PLJV_TX_MORAP_2016_CRP.img", sep=""
@@ -49,7 +49,7 @@ if(length(argv)>1){
   units <-
     sp::spTransform(rgdal::readOGR(
         "/gis_data/Grids/",
-        "1km_usng_pljv_region_v3.0",
+        "1km_usng_pljv_region_v2.0",
         verbose=F
       )[(argv[1]+1):argv[2], ],
       CRSobj=sp::CRS(raster::projection(r))
@@ -59,7 +59,7 @@ if(length(argv)>1){
   units <-
     sp::spTransform(rgdal::readOGR(
         "/gis_data/Grids/",
-        "1km_usng_pljv_region_v3.0",
+        "1km_usng_pljv_region_v2.0",
         verbose=F
       ),
       CRSobj=sp::CRS(raster::projection(r))
@@ -106,7 +106,7 @@ for(i in 1:nrow(area_statistics)){
   #     from = eval(parse(text=as.character(area_statistics[i, 2])))
   #   )
   units@data[, as.character(area_statistics[i, 1])] <-
-    par_calc_stat(
+    OpenIMBCR::par_calc_stat(
       # using our 3x3 buffered unit raster extractions
       X=usng_extractions_9km,
       fun = OpenIMBCR::calc_total_area,
@@ -124,31 +124,31 @@ valid_habitat_values <- eval(parse(
   ))
 cat(" -- calculating patch configuration metrics\n")
 units@data[, as.character(configuration_statistics[1])] <-
-  par_calc_stat(
+  OpenIMBCR::par_calc_stat(
       # using our using our un-buffered unit raster extractions
       usng_extractions_9km,
       # parse the focal landscape configuration metric
-      fun = calc_patch_count,
+      fun = OpenIMBCR::calc_patch_count,
       # using these PLJV landcover cell values in the supplemental
       # reclassification
       from = valid_habitat_values
     )
 units@data[, as.character(configuration_statistics[2])] <-
-  par_calc_stat(
+  OpenIMBCR::par_calc_stat(
     # using our using our un-buffered unit raster extractions
     usng_extractions_9km,
     # mean patch area function:
-    fun = calc_mean_patch_area,
+    fun = OpenIMBCR::calc_mean_patch_area,
     # using these PLJV landcover cell values in the supplemental
     # reclassification
     from = valid_habitat_values
   )
 units@data[, as.character(configuration_statistics[3])] <-
-  par_calc_stat(
+  OpenIMBCR::par_calc_stat(
     # using our using our un-buffered unit raster extractions
     usng_extractions_9km,
     # mean inter-patch distance function:
-    fun = calc_interpatch_distance,
+    fun = OpenIMBCR::calc_interpatch_distance,
     # using these PLJV landcover cell values in the supplemental
     # reclassification
     from = valid_habitat_values,

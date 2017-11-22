@@ -591,26 +591,30 @@ x_correlation_matrix <- round(cor(imbcr_df@siteCovs),2)
 #
 
 
-if ( abs(x_correlation_matrix['ag_mgp_ar','ag_sgp_ar']) > 0.5){
-    warning("found a relatively high level of correlation between spg and mgp area -- favoring sgp and dropping mgp")
-    imbcr_df@siteCovs[,!grepl(colnames(imbcr_df@siteCovs), pattern="_sgp")]
-    #imbcr_df@siteCovs[,'grass_ar'] <- rowSums(imbcr_df@siteCovs[, c('ag_sgp_ar','lg_sgp_ar')])
+if(sum(grepl(colnames(x_correlation_matrix), pattern="sgp_ar|mgp_ar")) > 1)
+  if ( abs(x_correlation_matrix['ag_mgp_ar','ag_sgp_ar']) > 0.5){
+      warning("found a relatively high level of correlation between spg and mgp area -- favoring sgp and dropping mgp")
+      imbcr_df@siteCovs[,!grepl(colnames(imbcr_df@siteCovs), pattern="_sgp")]
+      #imbcr_df@siteCovs[,'grass_ar'] <- rowSums(imbcr_df@siteCovs[, c('ag_sgp_ar','lg_sgp_ar')])
+  }
 }
 
 #
 # Check for correlation between SGP and PC1
 #
-if (exists('pca_m')){
-  imbcr_df <- OpenIMBCR:::check_correlation_matrix(
-    var='ag_sgp_ar',
-    x_correlation_matrix=x_correlation_matrix,
-    imbcr_df=imbcr_df
-  )
-  imbcr_df <- OpenIMBCR:::check_correlation_matrix(
-    var='ag_mgp_ar',
-    x_correlation_matrix=x_correlation_matrix,
-    imbcr_df=imbcr_df
-  )
+if(sum(grepl(colnames(x_correlation_matrix), pattern="sgp_ar|mgp_ar")) > 0)
+  if (exists('pca_m')){
+    imbcr_df <- OpenIMBCR:::check_correlation_matrix(
+      var='ag_sgp_ar',
+      x_correlation_matrix=x_correlation_matrix,
+      imbcr_df=imbcr_df
+    )
+    imbcr_df <- OpenIMBCR:::check_correlation_matrix(
+      var='ag_mgp_ar',
+      x_correlation_matrix=x_correlation_matrix,
+      imbcr_df=imbcr_df
+    )
+  }
 }
 # drop roads from consideration
 imbcr_df@siteCovs <-
