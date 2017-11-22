@@ -591,7 +591,7 @@ x_correlation_matrix <- round(cor(imbcr_df@siteCovs),2)
 #
 
 
-if(sum(grepl(colnames(x_correlation_matrix), pattern="sgp_ar|mgp_ar")) > 1)
+if(sum(grepl(colnames(x_correlation_matrix), pattern="sgp_ar|mgp_ar")) > 1) {
   if ( abs(x_correlation_matrix['ag_mgp_ar','ag_sgp_ar']) > 0.5){
       warning("found a relatively high level of correlation between spg and mgp area -- favoring sgp and dropping mgp")
       imbcr_df@siteCovs[,!grepl(colnames(imbcr_df@siteCovs), pattern="_sgp")]
@@ -601,7 +601,7 @@ if(sum(grepl(colnames(x_correlation_matrix), pattern="sgp_ar|mgp_ar")) > 1)
 #
 # if we have a "grass" covariate, say from NASS, check for correlation with PC1
 #
-if(sum(grepl(colnames(x_correlation_matrix), pattern="grass_ar")) > 0)
+if(sum(grepl(colnames(x_correlation_matrix), pattern="grass_ar")) > 0) {
   imbcr_df <- OpenIMBCR:::check_correlation_matrix(
     var='grass_ar',
     x_correlation_matrix=x_correlation_matrix,
@@ -625,7 +625,7 @@ if(sum(grepl(colnames(x_correlation_matrix), pattern="sgp_ar|mgp_ar")) > 0) {
     )
   }
 }
-# drop roads from consideration
+# drop roads from consideration, if it's in the input table
 imbcr_df@siteCovs <-
   imbcr_df@siteCovs[ , !grepl(colnames(imbcr_df@siteCovs), pattern="rd_ar")]
 
