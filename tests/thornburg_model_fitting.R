@@ -453,7 +453,7 @@ cat(" -- calculating detection covariates\n")
 
 # merge-in supplemental detection covariates
 detection_metadata <- read.csv(
-    "/global_workspace/imbcr_number_crunching/PLJV_IMBCR_SiteData_byPoint_2016-2017.csv"
+    "/global_workspace/imbcr_number_crunching/results/PLJV_IMBCR_SiteData_byPoint_2016-2017.csv"
   )
 colnames(detection_metadata) <- tolower(colnames(detection_metadata))
 imbcr_observations@data <- merge(
