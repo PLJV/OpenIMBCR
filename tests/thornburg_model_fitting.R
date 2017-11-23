@@ -14,15 +14,16 @@ stopifnot(grepl(
   ))
 system("clear")
 #' pavlacky fragmentation pca
-pca_reconstruction <- function(x,
-                               frag_covs=NULL,
-                               total_area_filter=NULL,
-                               total_area_suffix="_ar$",
-                               drop_total_area=T,
-                               scale=T,
-                               center=T,
-                               test=1)
-{
+pca_partial_reconstruction <- function(
+  x=NULL,
+  frag_covs=NULL,
+  total_area_filter=NULL,
+  total_area_suffix="_ar$",
+  drop_total_area=T,
+  scale=T,
+  center=F,
+  test=4
+) {
   which_component_max_area <- function(m=NULL, area_metric="total_area"){
     # find the eigenvector rotation maximums for each component
     return(as.vector(which.max(abs(m$rotation[area_metric,]))))
@@ -148,10 +149,10 @@ pca_reconstruction <- function(x,
         total_area <- pca$x[,total_area_component] %*% t(pca$rotation[,total_area_component])
         x@siteCovs$total_area <- total_area[,'total_area']
     }
-    # Re-calculate a PCA from our partial reconstruction
+    # Re-calculate a PCA from (above) partial reconstruction of our fragmentation metrics
     pca_2 <- prcomp(x_hat, scale.=T, center=T)
-    # subset the scores matrix ($x) for our single retained component
-    scores_matrix <- as.matrix(pca$x[,1])
+    # subset the scores matrix ($x) for the first principal component
+    scores_matrix <- as.matrix(pca_2$x[,1])
     colnames(scores_matrix) <- "PC1"
     # drop our lurking configuration metrics
     x@siteCovs <- cbind(
