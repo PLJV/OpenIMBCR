@@ -862,20 +862,6 @@ if(length(all_variables_within_2aic)<length(allHabitatCovs)){
   )
 }
 
-# spatial_model_selection_table <- OpenIMBCR:::allCombinations_dAIC(
-#   siteCovs=allSpatialCovs,
-#   detCovs=allDetCovs,
-#   step=500,
-#   umdf=imbcr_df,
-#   umFunction=unmarked::gdistsamp,
-#   mixture=mixture_dist,
-#   unitsOut="kmsq",
-#   K=K,
-#   se=T,
-#   keyfun=key_function,
-#   offset="offset(log(effort))"
-# )
-
 
 #
 # now calculate some akaike weights from our run table
@@ -885,16 +871,11 @@ model_selection_table$weight <- OpenIMBCR:::akaike_weights(
     model_selection_table$AIC
   )
 
-# spatial_model_selection_table$weight <- OpenIMBCR:::akaike_weights(
-#     spatial_model_selection_table$AIC
-#   )
-
 save(
     compress=T,
     list=c("argv",
            "habitat_vars_summary_statistics",
            "model_selection_table",
-           # "spatial_model_selection_table",
            "imbcr_df_original",
            "imbcr_df",
            "negbin_aic",
