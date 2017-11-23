@@ -154,6 +154,7 @@ pca_partial_reconstruction <- function(
     # subset the scores matrix ($x) for the first principal component
     scores_matrix <- as.matrix(pca_2$x[,1])
     colnames(scores_matrix) <- "PC1"
+    # bind our 'fragmentation' component and then drop
     # drop our lurking configuration metrics
     x@siteCovs <- cbind(
         x@siteCovs,
@@ -576,7 +577,7 @@ if ( sum(grepl(colnames(imbcr_df@siteCovs), pattern=c("mn_p_ar|pat_ct|inp_dst"))
   warning("we dropped one or more of our fragmentation metrics due to ",
   "missingness while pruning the input dataset -- skipping PCA calculation")
 } else {
-  pca_m <- pca_reconstruction(imbcr_df, test=4, drop_total_area=F)
+  pca_m <- pca_partial_reconstruction(imbcr_df, test=4, drop_total_area=F)
   imbcr_df_original <- imbcr_df
   imbcr_df <- pca_m[[1]]
 }
