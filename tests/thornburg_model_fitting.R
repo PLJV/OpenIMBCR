@@ -12,17 +12,21 @@ require(OpenIMBCR)
 stopifnot(grepl(
     tolower(.Platform$OS.type), pattern = "unix"
   ))
+
 system("clear")
-#' pavlacky fragmentation pca
+
+#' hidden local function that will do a partial reconstruction of habitat area
+#' and habitat fragmentation, providing a total area metric and a fragmentation
+#' metric that are uncorrelated from each other.
 pca_partial_reconstruction <- function(
-  x=NULL,
-  frag_covs=NULL,
-  total_area_filter=NULL,
-  total_area_suffix="_ar$",
-  drop_total_area=T,
-  scale=T,
-  center=F,
-  test=4
+  x=NULL,                   # source data.frame to use for our PCA
+  frag_covs=NULL,           # explicitly define frag metrics, otherwise will pick defaults
+  total_area_filter=NULL,   # i.e., drop any variables that match (grep)
+  total_area_suffix="_ar$", # all habitat vars have this suffix
+  drop_total_area=T,        # when we are done, should we keep a metric?
+  scale=T,                  # by default, should we scale our input table?
+  center=F,                 # by default, should we center our input table?
+  test=4                    # debug: pick an implementation (1-4)
 ) {
   which_component_max_area <- function(m=NULL, area_metric="total_area"){
     # find the eigenvector rotation maximums for each component
@@ -264,7 +268,7 @@ pca_dim_reduction <- function(x,
 }
 #' testing : build a full PCA (for all covariates) and train a model to a subset
 #' of components that explain some threshold of variance
-quantile_pcr <- function(imbcr_df=NULL, siteCovs=NULL, threshold=0.7, K=NULL){
+quantile_pcr <- function(imbcr_df=NULL, siteCovs=NULL, detCovs=NULL, threshold=0.7, K=NULL){
   if(is.null(K)){
     K <- OpenIMBCR:::calc_k(imbcr_df)
   }
@@ -285,7 +289,7 @@ quantile_pcr <- function(imbcr_df=NULL, siteCovs=NULL, threshold=0.7, K=NULL){
         sep=""
       )),
       ~1,
-      as.formula(paste("~",paste(allDetCovs, collapse="+"))),
+      as.formula(paste("~",paste(detCovs, collapse="+"))),
       data=imbcr_df,
       keyfun="halfnorm",
       mixture="P",
@@ -446,6 +450,7 @@ breaks <- append(0,as.numeric(quantile(as.numeric(
     na.rm=T,
     probs=seq(0.05,0.90,length.out=9))
   ))
+
 imbcr_observations <- OpenIMBCR:::calc_dist_bins(
     imbcr_observations,
     breaks=breaks
@@ -470,8 +475,8 @@ imbcr_observations$sky_end <- (imbcr_observations$sky_end+1)^2
 imbcr_observations$wind_st <- (imbcr_observations$wind_st+1)^2
 imbcr_observations$wind_end <- (imbcr_observations$wind_end+1)^2
 
-imbcr_observations <- OpenIMBCR:::calc_day_of_year(imbcr_observations)
-imbcr_observations <- OpenIMBCR:::calc_transect_effort(imbcr_observations)
+imbcr_observations <- OpenIMBCR::calc_day_of_year(imbcr_observations)
+imbcr_observations <- OpenIMBCR::calc_transect_effort(imbcr_observations)
 
 # append detection covariate summary statistics to our
 # habitat summary table so we can go-back from mean-variance
