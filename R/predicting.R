@@ -18,6 +18,7 @@
 
 #' testing: use the parallel package to predict across a large input
 #' table (with unmarked) using chunking.
+#' @export
 par_unmarked_predict <- function(run_table=NULL, m=NULL){
 
       steps <- seq(0, nrow(run_table), by=100)
