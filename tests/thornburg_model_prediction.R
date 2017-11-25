@@ -144,7 +144,7 @@ akaike_models_m <- OpenIMBCR:::akaike_predict(
 #   )
 cat(" -- reading our input vector data containing covariates for predict()\n")
 units <- OpenIMBCR:::readOGRfromPath(
-    "/global_workspace/thornburg/vector/units_attributed.shp"
+    "/global_workspace/thornburg/vector/units_attributed_nass_2016.shp"
   )
 cat(" -- calculating centroids for each USNG unit\n")
 centroids <- rgeos::gCentroid(
@@ -188,11 +188,11 @@ if(using_fragmentation_metric){
 # across all stations
 units@data$effort <- mean(top_model_m@data@siteCovs$effort)
 cat(" -- predicting against top model\n")
-predicted_density_top_model <- par_unmarked_predict(
+predicted_density_top_model <- OpenIMBCR::par_unmarked_predict(
     units,
     top_model_m
   )
-# predicted_density_spatial_top_model <- par_unmarked_predict(
+# predicted_density_spatial_top_model <- OpenIMBCR::par_unmarked_predict(
 #     units,
 #     top_spatial_m
 #   )
@@ -202,11 +202,11 @@ if(length(akaike_models_m)>1){
         X=akaike_models_m,
         FUN=function(x) {
         gc() # forces us to drop an old cluster if it's lurking
-        prediction <- par_unmarked_predict(units, x$model)
+        prediction <- OpenIMBCR::par_unmarked_predict(units, x$model)
         return(list(prediction=prediction, weight=x$weight))
     })
     # merge our tables
-    predicted_density <- akaike_weight_predictions(
+    predicted_density <- OpenIMBCR::akaike_weight_predictions(
       predicted_density_akaike_models,
       col=1 # we're not averaging across stderr here
     )
@@ -224,7 +224,7 @@ if(length(akaike_models_m)>1){
 #         return(list(prediction=prediction, weight=x$weight))
 #     })
 #     # merge our tables
-#     spatial_predicted_density <- akaike_weight_predictions(
+#     spatial_predicted_density <- OpenIMBCR::akaike_weight_predictions(
 #       predicted_density_spatial_akaike_models,
 #       col=1 # we're not averaging across stderr here
 #     )

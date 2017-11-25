@@ -93,6 +93,7 @@ akaike_predict <- function(
 #' a data.frame of weighted-average predictions. 
 #' @param col column of the prediction table to average. Typically there are th
 #' ree columns from predict, specifying prediction, upper-bound, and lower-bound
+#' @export
 akaike_weight_predictions <- function(akaike_list=NULL, col=1){
     table <- (do.call(cbind, lapply(
         X=akaike_list,
