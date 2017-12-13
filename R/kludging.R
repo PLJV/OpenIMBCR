@@ -531,3 +531,14 @@ scrub_unmarked_dataframe <- function(x=NULL, normalize=T, prune_cutoff=NULL){
   }
   return(x)
 }
+#' hidden function that will calculate the centroids of a USNG
+#' (SpatialPolygons) and return only unique (non-duplicated) 
+#' units
+drop_overlapping_units <- function(units=NULL){
+   duplicated <- duplicated(round(
+       rgeos::gCentroid(units, byid=T)@coords
+     ))
+    return(
+      units[!duplicated , ]
+    )
+}
