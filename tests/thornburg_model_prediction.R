@@ -143,9 +143,9 @@ akaike_models_m <- OpenIMBCR:::akaike_predict(
 #     keyfun=key_function
 #   )
 cat(" -- reading our input vector data containing covariates for predict()\n")
-units <- OpenIMBCR:::readOGRfromPath(
+units <- OpenIMBCR:::drop_overlapping_units(OpenIMBCR:::readOGRfromPath(
     "/global_workspace/thornburg/vector/units_attributed_nass_2016.shp"
-  )
+  ))
 cat(" -- calculating centroids for each USNG unit\n")
 centroids <- rgeos::gCentroid(
     as(

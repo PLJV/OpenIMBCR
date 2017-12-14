@@ -413,7 +413,9 @@ if( sum(!is.na(imbcr_observations$radialdistance)) < 80){
 
 cat(" -- reading habitat training data and mean-centering\n")
 
-units <- OpenIMBCR:::readOGRfromPath(argv[1])
+units <- OpenIMBCR:::drop_overlapping_units(OpenIMBCR:::readOGRfromPath(
+    argv[1]
+  ))
 
 # the raw IMBCR DataFrame will have a mess of variables in
 # it that we don't need. Let's assume anything with the suffix

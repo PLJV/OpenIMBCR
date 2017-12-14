@@ -144,13 +144,22 @@ imbcrTableToShapefile <- function(filename=NULL,outfile=NULL,
     }
     # write to disk -- and allow some wiggle-room on filename conventions
     if(write){
-      rgdal::writeOGR(s,".",ifelse(is.null(outfile),gsub(filename,pattern=".csv",replacement=""),outfile),driver="ESRI Shapefile",overwrite=T)
+      rgdal::writeOGR(
+        s,
+        ".",
+        ifelse(is.null(outfile),gsub(filename,pattern=".csv",replacement=""),outfile),
+        driver="ESRI Shapefile",
+        overwrite=T
+      )
     }
   }
   return(s)
 }
 #' fetch IMBCR Metadata to Landfire code conversions
-fetchImbcrToLandfireMetadata <-function(url="https://docs.google.com/spreadsheets/d/1wJ3Xwr67GTYYfim29cKQ9m3AJgoOQryYTHc9v5gJB2g/pub?gid=0&single=true&output=csv"){
+fetchImbcrToLandfireMetadata <-function(
+  url=paste("https://docs.google.com/spreadsheets/d/1wJ3Xwr67GTYYfim29cKQ9m3AJgoOQ",
+        "ryYTHc9v5gJB2g/pub?gid=0&single=true&output=csv", sep="")
+){
   download.file(url,destfile="imbcr_meta_codes.csv",quiet=T);
     t <- read.csv("imbcr_meta_codes.csv")
       names(t) <- tolower(names(t))
@@ -158,7 +167,23 @@ fetchImbcrToLandfireMetadata <-function(url="https://docs.google.com/spreadsheet
   file.remove("imbcr_meta_codes.csv")
   return(t[,c(1,2)])
 }
-
+#' hidden function that will calculate the centroids of a USNG
+#' (SpatialPolygons) and return only unique (non-duplicated)
+#' units
+drop_overlapping_units <- function(units=NULL){
+   # warn if units don't appear to be projected in
+   # meters, which would make our rounding below
+   # inappropriate
+   if(!grep(raster::projection(units), pattern="units=m")){
+     warning("units= polygons do not appear to be metric -- we might over-estimate potential overlap")
+   }
+   duplicated <- duplicated(round(
+       rgeos::gCentroid(units, byid=T)@coords
+     ))
+    return(
+      units[!duplicated , ]
+    )
+}
 #' accepts a SpatialPointsDataFrame of IMBCR data and parses observations into counts for a focal
 #' species specified by the user.
 #' @param spp character string specifying focal species common name
@@ -531,14 +556,4 @@ scrub_unmarked_dataframe <- function(x=NULL, normalize=T, prune_cutoff=NULL){
   }
   return(x)
 }
-#' hidden function that will calculate the centroids of a USNG
-#' (SpatialPolygons) and return only unique (non-duplicated) 
-#' units
-drop_overlapping_units <- function(units=NULL){
-   duplicated <- duplicated(round(
-       rgeos::gCentroid(units, byid=T)@coords
-     ))
-    return(
-      units[!duplicated , ]
-    )
-}
+
