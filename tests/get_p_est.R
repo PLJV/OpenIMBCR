@@ -1,0 +1,6 @@
+require(unmarked)
+argv <- commandArgs(trailingOnly=T)
+load(argv)
+cat(" -- processing",argv,"\n")
+coefficients <- coef(all_covs_m)
+cat(" -- p =",plogis(coefficients['p(Int)']),"\n")

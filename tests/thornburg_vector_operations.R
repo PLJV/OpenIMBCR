@@ -36,7 +36,7 @@ argv <- na.omit(suppressWarnings(as.numeric(commandArgs(trailingOnly = T))))
 #   ))
 
 r <- raster::raster(paste("/gis_data/Landcover/NASS/Raster/",
-    "2016_30m_cdls.tif", sep=""
+    "2016_nass_crp_test_merge.tif", sep=""
   ))
 
 
