@@ -70,7 +70,7 @@ calc_route_centroids <- function(s=NULL, four_letter_code=NULL){
 	    FUN=function(transect){ 
 	      transect <- s[s$transectnum == transect, ] 
 	      detections <- transect$birdcode == four_letter_code
-		      detections <- sum(transect[detections,]$radialdistance > 0)
+		      detections <- sum(transect[detections,]$radialdistance > 0, na.rm=T)
 	      pt <- rgeos::gCentroid(transect)
 	        pt$detections <- detections
 	        pt$transect <- unique(transect$transectnum)
