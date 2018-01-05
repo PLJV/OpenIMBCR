@@ -586,9 +586,10 @@ imbcr_df <- OpenIMBCR:::scrub_unmarked_dataframe(
 # figure out an initial list of habitat covariates
 allHabitatCovs <- get_habitat_covs(imbcr_df)
 
-# drop the luke george version of habitat covariates
+# drop the adam green and luke george versions of habitat covariates
 # for our initial round of testing
 allHabitatCovs <- allHabitatCovs[!grepl(allHabitatCovs, pattern="lg_")]
+allHabitatCovs <- allHabitatCovs[!grepl(allHabitatCovs, pattern="ag_")]
 
 allDetCovs <- get_detection_covs(imbcr_df)
 

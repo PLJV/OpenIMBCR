@@ -143,9 +143,9 @@ akaike_models_m <- OpenIMBCR:::akaike_predict(
 #     keyfun=key_function
 #   )
 cat(" -- reading our input vector data containing covariates for predict()\n")
-units <- OpenIMBCR:::drop_overlapping_units(OpenIMBCR:::readOGRfromPath(
-    "/global_workspace/thornburg/vector/units_attributed_nass_2016.shp"
-  ))
+units <- OpenIMBCR:::readOGRfromPath(
+    "/global_workspace/iplan_imbcr_workspace/vector/units_attributed_nass_2016.shp"
+  )
 cat(" -- calculating centroids for each USNG unit\n")
 centroids <- rgeos::gCentroid(
     as(
@@ -168,7 +168,7 @@ cat(
 using_fragmentation_metric <- grepl(
     paste(unlist(lapply(akaike_models_m,
     FUN=function(x) as.character(x$model@formula))), collapse=" "),
-    pattern="PC"
+    pattern="PC|total_area"
   )
 if(using_fragmentation_metric){
   cat(" -- calculating a fragmentation metric from our input configuration data\n")
