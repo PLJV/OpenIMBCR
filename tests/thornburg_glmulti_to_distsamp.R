@@ -310,23 +310,38 @@ predicted <- lapply(
       })
     }
 )
-
-predicted <- lapply(predicted, FUN=function(x) do.call(rbind, x))
-
+# clean-up our 'parallel' call
 rm(predict_df); 
-parallel::stopCluster(cl);
-rm(cl);
-
-predicted <- sapply(
+parallel::stopCluster(cl); rm(cl);
+# join the individual rows from within each model run
+# and return a single data.frame for each model
+predicted <- lapply(
+    predicted, 
+    FUN=function(x) do.call(rbind, x)
+  )
+# each model run will have a predicted column and 
+# a confidence interval -- we are only interested in 
+# the predicted column right now
+predicted <- lapply(
     X=1:length(aic_weights), 
     FUN=function(x){ predicted[[x]]$Predicted }
   )
-  
-predicted <- sapply(
-    1:nrow(predicted), 
-    FUN=function(x){ weighted.mean(x=predicted[i,], w=aic_weights) }
-  )
-
+# if we have more than one model in the top models
+# table, let's average the results across our models
+# using AIC weighting parameter taken from 'unmarked'.
+if(length(predicted)>1){
+  # join our predictions across models into a single
+  # matrix that we can apply a weight across 
+  predicted <- do.call(cbind, predicted)
+  predicted <- sapply(
+      1:nrow(predicted), 
+      FUN=function(x){ 
+        weighted.mean(x=predicted[i,], w=aic_weights) 
+      }
+    )
+} else {
+  predicted <- unlist(predicted)
+}
 # copy our units shapefile for our predictions
 pred_units <- units;
 pred_units@data <- data.frame(pred=predicted); 
