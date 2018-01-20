@@ -10,6 +10,10 @@ if(file.exists(gsub(
   stop("previous workspace for this bird found in CWD (skipping)")
 }
 
+AIC_RESCALE_CONST = 100000
+AIC_SUBSTANTIAL_THRESHOLD = 8
+CORRELATION_THRESHOLD = 0.55
+
 #
 # Local accessory functions, some of which may overload what's 
 # saved in the loaded Rdata file
@@ -40,7 +44,7 @@ plot_model_pi <- function(tests=NULL, unmarked_m=NULL){
   grid(); grid();
 }
 
-fit_distsamp <- function(formula=NULL, data=NULL){
+fit_distsamp <- function(formula=NULL, data=NULL, keyfun="halfnorm"){
   return(unmarked::distsamp(
         formula=as.formula(paste(
           "~1+offset(log(effort))~",
@@ -50,7 +54,7 @@ fit_distsamp <- function(formula=NULL, data=NULL){
           )),
         #formula=1+offset(log(effort))~1+offset(log(effort)),
         data=data,
-        keyfun="halfnorm",
+        keyfun=keyfun,
         unitsOut="kmsq",
         output="abund",
         #starts=c(c(as.vector(coef(m))),1,1),
@@ -127,13 +131,25 @@ y <- do.call(rbind, lapply(
         labels=paste("dst_class_",1:(length(breaks)-1),sep=""),sep="")
       ), nrow=1)
   }))
+# calculate transect-level centroid (lat/lon) and merge it into our
+# site-level covariates table for unmarked
+coords <- do.call(rbind, lapply(
+  X=unique(source$transectnum),
+  FUN=function(x){
+    d <- rgeos::gCentroid(sp::spTransform(
+        s[s$transect == x ,], 
+        sp::CRS(raster::projection("+init=epsg:4326"))
+      ))@coords
+    return(data.frame(lon=d[1],lat=d[2]))
+  }))
 
 siteCovs <- do.call(rbind, lapply(
   X=unique(source$transectnum),
   FUN=function(x){
     s[s$transect == x ,]@data
   }))
-  
+
+siteCovs <- cbind(siteCovs, coords)
 siteCovs$effort <- calc_transect_effort(source)
   
 unmarked_data_frame <- unmarked::unmarkedFrameDS(
@@ -145,13 +161,14 @@ unmarked_data_frame <- unmarked::unmarkedFrameDS(
      dist.breaks=breaks
      #numPrimary=1
    )
-
-vars <- c("grass_ar","shrub_ar","crp_ar","wetland_ar","pat_ct")
+   
+# define the covariates we are going to use for our modeling 
+vars <- c("grass_ar","shrub_ar","crp_ar","wetland_ar","pat_ct","lat","lon")
 
 # drop strongly-correlated variables
-x_cor_matrix <- cor(s@data[,vars])
+x_cor_matrix <- cor(siteCovs[,vars])
 
-cor_threshold <- abs(x_cor_matrix)>0.55
+cor_threshold <- abs(x_cor_matrix)>CORRELATION_THRESHOLD
 
 passing <- vector()
 failing <- vector()
@@ -179,6 +196,39 @@ if(length(failing)>0){
   vars <- passing
 }
 
+# Find an appropriate key function for our detection sub-model
+
+keyfunction <-
+  data.frame(
+      key=c("hazard",
+        "exp",
+        "uniform",
+        "halfnorm")
+    )
+   
+keyfunction$aic <- as.vector(sapply(
+  X=as.vector(keyfunction$key),
+  FUN=function(x){
+    unmarked::distsamp(
+      formula=~1~1, 
+      keyfun=x, 
+      unitsOut="kmsq", 
+      output="abund", 
+      se=F, 
+      data=unmarked_data_frame
+      )@AIC
+  }))+AIC_RESCALE_CONST
+
+# test: do we substantially improve on the half-normal detection function
+# by using an alternative? If no, stick to half-normal
+if( keyfunction[which.min(keyfunction$aic) , 'aic'] < 
+    keyfunction$aic[keyfunction$key == "halfnorm"]-AIC_SUBSTANTIAL_THRESHOLD
+  ){
+  keyfunction <- as.vector(keyfunction[which.min(keyfunction$aic) , 'key'])
+} else {
+  keyfunction <- "halfnorm"
+}
+
 # Fit a full model to our passing variables
 unmarked_m_full <- unmarked::distsamp(
       formula=as.formula(paste(
@@ -187,12 +237,10 @@ unmarked_m_full <- unmarked::distsamp(
         "+offset(log(effort))",
         sep=""
         )),
-      #formula=1+offset(log(effort))~1+offset(log(effort)),
       data=unmarked_data_frame,
-      keyfun="halfnorm",
+      keyfun=keyfunction,
       unitsOut="kmsq",
       output="abund",
-      #starts=c(c(as.vector(coef(m))),1,1),
       se=T
 )
 
@@ -200,6 +248,15 @@ unmarked_m_full <- unmarked::distsamp(
 quadratics <- quadratics_to_keep(unmarked_m_full)
 
 if(length(quadratics)>0){
+  vars_to_lin_poly <- function(x){
+    if(length(!grepl(x, pattern="1)"))>0){
+      already_scaled <- x[grepl(x, pattern="1)")]
+      regulars <- paste("poly(",x[!grepl(x, pattern="1)")]," ,1)",sep="")
+      return(c(already_scaled,regulars))
+    } else {
+      return(x)
+    }
+  }
   vars <- vars[
     !as.vector(sapply(vars, FUN=function(p){ 
         sum(grepl(x=quadratics, pattern=p))>0  
@@ -208,36 +265,53 @@ if(length(quadratics)>0){
   # use AIC to justify our proposed quadratic terms
   for(q in quadratics){
     lin_var <- gsub(
-        gsub(q,pattern="poly[(]", replacement=""),
+        q,
         pattern=", 2[)]",
-        replacement=""
+        replacement=", 1)"
       )
     
     m_lin_var <- OpenIMBCR:::AIC(fit_distsamp(
         formula=paste(
-            c(vars,lin_var,quadratics[!(quadratics %in% q)]), collapse="+"
+            c(ifelse(length(vars)>0, vars_to_lin_poly(vars) ,""),
+              lin_var,
+              quadratics[!(quadratics %in% q)]
+              ), 
+              collapse="+"
             ), 
-        unmarked_data_frame
-      ))+100000
+        data=unmarked_data_frame,
+        keyfun=keyfunction
+      ))+AIC_RESCALE_CONST
       
     m_quad_var <- OpenIMBCR:::AIC(fit_distsamp(
-        formula=paste(c(vars, quadratics), collapse="+"), 
-        unmarked_data_frame
-      ))+100000
-    # if we don't improve our AIC with the quadratic by at-least 6 aic units
+        formula=paste(
+        c( ifelse(length(vars)>0, vars_to_lin_poly(vars) ,""), 
+           quadratics
+           ), 
+           collapse="+"
+         ), 
+        data=unmarked_data_frame,
+        keyfun=keyfunction
+      ))+AIC_RESCALE_CONST
+    # if we don't improve our AIC with the quadratic by at-least X aic units
     # (pretty substatial support), keep the linear version
-    if( m_lin_var-m_quad_var < 7){
+    if( m_lin_var-m_quad_var < AIC_SUBSTANTIAL_THRESHOLD){
       quadratics <- quadratics[!(quadratics %in% q)]
       vars <- c(vars,lin_var)
     }
   }
-    
+  
+  # now convert any remaining linear vars to a scale consistent with poly()
+  if(sum(!grepl(vars,pattern="poly"))>0){
+    vars <- vars_to_lin_poly(vars)
+  }
+  
   vars <- c(vars, quadratics)
-
+  
   # refit our full model minus un-intuitive quadratics
   unmarked_m_full <- fit_distsamp(
       formula=paste(vars, collapse="+"),
-      unmarked_data_frame
+      unmarked_data_frame,
+      keyfun=keyfunction
     )
 }
 
@@ -247,7 +321,7 @@ formulas <- calc_all_distsamp_combinations(vars)
 
 unmarked_tests <- lapply(
     formulas, 
-    FUN=fit_distsamp, data=unmarked_data_frame
+    FUN=fit_distsamp, data=unmarked_data_frame, keyfun=keyfunction
   )
 
 names(unmarked_tests) <- formulas
@@ -256,11 +330,11 @@ names(unmarked_tests) <- formulas
 model_selection_table <- unmarked::modSel(unmarked_tests)
 
 unmarked_top_models <- model_selection_table@Full$formula[
-    model_selection_table@Full$delta < 6
+    model_selection_table@Full$delta < AIC_SUBSTANTIAL_THRESHOLD
   ]
 
 aic_weights <- model_selection_table@Full$AICwt[
-    model_selection_table@Full$delta < 6
+    model_selection_table@Full$delta < AIC_SUBSTANTIAL_THRESHOLD
   ]
 
 formulas <- sapply(
@@ -269,15 +343,56 @@ formulas <- sapply(
       FUN=function(x) { return(paste(x[1:(length(x)-1)], collapse="+")) }
     )
 
+# ok -- in order to predict with these models, we need to abandon the scaling
+# used by poly during our model selection work so that our output
+# is numerically consistent with observations taken across our 1
+# km units data set. We can do this by appending raw=T to poly()
+
+# linear terms with scale
+formulas <- unlist(lapply(
+  X=formulas,
+  FUN=function(x){
+    x <- strsplit(x, split="[+]")
+    x <- lapply(x[[1]],
+    FUN=function(i){
+      if(grepl(i, pattern=", 1")){
+          i <- gsub(i, pattern="poly[(]", replacement="scale(")
+          i <- gsub(i, pattern="[,] ", replacement="^")
+          i <- gsub(i, pattern="\\^1", replacement="")
+      }
+        return(i)
+      })
+    paste(x, collapse="+")
+  }
+))
+
 unmarked_tests <- lapply(
     formulas, 
-    FUN=fit_distsamp, data=unmarked_data_frame
+    FUN=fit_distsamp, 
+    data=unmarked_data_frame,
+    keyfun=keyfunction
   )
 
+# add a fake effort offset
 units$effort <- mean(unmarked_data_frame@siteCovs$effort)
 
-# do some weighted model averaging
+cat(" -- calculating lat/lon for grid cell centroids\n")
 
+coords <- rgeos::gCentroid(units, byid=T) 
+  
+coords <- sp::spTransform(
+    coords, 
+    sp::CRS(raster::projection("+init=epsg:4326"))
+  )@coords[,c(1,2)]
+  
+colnames(coords) <- c("lon","lat")
+
+units@data <- cbind(
+    units@data[ , !grepl(names(units),pattern="lon|lat")], 
+    coords
+  )
+
+# do some weighted model averaging
 cat(
     " -- model averaging across prediction units",
     "table (this could take some time)\n"
@@ -285,40 +400,61 @@ cat(
 
 predict_df <- units@data
 
-steps <- round(seq(1,nrow(predict_df), length.out=100))
+#steps <- round(seq(1,nrow(predict_df), length.out=parallel::detectCores()-1))
 # add 1 to the last step to accomodate our lapply splitting
-steps[length(steps)] <- steps[length(steps)]+1
+#steps[length(steps)] <- steps[length(steps)]+1
 
 require(parallel)
 cl <- parallel::makeCluster(parallel::detectCores()-1)
 
-parallel::clusterExport(cl=cl, varlist=c("predict_df","steps"))
+#parallel::clusterExport(cl=cl, varlist=c("predict_df","steps"))
+parallel::clusterExport(cl=cl, varlist=c("predict_df"))
 
-predicted <- lapply(
-  X=unmarked_tests, 
-  FUN=function(model){
-    predicted <- parallel::parLapply(
-      cl=cl,
-      X=1:(length(steps)-1), 
-      fun=function(i, type='state'){ 
-        return(unmarked::predict(
-            model, 
-            type=type, 
-            state=state, 
-            newdata=predict_df[seq(steps[i], (steps[i+1]-1)),] 
-          )) 
-      })
-    }
-)
+# version 1: don't predict in row chunks -- parallelize across models
+predicted <- parallel::parLapply(
+  cl=cl,
+  X=unmarked_tests,
+  fun=function(model){
+    return(unmarked::predict(
+        model, 
+        type='state',
+        newdata=predict_df,
+        se=F,
+        engine='C'
+        #newdata=predict_df[seq(steps[i], (steps[i+1]-1)),] 
+      )) 
+  })
+
+# version 2: don't predict across models -- parallelize across row chunks
+# which is much faster but might distort model results a bit due to scale()
+# issues  
+# predicted <- lapply(
+#  X=unmarked_tests, 
+#  FUN=function(model){
+#    predicted <- parallel::parLapply(
+#      cl=cl,
+#      X=1:(length(steps)-1), 
+#      fun=function(i, type='state'){ 
+#        return(unmarked::predict(
+#            model, 
+#            type='state',
+#            se=F,
+#            engine='C', 
+#            newdata=predict_df[seq(steps[i], (steps[i+1]-1)),] 
+#          )) 
+#      })
+#    }
+#)
+
 # clean-up our 'parallel' call
 rm(predict_df); 
 parallel::stopCluster(cl); rm(cl);
 # join the individual rows from within each model run
 # and return a single data.frame for each model
-predicted <- lapply(
-    predicted, 
-    FUN=function(x) do.call(rbind, x)
-  )
+#predicted <- lapply(
+#    predicted, 
+#    FUN=function(x) do.call(rbind, x)
+#  )
 # each model run will have a predicted column and 
 # a confidence interval -- we are only interested in 
 # the predicted column right now
@@ -335,7 +471,7 @@ if(length(predicted)>1){
   predicted <- do.call(cbind, predicted)
   predicted <- sapply(
       1:nrow(predicted), 
-      FUN=function(x){ 
+      FUN=function(i){ 
         weighted.mean(x=predicted[i,], w=aic_weights) 
       }
     )
@@ -377,11 +513,10 @@ r_data_file <- gsub(r_data_file, pattern="pois_glm", replacement="hds_pois")
 
 save(
     compress=T,
-    list=ls(),
+    list=ls(pattern="[a-z]"),
     file=r_data_file
   )
 
 #plot_model_pi_densities(tests, unmarked_m)
 #round(sd(s$detections))/round(mean(s$detections))
 #mean(unmarked::getP(unmarked_m))-mean(pDet)
-
