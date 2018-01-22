@@ -122,6 +122,17 @@ source <- OpenIMBCR:::scrub_imbcr_df(
 # drop observations that are beyond our cut-off (but keep our NA's)
 source <- source[ is.na(source$radialdistance) | (source$radialdistance <= cutoff) , ]
 
+# overload 'breaks' and do some re-binning of our distance breaks to force
+# a shoulder (yes, I know -- grumble, grumble)
+
+breaks <- c(
+  0, 
+  as.vector(quantile(
+      source$radialdistance, 
+      probs=seq(0.25, 1, length.out=6), na.rm=T)
+    )
+  )
+  
 y <- do.call(rbind, lapply(
   X=unique(source$transectnum),
   FUN=function(x){
@@ -131,6 +142,7 @@ y <- do.call(rbind, lapply(
         labels=paste("dst_class_",1:(length(breaks)-1),sep=""),sep="")
       ), nrow=1)
   }))
+  
 # calculate transect-level centroid (lat/lon) and merge it into our
 # site-level covariates table for unmarked
 coords <- do.call(rbind, lapply(
@@ -210,7 +222,7 @@ keyfunction$aic <- as.vector(sapply(
   X=as.vector(keyfunction$key),
   FUN=function(x){
     unmarked::distsamp(
-      formula=~1~1, 
+      formula=~1+offset(log(effort))~1+offset(log(effort)), 
       keyfun=x, 
       unitsOut="kmsq", 
       output="abund", 
@@ -484,18 +496,20 @@ pred_units@data <- data.frame(pred=predicted);
 
 rm(predicted);
 
-# censor any predictions greater than K (max)
+# above, scale(units) compresses our explanatory variables slightly -- this is a 
+# hack that scale our predictions relative to our full model's predicted max(N)
 
-cat(
-    " -- number of sites with prediction greater than max(K):",
-    sum(pred_units$pred > max(rowSums(unmarked_data_frame@y))),
-    "\n"
-  )
+PRED_MAX <- max(unmarked::predict(
+  unmarked_m_full, type="state")[,1], na.rm=T)
 
-pred_units$pred[(pred_units$pred > max(rowSums(unmarked_data_frame@y)))] <- 
-  max(rowSums(unmarked_data_frame@y))
+pred_units$pred[pred_units$pred < 1] <- 0
+pred_units$pred[pred_units$pred > PRED_MAX] <- PRED_MAX
 
-pred_units$pred[pred_units$pred<1] <- 0
+pred_units$pred <- 
+  ( pred_units$pred - min(pred_units$pred) ) /
+  ( max(pred_units$pred, na.rm=T) - min(pred_units$pred, na.rm=T) )
+
+pred_units$pred <- pred_units$pred * PRED_MAX
 
 rgdal::writeOGR(
   pred_units, 
@@ -509,14 +523,14 @@ rgdal::writeOGR(
   overwrite=T
 )
 
-r_data_file <- gsub(r_data_file, pattern="pois_glm", replacement="hds_pois")
+r_data_file <- gsub(
+    r_data_file, 
+    pattern="pois_glm", 
+    replacement="hds_pois"
+  )
 
 save(
     compress=T,
     list=ls(pattern="[a-z]"),
     file=r_data_file
   )
-
-#plot_model_pi_densities(tests, unmarked_m)
-#round(sd(s$detections))/round(mean(s$detections))
-#mean(unmarked::getP(unmarked_m))-mean(pDet)
