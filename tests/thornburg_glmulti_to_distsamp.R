@@ -1,5 +1,6 @@
 
-options(error=traceback)
+# options(error=traceback)
+options(warn=-1)
 load(commandArgs(trailingOnly=T)[1])
 
 if(file.exists(gsub(
@@ -7,7 +8,8 @@ if(file.exists(gsub(
     pattern="pois_glm", 
     replacement="hds_pois"
   ))){
-  stop("previous workspace for this bird found in CWD (skipping)")
+  cat("previous workspace for this bird found in CWD (skipping)\n")
+  q("no")
 }
 
 AIC_RESCALE_CONST = 100000
@@ -129,9 +131,12 @@ breaks <- c(
   0, 
   as.vector(quantile(
       source$radialdistance, 
-      probs=seq(0.25, 1, length.out=6), na.rm=T)
+      probs=seq(0.10, 1, length.out=6), na.rm=T)
     )
   )
+
+breaks[length(breaks)+1] <- breaks[length(breaks)] + median(diff(breaks))
+breaks[length(breaks)+1] <- breaks[length(breaks)] + median(diff(breaks))
   
 y <- do.call(rbind, lapply(
   X=unique(source$transectnum),
@@ -234,7 +239,7 @@ keyfunction$aic <- as.vector(sapply(
 # test: do we substantially improve on the half-normal detection function
 # by using an alternative? If no, stick to half-normal
 if( keyfunction[which.min(keyfunction$aic) , 'aic'] < 
-    keyfunction$aic[keyfunction$key == "halfnorm"]-AIC_SUBSTANTIAL_THRESHOLD
+    keyfunction$aic[keyfunction$key == "halfnorm"]-(AIC_SUBSTANTIAL_THRESHOLD*10)
   ){
   keyfunction <- as.vector(keyfunction[which.min(keyfunction$aic) , 'key'])
 } else {
@@ -496,8 +501,9 @@ pred_units@data <- data.frame(pred=predicted);
 
 rm(predicted);
 
-# above, scale(units) compresses our explanatory variables slightly -- this is a 
-# hack that scale our predictions relative to our full model's predicted max(N)
+# above, scale(units) compresses our explanatory variables slightly relative to 
+# the data used to fit each model -- below is a hack that uses min-max normalization 
+# to re-scale our predictions relative to our full model's predicted max(N)
 
 PRED_MAX <- max(unmarked::predict(
   unmarked_m_full, type="state")[,1], na.rm=T)
