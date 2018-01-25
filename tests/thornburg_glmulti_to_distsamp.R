@@ -360,11 +360,13 @@ formulas <- calc_all_distsamp_combinations(vars)
 
 unmarked_tests <- lapply(
     formulas,
-    FUN=fit_distsamp, data=unmarked_data_frame, keyfun=keyfunction
+    FUN = fit_distsamp,
+    data = unmarked_data_frame,
+    keyfun = keyfunction
   )
 
-names(unmarked_tests) <- formulas
-  unmarked_tests <- unmarked::fitList(unmarked_tests)
+unmarked_tests <- unmarked::fitList(unmarked_tests)
+  names(unmarked_tests) <- formulas
 
 model_selection_table <- unmarked::modSel(unmarked_tests)
 
@@ -377,9 +379,9 @@ aic_weights <- model_selection_table@Full$AICwt[
   ]
 
 formulas <- sapply(
-  strsplit(sapply(strsplit(unmarked_top_models, split="~"),
-      FUN=function(x){ x[3] }), split="[+]"),
-      FUN=function(x) { return(paste(x[1:(length(x)-1)], collapse="+")) }
+  strsplit(sapply(strsplit(unmarked_top_models, split = "~"),
+      FUN=function(x){ x[3] }), split = "[+]"),
+      FUN=function(x) { return(paste(x[1:(length(x) - 1)], collapse = "+")) }
     )
 
 # ok -- in order to predict with these models, we need to abandon the scaling
@@ -391,17 +393,17 @@ formulas <- sapply(
 formulas <- unlist(lapply(
   X=formulas,
   FUN=function(x){
-    x <- strsplit(x, split="[+]")
+    x <- strsplit(x, split = "[+]")
     x <- lapply(x[[1]],
     FUN=function(i){
-      if(grepl(i, pattern=", 1")){
-          i <- gsub(i, pattern="poly[(]", replacement="scale(")
-          i <- gsub(i, pattern="[,] ", replacement="^")
-          i <- gsub(i, pattern="\\^1", replacement="")
+      if(grepl(i, pattern = ", 1")){
+          i <- gsub(i, pattern="poly[(]", replacement = "scale(")
+          i <- gsub(i, pattern="[,] ", replacement = "^")
+          i <- gsub(i, pattern="\\^1", replacement = "")
       }
         return(i)
       })
-    paste(x, collapse="+")
+    paste(x, collapse = "+")
   }
 ))
 
@@ -417,24 +419,24 @@ units$effort <- mean(unmarked_data_frame@siteCovs$effort)
 
 cat(" -- calculating lat/lon for grid cell centroids\n")
 
-coords <- rgeos::gCentroid(units, byid=T)
+coords <- rgeos::gCentroid(units, byid = T)
 
 coords <- sp::spTransform(
     coords,
     sp::CRS(raster::projection("+init=epsg:4326"))
-  )@coords[,c(1,2)]
+  )@coords[, c(1, 2)]
 
 colnames(coords) <- c("lon","lat")
 
 units@data <- cbind(
-    units@data[ , !grepl(names(units),pattern="lon|lat")],
+    units@data[, !grepl(names(units), pattern = "lon|lat")],
     coords
   )
 
 # do some weighted model averaging
 cat(
     " -- model averaging across prediction units",
-    "table (this could take some time)\n"
+    "table (this could take some time)\n"cd
   )
 
 predict_df <- units@data
@@ -444,10 +446,10 @@ predict_df <- units@data
 #steps[length(steps)] <- steps[length(steps)]+1
 
 require(parallel)
-cl <- parallel::makeCluster(parallel::detectCores()-1)
+cl <- parallel::makeCluster(parallel::detectCores() - 1)
 
 #parallel::clusterExport(cl=cl, varlist=c("predict_df","steps"))
-parallel::clusterExport(cl=cl, varlist=c("predict_df"))
+parallel::clusterExport(cl=cl, varlist = c("predict_df"))
 
 # version 1: don't predict in row chunks -- parallelize across models
 predicted <- parallel::parLapply(
@@ -456,10 +458,10 @@ predicted <- parallel::parLapply(
   fun=function(model){
     return(unmarked::predict(
         model,
-        type='state',
-        newdata=predict_df,
-        se=F,
-        engine='C'
+        type = 'state',
+        newdata = predict_df,
+        se = F,
+        engine = 'C'
         #newdata=predict_df[seq(steps[i], (steps[i+1]-1)),]
       ))
   })
@@ -504,14 +506,14 @@ predicted <- lapply(
 # if we have more than one model in the top models
 # table, let's average the results across our models
 # using AIC weighting parameter taken from 'unmarked'.
-if(length(predicted)>1){
+if (length(predicted) > 1){
   # join our predictions across models into a single
   # matrix that we can apply a weight across
   predicted <- do.call(cbind, predicted)
   predicted <- sapply(
       1:nrow(predicted),
       FUN=function(i){
-        weighted.mean(x=predicted[i,], w=aic_weights)
+        weighted.mean(x=predicted[i, ], w = aic_weights)
       }
     )
 } else {
@@ -519,7 +521,7 @@ if(length(predicted)>1){
 }
 # copy our units shapefile for our predictions
 pred_units <- units;
-pred_units@data <- data.frame(pred=predicted);
+pred_units@data <- data.frame(pred = predicted);
 
 rm(predicted);
 
@@ -528,7 +530,7 @@ rm(predicted);
 # to re-scale our predictions relative to our full model's predicted max(N)
 
 PRED_MAX <- max(unmarked::predict(
-  unmarked_m_full, type="state")[,1], na.rm=T)
+  unmarked_m_full, type="state")[, 1], na.rm = T)
 
 pred_units$pred[pred_units$pred < 1] <- 0
 pred_units$pred[pred_units$pred > PRED_MAX] <- PRED_MAX
