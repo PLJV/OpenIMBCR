@@ -21,6 +21,15 @@ CORRELATION_THRESHOLD     <- 0.55
 # saved in the loaded Rdata file
 #
 
+plot_hn_det <- function(x=NULL, breaks=NULL){
+  param <- exp(coef(x, type = "det"))
+  plot(
+      function(x) gxhn(x, param), 0, max(breaks),
+  	  xlab = "Distance (m)", ylab = "Detection probability"
+    )
+  grid(); grid();
+}
+
 plot_model_pi <- function(tests = NULL, unmarked_m = NULL){
   hinge_m_pred <- density(as.vector(floor(
       predict(tests@objects[[1]], type = "response")))
