@@ -1,7 +1,6 @@
-
-# consider using options(error=traceback)
-options(warn = -1)
 load(commandArgs(trailingOnly = T)[1])
+# consider using options(error=traceback)
+options(warn = -1, error=traceback)
 
 if (file.exists(gsub(
     r_data_file,
@@ -436,7 +435,7 @@ units@data <- cbind(
 # do some weighted model averaging
 cat(
     " -- model averaging across prediction units",
-    "table (this could take some time)\n"cd
+    "table (this could take some time)\n"
   )
 
 predict_df <- units@data
