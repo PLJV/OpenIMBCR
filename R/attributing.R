@@ -94,7 +94,7 @@ calc_dist_bins <- function(df=NULL, p=0.95, breaks=10, force_shoulder=F){
     bin_intervals <- breaks
   }
   # calculate a detections matrix (by transect)
-  df <- data.frame(do.call(rbind, lapply(
+  df <- do.call(rbind, lapply(
     X = unique(as.character(df[,transect_fieldname(df)])),
     FUN = function(x){
       matrix(table(
@@ -107,9 +107,8 @@ calc_dist_bins <- function(df=NULL, p=0.95, breaks=10, force_shoulder=F){
         nrow=1
       )
     }
-  )))
+  ))
   # record names and return to user
-  colnames(df) <-  paste("dst_class_",1:(length(bin_intervals)-1),sep = "")
   return(list(y=df, breaks=bin_intervals))
 }
 #' hidden function that calculates route centroids and attribute the source data
@@ -127,9 +126,9 @@ calc_route_centroids <- function(s=NULL, four_letter_code=NULL, use='detections'
       # use sum of distances > 0 by default
       if(grepl(tolower(use), pattern="detections")){
         detections <- sum(transect[detections,]$radialdistance > 0, na.rm=T)
-      # if anything else is specified, the user must be refering to the cluster count field
+      # if anything else is specified, try to sum a data.frame by that variable
       } else {
-        detections <- sum(transect[detections,]$cl_count, na.rm=T)
+        detections <- sum(transect[detections, use], na.rm=T)
       }
       pt <- rgeos::gCentroid(transect)
       pt$transect <- unique(transect$transectnum)
@@ -138,7 +137,14 @@ calc_route_centroids <- function(s=NULL, four_letter_code=NULL, use='detections'
     })
   return(do.call(rbind, pts))
 }
-
+#' calculate the latitude and longitude of feature centroids in an input dataset
+#' and return an appended Spatial*DataFrame Object with lat/lon entries
+calc_lat_lon <- function(s=NULL, proj_str="+init=epsg:4326"){
+  coords <- as.data.frame(rgeos::gCentroid(sp::spTransform(s,proj_str), byid=T)@coords)
+  colnames(coords) <- c("lon","lat")
+  s@data <- cbind(s@data, coords)
+  return(s)
+}
 #' hidden function that summarizes imbcr transect covariate data and metadata
 #' by year (with list comprehension). This allows you to calculate covariates
 #' at the IMBCR station level and then pool (summarize) the observations by

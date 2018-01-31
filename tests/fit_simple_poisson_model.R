@@ -210,6 +210,9 @@ if(length(quadratics)>0){
       family=poisson,
       data=s@data
     )
+# we are not keeping any of our quadratics? still scale with poly()
+} else {
+  vars <- paste("poly(", paste(vars, ", 1)", sep=""), sep="")
 }
 
 # use model selection with interactions across our candidate variables
@@ -224,8 +227,8 @@ vals <- as.vector(predict(
       newdata=units@data,
       type="response"))
 
+# average across all models within a dAIC threshold of the top model
 if(class(vals)!="numeric"){
-  # average across all models within 2 AIC of the top model
   predicted@data <- data.frame(
       pred=as.vector(floor(predict(
         tests,
@@ -234,7 +237,7 @@ if(class(vals)!="numeric"){
         type="response")$averages)
       )
     )
-  # if there was only one top model, averaging won't work
+# if there was only one top model, averaging won't work
 } else {
   predicted@data <- data.frame(
     pred=as.vector(floor(predict(
