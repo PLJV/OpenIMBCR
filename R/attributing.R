@@ -55,41 +55,61 @@ calc_day_of_year <- function(df=NULL){
 #' a number of distance bin intervals (specified by breaks). Will
 #' reclass raw distances to bin identifier (e.g., distance class 3).
 #' @export
-calc_dist_bins <- function(df=NULL, p=0.90, breaks=10){
+calc_dist_bins <- function(df=NULL, p=0.95, breaks=10, force_shoulder=F){
   if(inherits(df,"Spatial")){
-     s <- df
     df <- df@data
   }
-  # define our bin intervals from breaks
-  if(length(breaks) == 1){
-    bin_intervals <- seq(
+  # Distance at which detections for all birds are considered suspect in IMBCR
+  EMPIRICAL_DIST_CUTOFF <- 300 
+  # what's our cut-off -- drop distance observations that are outside of the cut-off
+  # if they are beyond our "difficult to detect" threshold
+  cutoff <- quantile(df[,distance_fieldname(df)], p=p, na.rm=T)
+  if (cutoff > EMPIRICAL_DIST_CUTOFF){
+    df <- df[ is.na(df[,distance_fieldname(df)]) | (df[,distance_fieldname(df)] <= cutoff) , ]
+  # if our cut-off isn't greater than our "difficult to detect" threshold then don't
+  # drop any records
+  } else {
+    p <- 1
+  }
+  # define our bin intervals for a user-specified number of breaks
+  if (length(breaks) == 1){
+    if (force_shoulder){
+      bin_intervals <- c(
+        0,
+        as.vector(quantile(
+          df[,distance_fieldname(df)],
+          probs = seq(0.5, 1, length.out = breaks-1), na.rm = T)
+        )
+      )
+    } else {
+      bin_intervals <- seq(
         from=0,
         to=quantile(df[,distance_fieldname(df)], p=p, na.rm=T),
-        length.out=breaks+1
+        length.out=breaks
       )
+    }
+  # or did the user specify explicit breaks for us to use?
   } else {
     bin_intervals <- breaks
   }
-  # build a distance class using the our calculated breaks
-  df[,'dist_class'] <- 0
-  for (j in length(bin_intervals):2){
-    match <- which(df[, distance_fieldname(df)] <= bin_intervals[j])
-    df[match, 'dist_class'] <- as.character(j-1)
-  }
-  # if we haven't matched but a radial distance was recorded, it
-  # belongs in the furthest distance bin
-  match <- df[,'dist_class'] == 0 & !is.na(df[, distance_fieldname(df)])
-    df[match,'dist_class'] <- as.character(length(breaks)-1)
-  # assume all remaining unmatched values are non-detections
-  df[df[,'dist_class'] == 0, 'dist_class'] <- NA
-  # return the breaks and the processed data.frame
-  # back to user for inspection
-  if(exists("s")){
-    s@data <- df
-    return(list(distance_breaks=bin_intervals,processed_data=s))
-  } else {
-    return(list(distance_breaks=bin_intervals,processed_data=df))
-  }
+  # calculate a detections matrix (by transect)
+  df <- data.frame(do.call(rbind, lapply(
+    X = unique(as.character(df[,transect_fieldname(df)])),
+    FUN = function(x){
+      matrix(table(
+          cut(
+            df[ df[ , transect_fieldname(df)] == x, distance_fieldname(df) ],
+            breaks = bin_intervals,
+            labels = paste("dst_class_",1:(length(bin_intervals)-1),sep = "")
+          )
+        ),
+        nrow=1
+      )
+    }
+  )))
+  # record names and return to user
+  colnames(df) <-  paste("dst_class_",1:(length(bin_intervals)-1),sep = "")
+  return(list(y=df, breaks=bin_intervals))
 }
 #' hidden function that summarizes imbcr transect covariate data and metadata
 #' by year (with list comprehension). This allows you to calculate covariates
