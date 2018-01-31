@@ -134,10 +134,7 @@ source <- OpenIMBCR:::scrub_imbcr_df(
   )
 
 
-y <- OpenIMBCR::calc_dist_bins(source, force_shoulder=T, p=0.95)
-
-breaks <- y$breaks
-y      <- y$y
+detections <- OpenIMBCR::calc_dist_bins(source, force_shoulder=T, p=0.95)
 
 # calculate transect-level centroid (lat/lon) and merge it into our
 # site-level covariates table for unmarked
@@ -161,13 +158,11 @@ siteCovs <- cbind(siteCovs, coords)
 siteCovs$effort <- calc_transect_effort(source)
 
 unmarked_data_frame <- unmarked::unmarkedFrameDS(
-     y = y,
+     y = detections$y,
      siteCovs = siteCovs,
-     #yearlySiteCovs=NULL,
      survey = "point",
      unitsIn = "m",
-     dist.breaks = breaks
-     #numPrimary=1
+     dist.breaks = detections$breaks
    )
 
 # define the covariates we are going to use for our modeling

@@ -112,6 +112,33 @@ calc_dist_bins <- function(df=NULL, p=0.95, breaks=10, force_shoulder=F){
   colnames(df) <-  paste("dst_class_",1:(length(bin_intervals)-1),sep = "")
   return(list(y=df, breaks=bin_intervals))
 }
+#' hidden function that calculates route centroids and attribute the source data
+#' with number of detections for a bird of interest
+#' @export
+calc_route_centroids <- function(s=NULL, four_letter_code=NULL, use='detections'){
+  transects <- as.vector(unique(
+    s$transectnum
+  ))
+  pts <- lapply(
+    X=transects, 
+    FUN=function(transect){ 
+      transect <- s[s$transectnum == transect, ] 
+      detections <- transect$birdcode == four_letter_code
+      # use sum of distances > 0 by default
+      if(grepl(tolower(use), pattern="detections")){
+        detections <- sum(transect[detections,]$radialdistance > 0, na.rm=T)
+      # if anything else is specified, the user must be refering to the cluster count field
+      } else {
+        detections <- sum(transect[detections,]$cl_count, na.rm=T)
+      }
+      pt <- rgeos::gCentroid(transect)
+      pt$transect <- unique(transect$transectnum)
+      pt@data[, use] <- detections
+      return(pt)
+    })
+  return(do.call(rbind, pts))
+}
+
 #' hidden function that summarizes imbcr transect covariate data and metadata
 #' by year (with list comprehension). This allows you to calculate covariates
 #' at the IMBCR station level and then pool (summarize) the observations by

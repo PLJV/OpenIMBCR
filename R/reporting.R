@@ -59,22 +59,3 @@ partialPredict <- function(m=NULL, var=NULL, type='state', plot=T, nCores=NULL,
     return(list(x=x, y=y))
   }
 }
-#' hidden function that calculates route centroids and attribute the source data
-#' with number of detections for a bird of interest
-calc_route_centroids <- function(s=NULL, four_letter_code=NULL){
-	transects <- as.vector(unique(
-	    s$transectnum
-	  ))
-	pts <- lapply(
-	    X=transects, 
-	    FUN=function(transect){ 
-	      transect <- s[s$transectnum == transect, ] 
-	      detections <- transect$birdcode == four_letter_code
-		      detections <- sum(transect[detections,]$radialdistance > 0, na.rm=T)
-	      pt <- rgeos::gCentroid(transect)
-	        pt$detections <- detections
-	        pt$transect <- unique(transect$transectnum)
-	      return(pt)
-	    })
-	return(do.call(rbind, pts))
-}
