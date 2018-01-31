@@ -133,36 +133,11 @@ source <- OpenIMBCR:::scrub_imbcr_df(
     four_letter_code = toupper(argv[2])
   )
 
-# drop observations that are beyond our cut-off (but keep our NA's)
-source <- source[ is.na(source$radialdistance) | (source$radialdistance <= cutoff) , ]
 
-# overload 'breaks' and do some re-binning of our distance breaks to force
-# a shoulder (yes, I know -- grumble, grumble)
+y <- OpenIMBCR::calc_dist_bins(source, force_shoulder=T, p=0.95)
 
-breaks <- c(
-  0,
-  as.vector(quantile(
-      source$radialdistance,
-      probs = seq(0.5, 1, length.out = 8), na.rm = T)
-    )
-  )
-
-
-# breaks <- round(seq(
-#     from = 0,
-#     to = quantile(source$radialdistance, 1, na.rm = T),
-#     length.out = 7
-#   ))
-
-y <- do.call(rbind, lapply(
-  X = unique(source$transectnum),
-  FUN = function(x){
-    matrix(table(cut(
-        source[source$transectnum == x,]$radialdistance,
-        breaks = breaks,
-        labels = paste("dst_class_",1:(length(breaks)-1),sep = ""),sep = "")
-      ), nrow = 1)
-  }))
+breaks <- y$breaks
+y      <- y$y
 
 # calculate transect-level centroid (lat/lon) and merge it into our
 # site-level covariates table for unmarked
