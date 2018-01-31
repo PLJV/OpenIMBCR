@@ -16,18 +16,19 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
 #'
 #' @export
-calc_transect_effort <- function(df=NULL){
-  transects <- unique(as.character(df@data[,transect_fieldname(df)]))
-  for(t in transects){
-    for(y in unique(df@data[df@data[, transect_fieldname(df)] == t, "year"])){
-      focal <- df@data[, transect_fieldname(df)] == t & df@data[, "year"] == y
-      df@data[focal, 'effort'] <- length(unique(df@data[focal,'point']))
-    }
+calc_transect_effort <- function(df = NULL) {
+  if(inherits(df,"Spatial")){
+    df <- df@data
   }
-  return(df)
+  effort <- sapply(
+    unique(as.character(df[,transect_fieldname(df)])),
+    FUN = function(n){
+      sum(length(unique(df[ df[,transect_fieldname(df)] == n, ]$point)), na.rm = T)
+    }
+  )
+  return(effort)
 }
 #'
 #' @export
