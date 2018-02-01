@@ -13,7 +13,7 @@ if (file.exists(gsub(
 
 AIC_RESCALE_CONST         <- 100000
 AIC_SUBSTANTIAL_THRESHOLD <- 8
-CORRELATION_THRESHOLD     <- 0.55
+CORRELATION_THRESHOLD     <- 0.65
 
 #
 # Local accessory functions, some of which may overload what's

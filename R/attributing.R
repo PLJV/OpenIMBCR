@@ -125,10 +125,10 @@ calc_route_centroids <- function(s=NULL, four_letter_code=NULL, use='detections'
       detections <- transect$birdcode == four_letter_code
       # use sum of distances > 0 by default
       if(grepl(tolower(use), pattern="detections")){
-        detections <- sum(transect[detections,]$radialdistance > 0, na.rm=T)
+        detections <- sum(transect@data[detections, distance_fieldname(s)] > 0, na.rm=T)
       # if anything else is specified, try to sum a data.frame by that variable
       } else {
-        detections <- sum(transect[detections, use], na.rm=T)
+        detections <- sum(transect@data[detections, use], na.rm=T)
       }
       pt <- rgeos::gCentroid(transect)
       pt$transect <- unique(transect$transectnum)

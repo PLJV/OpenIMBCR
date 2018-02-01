@@ -12,7 +12,7 @@ calc_transect_summary_detections <- function(s=NULL, name=NULL, field='est_abund
   return(OpenIMBCR:::calc_route_centroids(
       s = s,
       four_letter_code = toupper(name),
-      use='est_abund'
+      use=field
     ))
 }
 
@@ -66,9 +66,16 @@ if (file.exists(r_data_file)) {
 }
 
 s <- OpenIMBCR:::scrub_imbcr_df(
-    OpenIMBCR:::imbcrTableToShapefile("RawData_PLJV_IMBCR_20161201.csv"),
-    four_letter_code = toupper(argv[2])
+     OpenIMBCR:::imbcrTableToShapefile(
+        "/global_workspace/imbcr_number_crunching/results/RawData_PLJV_IMBCR_20161201.csv"
+     ),
+     four_letter_code = toupper(argv[2])
   )
+
+if( sum(s$radialdistance>0, na.rm=T) < 180){
+  cat(" -- not enough detections to fit a meaningful model for", argv[2],"(quitting)\n")
+  q("no")
+}
 
 detections <- OpenIMBCR:::calc_dist_bins(s)
 effort     <- as.vector(OpenIMBCR:::calc_transect_effort(s))
@@ -97,6 +104,14 @@ per_obs_det_probabilities <- round(sapply(
     function(x) pred_hn_det_from_distance(intercept_m, dist=x)), 
     2
   )
+
+# don't allow a 0.0 detection probability
+if(min(per_obs_det_probabilities, na.rm=T)==0){
+  min <- as.numeric(quantile(per_obs_det_probabilities, na.rm=T, p=seq(0,0.2,by = 0.001)))
+    min <- min(min[min > 0])
+  per_obs_det_probabilities[per_obs_det_probabilities == 0] <- min
+}
+
 
 s$est_abund <- round(s$cl_count / per_obs_det_probabilities)
 
@@ -277,3 +292,4 @@ save(
     list=ls(),
     file=r_data_file
   )
+
