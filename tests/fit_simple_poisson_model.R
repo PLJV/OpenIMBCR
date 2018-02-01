@@ -278,7 +278,8 @@ cat(
     "\n"
   )
 
-predicted$pred[( predicted$pred > max(round(predict(m, type="response"))) )] <- max(s$est_abund)
+predicted$pred[( predicted$pred > max(round(predict(m, type="response"))) )] <-
+  max(round(predict(m, type="response")))
 predicted$pred[predicted$pred<1] <- 0
 
 rgdal::writeOGR(
@@ -298,4 +299,3 @@ save(
     list=ls(),
     file=r_data_file
   )
-
