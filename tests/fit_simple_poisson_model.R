@@ -133,12 +133,12 @@ s <- OpenIMBCR:::spatial_join(s, units)
 # add latitude and longitude
 cat(" -- calculating spatial covariates\n")
  
-    s <- calc_lat_lon(s)
-units <- calc_lat_lon(units)
+    s <- OpenIMBCR:::calc_lat_lon(s)
+units <- OpenIMBCR:::calc_lat_lon(units)
 
 # define the covariates we are going to use in our analysis
 
-vars <- c("grass_ar","shrub_ar","crp_ar","wetland_ar","pat_ct")
+vars <- c("grass_ar","shrub_ar","crp_ar","wetland_ar","pat_ct","lat","lon")
 
 # drop strongly-correlated variables
 x_cor_matrix <- cor(s@data[,vars])

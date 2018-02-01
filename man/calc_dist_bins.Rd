@@ -7,7 +7,7 @@ field name. Will attempt to arbitrarily bin the distances into
 a number of distance bin intervals (specified by breaks). Will
 reclass raw distances to bin identifier (e.g., distance class 3).}
 \usage{
-calc_dist_bins(df = NULL, p = 0.9, breaks = 10)
+calc_dist_bins(df = NULL, p = 0.95, breaks = 10, force_shoulder = F)
 }
 \description{
 accepts a Spatial*DataFrame object with a distance observation
