@@ -194,7 +194,7 @@ if(length(quadratics)>0){
     m_lin_var <- AIC(glm(
         formula=paste("est_abund~",
           paste(
-            c(paste("poly(", paste(vars[1:2], ", 1)", sep=""), sep=""),lin_var,quadratics[!(quadratics %in% q)]), collapse="+"),
+            c(paste("poly(", paste(vars, ", 1)", sep=""), sep=""),lin_var,quadratics[!(quadratics %in% q)]), collapse="+"),
             "+offset(log(effort))",
             sep=""
           ),
@@ -203,7 +203,7 @@ if(length(quadratics)>0){
       ))+AIC_RESCALE_CONST
     m_quad_var <- AIC(glm(
         formula=paste("est_abund~",
-            paste(c(paste("poly(", paste(vars[1:2], ", 1)", sep=""), sep=""), quadratics), collapse="+"),
+            paste(c(paste("poly(", paste(vars, ", 1)", sep=""), sep=""), quadratics), collapse="+"),
             "+offset(log(effort))",
             sep=""
           ),
