@@ -22,13 +22,13 @@ quadratics_to_keep <- function(m){
   keep <- (coefficients(m) < 0) * quadratic_terms
   quadratic_terms <- names(coefficients(m))[keep == 1]
     quadratic_terms <- gsub(quadratic_terms, pattern = ")2", replacement = ")")
-  # test: are we a positive linear term and a negative quadratic 
+  # test: are we a positive linear term and a negative quadratic
   direction_of_coeffs <- coefficients(m)/abs(coefficients(m))
   direction_of_coeffs <- direction_of_coeffs[ gsub(names(direction_of_coeffs), pattern="[)].", replacement=")") %in% quadratic_terms ]
   steps <- seq(1, length(direction_of_coeffs), by = 2)
   keep <- names(direction_of_coeffs[ which ( direction_of_coeffs[steps] + direction_of_coeffs[steps+1]  == 0 ) ])
     quadratic_terms <- gsub(keep, pattern = ")1", replacement = ")")
-  # test are both our linear and quadratic terms negative? drop if so 
+  # test are both our linear and quadratic terms negative? drop if so
   if (length(quadratic_terms) > 0){
     return(quadratic_terms)
   } else {
@@ -83,25 +83,25 @@ effort     <- as.vector(OpenIMBCR:::calc_transect_effort(s))
 # fit an intercept-only detection function in unmarked
 
 umdf <- unmarked::unmarkedFrameDS(
-    y=as.matrix(detections$y), 
-    siteCovs=data.frame(effort=effort), 
-    dist.breaks=detections$breaks, 
-    survey="point", 
+    y=as.matrix(detections$y),
+    siteCovs=data.frame(effort=effort),
+    dist.breaks=detections$breaks,
+    survey="point",
     unitsIn="m"
   )
 
 intercept_m <- unmarked::distsamp(
-    formula = ~1 ~1+offset(log(effort)), 
-    data = umdf, 
-    se = T, 
+    formula = ~1 ~1+offset(log(effort)),
+    data = umdf,
+    se = T,
     keyfun = "halfnorm",
     unitsOut = "kmsq",
     output = "abund"
   )
 
 per_obs_det_probabilities <- round(sapply(
-    s$radialdistance, 
-    function(x) pred_hn_det_from_distance(intercept_m, dist=x)), 
+    s$radialdistance,
+    function(x) pred_hn_det_from_distance(intercept_m, dist=x)),
     2
   )
 
@@ -116,8 +116,8 @@ if(min(per_obs_det_probabilities, na.rm=T)==0){
 s$est_abund <- round(s$cl_count / per_obs_det_probabilities)
 
 s <- calc_transect_summary_detections(
-    s=s, 
-    name=toupper(argv[2]), 
+    s=s,
+    name=toupper(argv[2]),
     field='est_abund'
   )
 
@@ -132,7 +132,7 @@ s <- OpenIMBCR:::spatial_join(s, units)
 
 # add latitude and longitude
 cat(" -- calculating spatial covariates\n")
- 
+
     s <- OpenIMBCR:::calc_lat_lon(s)
 units <- OpenIMBCR:::calc_lat_lon(units)
 
@@ -181,6 +181,7 @@ m <- glm(
 quadratics <- quadratics_to_keep(m)
 
 if(length(quadratics)>0){
+  quadratics <- gsub(quadratics, pattern="[)].", replacement=")")
   vars <- vars[!as.vector(sapply(vars, FUN=function(p){ sum(grepl(x=quadratics, pattern=p))>0  }))]
   # use AIC to justify our proposed quadratic terms
   for(q in quadratics){
@@ -228,6 +229,11 @@ if(length(quadratics)>0){
 # we are not keeping any of our quadratics? still scale with poly()
 } else {
   vars <- paste("poly(", paste(vars, ", 1)", sep=""), sep="")
+  m <- glm(
+      formula=paste("est_abund~", paste(vars, collapse="+"), "+offset(log(effort))", sep=""),
+      family=poisson,
+      data=s@data
+    )
 }
 
 # use model selection with interactions across our candidate variables
