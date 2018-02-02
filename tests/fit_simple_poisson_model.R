@@ -113,7 +113,7 @@ if(min(per_obs_det_probabilities, na.rm=T)==0){
 }
 
 
-s$est_abund <- round(s$cl_count / per_obs_det_probabilities)
+s$est_abund <- round(s$cl_count > 0 / per_obs_det_probabilities)
 
 s <- calc_transect_summary_detections(
     s=s,
@@ -274,12 +274,12 @@ rm(vals)
 # censor any predictions greater than K (max)
 cat(
     " -- number of sites with prediction greater than predicted max(K):",
-    sum(predicted$pred > max(round(predict(m, type="response")))),
+    sum(predicted$pred > max(round(predict(predict(tests@objects[[1]], type="response")))),
     "\n"
   )
 
-predicted$pred[( predicted$pred > max(round(predict(m, type="response"))) )] <-
-  max(round(predict(m, type="response")))
+predicted$pred[( predicted$pred > max(round(predict(tests@objects[[1]], type="response"))) )] <-
+  max(round(predict(tests@objects[[1]], type="response")))
 predicted$pred[predicted$pred<1] <- 0
 
 rgdal::writeOGR(
