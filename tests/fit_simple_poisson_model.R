@@ -77,6 +77,8 @@ if( sum(s$radialdistance>0, na.rm=T) < 180){
   q("no")
 }
 
+cat(" -- calculating a detection function\n")
+
 detections <- OpenIMBCR:::calc_dist_bins(s)
 effort     <- as.vector(OpenIMBCR:::calc_transect_effort(s))
 
@@ -123,6 +125,8 @@ s <- calc_transect_summary_detections(
 
 s$effort <- effort
 
+cat(" -- reading model explanatory data\n")
+
 # read-in habitat covariates
 units <- OpenIMBCR:::readOGRfromPath(argv[1])
 
@@ -168,7 +172,7 @@ vars <- unlist(strsplit(readline("enter a comma-separated list of vars you want 
   vars <- passing
 }
 
-
+cat(" -- testing for non-sense quadratic terms\n")
 
 # fit our full model
 m <- glm(
@@ -239,6 +243,7 @@ if(length(quadratics)>0){
 # use model selection with interactions across our candidate variables
 tests <- glmulti::glmulti(m, intercept=T, family=poisson, level=1)
 
+cat(" -- predicting across an input regional shapefile\n")
 # predict across our full run dataset
 predicted <- units
 
@@ -271,16 +276,18 @@ if(class(vals)!="numeric"){
 
 rm(vals)
 
-# censor any predictions greater than K (max)
-cat(
-    " -- number of sites with prediction greater than predicted max(K):",
-    sum(predicted$pred > max(round(predict(predict(tests@objects[[1]], type="response")))),
-    "\n"
-  )
+# censor any predictions greater than predicted max of our top model
+#cat(
+#    " -- number of sites with prediction greater than predicted max(K):",
+#    sum(predicted$pred > max(round(predict(predict(tests@objects[[1]], type="response")))),
+#    "\n"
+#  )
 
-predicted$pred[( predicted$pred > max(round(predict(tests@objects[[1]], type="response"))) )] <-
-  max(round(predict(tests@objects[[1]], type="response")))
-predicted$pred[predicted$pred<1] <- 0
+#predicted$pred[( predicted$pred > max(round(predict(tests@objects[[1]], type="response"))) )] <-
+#  max(round(predict(tests@objects[[1]], type="response")))
+#predicted$pred[predicted$pred<1] <- 0
+
+cat(" -- writing to disk\n")
 
 rgdal::writeOGR(
   predicted,
