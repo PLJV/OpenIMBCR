@@ -94,9 +94,31 @@ quadratics_to_keep <-function(m){
   }
 }
 
-calc_all_distsamp_combinations <- function(vars = NULL){
+quadratics_to_keep <- function(m){
+  quadratic_terms <- grepl(names(coef(m)), pattern = "[)]2")
+  # test : are we negative and are we a quadratic term?
+  keep <- (coef(m) < 0) * quadratic_terms
+  if(length(keep)==0){
+    return(NULL)
+  }
+  quadratic_terms <- names(coef(m))[keep == 1]
+  quadratic_terms <- gsub(quadratic_terms, pattern = "[)]2", replacement = ")")
+  # test: are we a positive linear term and a negative quadratic 
+  direction_of_coeffs <- coef(m)/abs(coef(m))
+  steps <- seq(2, length(direction_of_coeffs), by = 2)
+  keep <- names(which(direction_of_coeffs[steps] + direction_of_coeffs[steps+1]  == 0))
+  quadratic_terms <- gsub(keep, pattern = "[)]1", replacement = ")")
+  # test are both our linear and quadratic terms negative? drop if so 
+  if (length(quadratic_terms) > 0){
+    return(quadratic_terms)
+  } else {
+    return(NULL)
+  }
+}
+
+calc_all_distsamp_combinations <- function(vars = NULL, poly_order=T){
   formulas <- gsub(OpenIMBCR:::mCombinations(
-          siteCovs = vars,
+          siteCovs = paste("poly(",vars,",2,raw=T)",sep=""),
           availCovs = NULL,
           detCovs = NULL,
           offset = "offset(log(effort))")[,1],
@@ -149,9 +171,105 @@ glm_to_distsamp <- function(m=NULL, umdf=NULL){
     ))
 }
 
+
 #
 # MAIN
 #
+
+# define the vars we are going to use
+vars <- c("grass_ar","shrub_ar","crp_ar","wetland_ar","pat_ct", "lat", "lon")
+
+umdf@siteCovs <- s@data
+
+original_formulas <- unmarked_models <- calc_all_distsamp_combinations(vars)
+  unmarked_models <- paste(unmarked_models, "+offset(log(effort))", sep="")
+
+unmarked_models <- lapply(
+    X=unmarked_models, 
+    FUN=function(m){
+      glm_to_distsamp(glm(paste("est_abund~",m, sep=""), data=s@data), umdf=umdf)  
+  })
+
+quadratic_terms <- lapply(
+    unmarked_models, 
+    FUN=quadratics_to_keep
+  )
+
+unmarked_models <- mapply(
+  FUN=function(...){
+    # drop the lam() prefix 
+    quadratics <- gsub(gsub(quadratics, pattern="lam[(]", replacement=""), pattern="[)][)]", replacement=")")
+    # drop poly() notation from the list of all covariates using in this model
+    vars <- gsub(gsub(vars, pattern="poly[(]", replacement=""), pattern="*.[0-2].*..*", replacement="")
+    if(length(quadratics)>0){
+      vars <- vars[!as.vector(sapply(vars, FUN=function(p){ sum(grepl(x=quadratics, pattern=p))>0  }))]
+      # use AIC to justify our proposed quadratic terms
+      for(q in quadratics){
+        lin_var <- gsub(
+          q,
+          pattern=", 2,",
+          replacement=", 1,"
+        )
+        
+        m_lin_var <- OpenIMBCR:::AIC(unmarked::distsamp(
+          formula=as.formula(paste("~1~",
+                        paste(
+                          c(paste("poly(", paste(vars, ", 1, raw=T)", sep=""), sep=""),lin_var,quadratics[!(quadratics %in% q)]), collapse="+"),
+                        "+offset(log(effort))",
+                        sep=""
+          )),
+          data=umdf,
+          se=F,
+          keyfun="halfnorm",
+          unitsOut="kmsq",
+          output="abund"
+        ))+AIC_RESCALE_CONST
+        m_quad_var <- OpenIMBCR:::AIC(unmarked::distsamp(
+          formula=as.formula(paste("~1~",
+                        paste(c(paste("poly(", paste(vars, ", 1, raw=T)", sep=""), sep=""), quadratics), collapse="+"),
+                        "+offset(log(effort))",
+                        sep=""
+          )),
+          data=umdf,
+          se=F,
+          keyfun="halfnorm",
+          unitsOut="kmsq",
+          output="abund"
+        ))+AIC_RESCALE_CONST
+        # if we don't improve our AIC with the quadratic by at-least 8 aic units
+        # (pretty substatial support), keep the linear version
+        if( m_lin_var-m_quad_var < AIC_SUBSTANTIAL_THRESHOLD){
+          quadratics <- quadratics[!(quadratics %in% q)]
+          vars <- c(vars,gsub(gsub(lin_var, pattern="poly[(]", replacement=""), pattern=", [0-9], raw.*=*.T[)]", replacement=""))
+        }
+      }
+      
+      vars <- c(paste("poly(", paste(vars, ", 1, raw=T)", sep=""), sep=""), quadratics)
+    }
+    return(vars)
+  },
+  quadratics=quadratic_terms,
+  vars=original_formulas
+)
+
+# refit our models
+unmarked_models <- lapply(
+  X=unmarked_models, 
+  FUN=function(x){
+    return(
+      unmarked::distsamp(
+        formula=as.formula(paste("~1~",
+                                 x,
+                                 "+offset(log(effort))",
+                                 sep=""
+        )),
+        data=umdf,
+        se=T,
+        keyfun="halfnorm",
+        unitsOut="kmsq",
+        output="abund" 
+      ))}
+)
 
 # top models to re-fit
 keep <- tests@crits - min(tests@crits) < AIC_SUBSTANTIAL_THRESHOLD
@@ -166,11 +284,14 @@ unmarked_models <- lapply(
     umdf=umdf
   )
 
-# predict across as many cores as we can
+# let's scale our newdata so that it is consistent with our original training data
 
-units@data$effort <- median(effort)
-
+# read from units attribute table and drop anything that isn't numeric
 predict_df <- units@data
+
+AICcmodavg:::modavgPred.AICunmarkedFitDS(cand.set = unmarked_models, parm.type="lambda", newdata = predict_df)
+
+
 
 require(parallel)
 cl <- parallel::makeCluster(parallel::detectCores() - 1)
