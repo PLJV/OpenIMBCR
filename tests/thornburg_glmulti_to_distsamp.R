@@ -271,25 +271,18 @@ unmarked_models <- lapply(
       ))}
 )
 
-# top models to re-fit
-keep <- tests@crits - min(tests@crits) < AIC_SUBSTANTIAL_THRESHOLD
+# make a fitList
+unmarked_models <- unmarked::fitList(fits=unmarked_models)
+model_selection_table <- unmarked::modSel(unmarked_models)
 
-# get weights
-aic_weights <- OpenIMBCR:::akaike_weights(tests@crits)[keep]
-
-# re-fit
-unmarked_models <- lapply(
-    X=tests@objects[keep],
-    FUN=glm_to_distsamp,
-    umdf=umdf
-  )
-
-# let's scale our newdata so that it is consistent with our original training data
+MOD_SEL_THRESHOLD <- min(which( cumsum(model_selection_table@Full$cumltvWt) > 0.90 ))
 
 # read from units attribute table and drop anything that isn't numeric
 predict_df <- units@data
 
-AICcmodavg:::modavgPred.AICunmarkedFitDS(cand.set = unmarked_models, parm.type="lambda", newdata = predict_df)
+predicted <- unmarked::predict(unmarked_models[1:MOD_SEL_THRESHOLD], type="state", newdata=predict_df)
+
+#AICcmodavg:::modavgPred.AICunmarkedFitDS(cand.set = unmarked_models, parm.type="lambda", newdata = predict_df)
 
 
 
