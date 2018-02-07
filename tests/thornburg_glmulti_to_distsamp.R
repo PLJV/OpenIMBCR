@@ -77,24 +77,31 @@ quadratics_to_keep <-function(m){
 }
 
 quadratics_to_keep <- function(m){
-  quadratic_terms <- grepl(names(coef(m)), pattern = "[)]2")
+  quadratic_terms <- grepl(names(unmarked::coef(m)), pattern = "[)]2")
   # test : are we negative and are we a quadratic term?
-  keep <- (coef(m) < 0) * quadratic_terms
-  if(length(keep)==0){
+  keep <- (unmarked::coef(m) < 0) * quadratic_terms
+  quadratic_terms <- names(unmarked::coef(m))[keep == 1]
+  # no negative quadratics? then leave
+  if(length(quadratic_terms)==0){
     return(NULL)
-  }
-  quadratic_terms <- names(coef(m))[keep == 1]
-  quadratic_terms <- gsub(quadratic_terms, pattern = "[)]2", replacement = ")")
-  # test: are we a positive linear term and a negative quadratic
-  direction_of_coeffs <- coef(m)/abs(coef(m))
-  steps <- seq(2, length(direction_of_coeffs), by = 2)
-  keep <- names(which(direction_of_coeffs[steps] + direction_of_coeffs[steps+1]  == 0))
-  quadratic_terms <- gsub(keep, pattern = "[)]1", replacement = ")")
-  # test are both our linear and quadratic terms negative? drop if so
-  if (length(quadratic_terms) > 0){
-    return(quadratic_terms)
+  # negative quadratic? let's make sure the linear term is positive
   } else {
-    return(NULL)
+    quadratic_terms <- gsub(quadratic_terms, pattern = "[)]2", replacement = ")")
+    quadratic_terms <- gsub(quadratic_terms, pattern = "lambda[(]|lam[(]", replacement="")
+    quadratic_terms <- gsub(quadratic_terms, pattern = "[)][)]", replacement=")")
+    # test: are we a positive linear term and a negative quadratic
+    direction_of_coeffs <- unmarked::coef(m)/abs(unmarked::coef(m))
+    steps <- seq(2, length(direction_of_coeffs), by = 2) # always skip the intercept
+    keep <- names(which(direction_of_coeffs[steps] + direction_of_coeffs[steps+1]  == 0))
+    # are our negative quadratic(s) in the "keep" array?
+    quadratic_terms <-
+      quadratic_terms[grepl(gsub(quadratic_terms, pattern=" ", ""), gsub(keep, pattern=" ", ""))]
+    # test are both our linear and quadratic terms negative? drop if so
+    if (length(quadratic_terms) > 0){
+      return(quadratic_terms)
+    } else {
+      return(NULL)
+    }
   }
 }
 
@@ -172,26 +179,42 @@ fit_distsamp <- function(lambdas=NULL, umdf=NULL){
 }
 
 fit_gdistsamp <- function(lambdas=NULL, umdf=NULL){
-  cl <- parallel::makeCluster(parallel::detectCores()-1)
-  parallel::clusterExport(cl, varlist=c("umdf"))
-  unmarked_models <- parallel::parLapply(
-      cl=cl,
-      X=lambdas,
-      fun=function(m){
-        unmarked::gdistsamp(
-          pformula=as.formula("~1"),
-          lambdaformula=as.formula(paste("~", m, sep="")),
-          phiformula=as.formula("~1"),
-          data=umdf,
-          se=T,
-          K=max(rowSums(umdf@y)),
-          keyfun="halfnorm",
-          unitsOut="kmsq",
-          mixture="NB",
-          output="abund"
-        )
-    })
-  parallel::stopCluster(cl);
+  if(length(lambdas)>1){
+    cl <- parallel::makeCluster(parallel::detectCores()-1)
+    parallel::clusterExport(cl, varlist=c("umdf"))
+    unmarked_models <- parallel::parLapply(
+        cl=cl,
+        X=lambdas,
+        fun=function(m){
+          unmarked::gdistsamp(
+            pformula=as.formula("~1"),
+            lambdaformula=as.formula(paste("~", m, sep="")),
+            phiformula=as.formula("~1"),
+            data=umdf,
+            se=T,
+            K=max(rowSums(umdf@y)),
+            keyfun="halfnorm",
+            unitsOut="kmsq",
+            mixture="NB",
+            output="abund"
+          )
+      })
+    parallel::stopCluster(cl);
+    return(unmarked_models);
+  } else {
+    return(unmarked::gdistsamp(
+      pformula=as.formula("~1"),
+      lambdaformula=as.formula(paste("~", unlist(lambdas), sep="")),
+      phiformula=as.formula("~1"),
+      data=umdf,
+      se=T,
+      K=max(rowSums(umdf@y)),
+      keyfun="halfnorm",
+      unitsOut="kmsq",
+      mixture="NB",
+      output="abund"
+    ))
+  }
   return(unmarked_models)
 }
 
@@ -209,10 +232,10 @@ aic_test_quadratic_terms_gdistsamp <- function(unmarked_models=NULL, original_fo
       # drop the lam() prefix
       quads <- gsub(gsub(quadratics[[i]], pattern="lambda[(]", replacement=""), pattern="[)][)]", replacement=")")
       v <- vars[i]
+      # drop poly() notation from the list of all covariates using in this model
+      v <- gsub(gsub(v, pattern="poly[(]", replacement=""), pattern="*.[0-2].*..*", replacement="")
       if(length(quads)>0){
-        # drop poly() notation from the list of all covariates using in this model
-        v <- gsub(gsub(vars[i], pattern="poly[(]", replacement=""), pattern="*.[0-2].*..*", replacement="")
-        v <- v[!as.vector(sapply(v, FUN=function(p){ sum(grepl(x=quads, pattern=p))>0  }))]
+        v <- v[!as.vector(sapply(v, FUN=function(p=NULL){ sum(grepl(x=quads, pattern=p))>0  }))]
         # use AIC to justify our proposed quadratic terms
         for(q in quads){
           lin_var <- gsub(
@@ -299,7 +322,12 @@ aic_test_quadratic_terms_gdistsamp <- function(unmarked_models=NULL, original_fo
           }
         }
         v <- c(paste("poly(", paste(v, ", 1, raw=T)", sep=""), sep=""), quads)
+      } else {
+        # if there were no valid quadratics to test, we will default to using
+        # the linear form only
+        v <- c(paste("poly(", paste(v, ", 1, raw=T)", sep=""), sep=""), quads)
       }
+
       return(v)
   })
   parallel::stopCluster(cl);
@@ -336,7 +364,7 @@ aic_test_quadratic_terms_distsamp <- function(unmarked_model=NULL, original_form
                           sep=""
             )),
             data=umdf,
-            se=F,
+            se=T,
             keyfun="halfnorm",
             unitsOut="kmsq",
             output="abund"
@@ -348,16 +376,21 @@ aic_test_quadratic_terms_distsamp <- function(unmarked_model=NULL, original_form
                           sep=""
             )),
             data=umdf,
-            se=F,
+            se=T,
             keyfun="halfnorm",
             unitsOut="kmsq",
             output="abund"
-          ))+AIC_RESCALE_CONST
+          )) + AIC_RESCALE_CONST
           # if we don't improve our AIC with the quadratic by at-least 8 aic units
           # (pretty substatial support), keep the linear version
           if( m_lin_var-m_quad_var < AIC_SUBSTANTIAL_THRESHOLD){
             quadratics <- quadratics[!(quadratics %in% q)]
-            vars <- c(vars,gsub(gsub(lin_var, pattern="poly[(]", replacement=""), pattern=", [0-9], raw.*=*.T[)]", replacement=""))
+            vars <- c(
+              vars,
+              gsub(gsub(lin_var, pattern="poly[(]", replacement=""),
+              pattern=", [0-9], raw.*=*.T[)]",
+              replacement="")
+            )
           }
         }
 
@@ -370,6 +403,71 @@ aic_test_quadratic_terms_distsamp <- function(unmarked_model=NULL, original_form
   )
   return(unmarked_models)
 }
+
+
+par_unmarked_predict <- function(unmarked_models=NULL, predict_df=NULL, type="lambda", weights=NULL){
+  # set-up our run and parallelize across our cores
+  cl <- parallel::makeCluster(parallel::detectCores()-1)
+  steps <- round(seq(1,nrow(predict_df), length.out=parallel::detectCores()-1))
+  # add 1 to the last step to accomodate our lapply splitting
+  steps[length(steps)] <- steps[length(steps)]+1
+
+  parallel::clusterExport(cl, varlist=c("predict_df","steps"))
+  predicted <- lapply(
+   X=unmarked_models,
+   FUN=function(model){
+     parallel::clusterExport(cl, varlist=c("model","type"))
+     return(parallel::parLapply(
+       cl=cl,
+       X=1:(length(steps)-1),
+       fun=function(i){
+         return(unmarked::predict(
+             model,
+             type=type,
+             se=T,
+             newdata=predict_df[seq(steps[i], (steps[i+1]-1)),]
+           ))
+       }))
+     }
+  )
+  rm(predict_df);
+  parallel::stopCluster(cl); rm(cl);
+  # join the individual rows from within each model run
+  # and return a single data.frame for each model
+  predicted <- lapply(
+     predicted,
+     FUN=function(x) do.call(rbind, x)
+   )
+   # each model run will have a predicted column and
+   # a confidence interval -- we are only interested in
+   # the predicted column right now
+   predicted <- lapply(
+       X=1:length(unmarked_models),
+       FUN=function(x){ predicted[[x]]$Predicted }
+   )
+   if(is.null(weights)){
+     return(predicted)
+   } else {
+     # if we have more than one model in the top models
+     # table, let's average the results across our models
+     # using AIC weighting parameter taken from 'unmarked'.
+     if (length(predicted) > 1){
+       # join our predictions across models into a single
+       # matrix that we can apply a weight across
+       predicted <- do.call(cbind, predicted)
+       predicted <- sapply(
+           1:nrow(predicted),
+           FUN=function(i){
+             weighted.mean(x=predicted[i, ], w = weights)
+           }
+         )
+     } else {
+       predicted <- unlist(predicted)
+     }
+     return(predicted)
+   }
+}
+
 #
 # MAIN
 #
@@ -377,8 +475,14 @@ aic_test_quadratic_terms_distsamp <- function(unmarked_model=NULL, original_form
 # define the vars we are going to use
 vars <- c("grass_ar","shrub_ar","crp_ar","wetland_ar","pat_ct", "lat", "lon")
 
+# calculate exhaustive (all possible) variable mCombinations
+# for model selection
+
 original_formulas <- unmarked_models <- calc_all_distsamp_combinations(vars)
   unmarked_models <- paste(unmarked_models, "+offset(log(effort))", sep="")
+
+# build a unmarked data.frame from our running
+# input data (s@data is attributed IMBCR grid centroids)
 
 umdf <- unmarked::unmarkedFrameGDS(
     y=as.matrix(detections$y),
@@ -389,37 +493,53 @@ umdf <- unmarked::unmarkedFrameGDS(
     unitsIn="m"
   )
 
-cat(" -- fitting a first round of negbin models and testing quadratic terms\n")
+  cat(
+      " -- fitting a first round of negbin models and testing quadratic terms",
+      "(this may take 40-80 minutes)\n")
 
+  # make an over-fit model of all variables to stare at
+  # and wonder
+  m_negbin_full_model <- fit_gdistsamp(
+    paste(paste("poly(",vars,",2,raw=T)",sep=""), collapse="+"),
+    umdf=umdf
+  )
+
+# takes about 45 minutes
 unmarked_models <- aic_test_quadratic_terms_gdistsamp(
   fit_gdistsamp(unmarked_models, umdf),
   original_formulas,
   umdf
 )
 
-# refit our models using the specification justified by our AIC
-# quadratics test
+# refit our models using the specification justified from testing AIC
+# across linear vs quadratic terms
 unmarked_models <- fit_gdistsamp(
-  X=lapply(unmarked_models, FUN=function(x){
-    paste(paste(x, collapse="+"), "+offset(log(effort))", sep="")
-  })
+  lambdas=lapply(
+    X=unmarked_models,
+    FUN=function(x){
+      return(paste(paste(x, collapse="+"), "+offset(log(effort))", sep=""))
+    }),
+  umdf=umdf
 )
 
-fit_gdistsamp
 # how does our dispersion look?
 dispersion <- sapply(
   X=unmarked_models,
   FUN=function(m){
+    # calculate k from number of parameters in our lambda
+    # formula -- could include intercept parameters too
     k <- sum(
       grepl(
         unlist(strsplit(as.character(m@formula)[3], split="[+]")),
         pattern="poly")
     )
+    # our detection bins across all IMBCR transects
     observed <- unmarked::getY(m@data)
     df <- (length(observed)-sum(is.na(observed)))-k
     return(round(AICcmodavg::Nmix.chisq(m)$chi.square / df, 2))
   }
 )
+
 
 # make a fitList
 model_selection_table <- unmarked::modSel(unmarked::fitList(
@@ -432,50 +552,40 @@ MOD_SEL_THRESHOLD <- as.numeric(model_selection_table@Full$model)[1:MOD_SEL_THRE
 # read from units attribute table and drop anything that isn't numeric
 predict_df <- units@data
 
-# standard model averaging from unmarked
-predicted <- unmarked::predict(
-  unmarked::fitList(unmarked_models[MOD_SEL_THRESHOLD]),
-  type="state",
-  dispersion=dispersion,
-  newdata=predict_df
+# standard model averaging from unmarked -- sllloowww
+# predicted <- unmarked::predict(
+#   unmarked::fitList(unmarked_models[MOD_SEL_THRESHOLD]),
+#   type="lambda",
+#   newdata=predict_df
+# )
+
+aic_weights <- model_selection_table@Full$AICwt[
+    MOD_SEL_THRESHOLD
+]
+
+predicted <- par_unmarked_predict(
+  unmarked_models=unmarked_models[MOD_SEL_THRESHOLD],
+  predict_df=predict_df,
+  type="lambda",
+  weights=aic_weights
 )
 
-
-
-# fancy model averaging from AICcmodavg
-predict_df <- AICcmodavg:::modavgPred.AICunmarkedFitDS(
-    cand.set = unmarked_models[MOD_SEL_THRESHOLD],
-    parm.type = "lambda",
-    c.hat=2,
-    newdata = predict_df
-  )
-
-
-# predict_df <- lapply(
-#     X=1:length(aic_weights),
-#     FUN=function(x){ predicted[[x]]$Predicted }
+# fancy model averaging from AICcmodavg (useful for getting averaged betas)
+# predict_df <- AICcmodavg:::modavgPred.AICunmarkedFitDS(
+#     cand.set = unmarked_models[MOD_SEL_THRESHOLD],
+#     parm.type = "grass_ar",
+#     newdata = predict_df
 #   )
 
-if (length(predict_df) > 1){
-  # join our predictions across models into a single
-  # matrix that we can apply a weight across
-  predict_df <- do.call(cbind, predict_df)
-  predict_df <- sapply(
-      1:nrow(predict_df),
-      FUN=function(i){
-        weighted.mean(x=predict_df[i, ], w = aic_weights)
-      }
-    )
-} else {
-  predict_df <- unlist(predict_df)
-}
+pred <- units
+pred@data <- data.frame(pred = predicted);
 
-predicted@data <- data.frame(pred = predicted);
+rm(predicted)
 
 cat(" -- writing to disk\n")
 
 rgdal::writeOGR(
-  predicted,
+  pred,
   ".",
   tolower(paste(argv[2],
       "_imbcr_hds_pois_prediction_",
@@ -494,6 +604,6 @@ r_data_file <- gsub(
 
 save(
     compress=T,
-    list=ls(pattern="[a-z]"),
+    list=(ls(pattern="[a-z]")),
     file=r_data_file
   )
