@@ -40,6 +40,54 @@ pred_hn_det_from_distance <- function(x=NULL, dist=NULL){
   return(as.vector(unmarked:::gxhn(x=dist, param)))
 }
 
+calc_emp_dispersion_statistic <- function(x = NULL, bs=999999){
+  observed <- sd(x)/round(mean(x))
+  predicted <- median(sapply(
+    X=bs,
+    FUN=function(i){
+      predicted <- rpois(n = length(x), round(mean(x)))
+      return( sd(predicted)/round(mean(predicted)) )
+    }))
+  return(round(observed/predicted, 2))
+}
+
+calc_intercept_statistics <- function(x=NULL){
+  load(x); # from an rdata file
+  PLJV_AREA = 646191.287039 # in square kilometers
+  return(data.frame(
+    spp=strsplit(r_data_file, split="_")[[1]][1],
+    mean_p_det=mean(per_obs_det_probabilities, na.rm=T),
+    upper_pred=max(unmarked::predict(intercept_m, type="state")[,1]),
+    lower_pred=min(unmarked::predict(intercept_m, type="state")[,1]),
+    mean_pred=mean(unmarked::predict(intercept_m, type="state")[,1]),
+    median_pred=median(unmarked::predict(intercept_m, type="state")[,1]),
+    max_detections=max(rowSums(detections$y)),
+    n_hat=mean(unmarked::predict(intercept_m, type="state")[,1])*PLJV_AREA
+  ))
+}
+#' wrapper function for calc_intercept_statistics that will accept a 
+#' vector of rdata filenames and build a summary table of results for
+#' all birds 
+calc_descriptive_statistics_rdata_files <- function(x=NULL){
+  cat(" -- processing:")
+  descriptive_statistics <- do.call(rbind, lapply(
+    X=r_data_files,
+    FUN=function(x){
+      cat(paste("[",which(r_data_files %in% x),"]",sep=""))
+      return(
+        calc_intercept_descriptive_statistics(x)
+      )
+    }
+  ))
+  cat("\n")
+
+  write.csv(
+      descriptive_statistics,
+      "intercept_model_descriptive_statistics.csv",
+      row.names=F
+    )
+}
+
 #
 # MAIN
 #
@@ -132,7 +180,8 @@ coords <- as.data.frame(rgeos::gCentroid(sp::spTransform(units,"+init=epsg:4326"
 
 # define the covariates we are going to use in our analysis
 
-vars <- c("grass_ar","shrub_ar","crp_ar","wetland_ar","pat_ct", "lat", "lon")
+#vars <- c("grass_ar","shrub_ar","crp_ar","wetland_ar","pat_ct", "lat", "lon")
+vars <- c("grass_ar","shrub_ar","crp_ar","wetland_ar","pat_ct")
 
 # ensure a consistent scale for our input data (we will use this a lot)
 
@@ -296,6 +345,7 @@ if(class(vals)!="numeric"){
     )
   )
 }
+
 
 rm(vals)
 

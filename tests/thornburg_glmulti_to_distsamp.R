@@ -128,11 +128,15 @@ calc_all_distsamp_combinations <- function(vars = NULL, poly_order=T){
   return(formulas)
 }
 
-calc_emp_dispersion_statistic <- function(x = NULL){
+calc_emp_dispersion_statistic <- function(x = NULL, bs=999999){
   observed <- sd(x)/round(mean(x))
-  predicted <- rpois(n = length(x), round(mean(x)))
-    predicted <- sd(predicted)/round(mean(predicted))
-  return(observed/predicted)
+  predicted <- median(sapply(
+    X=bs,
+    FUN=function(i){
+      predicted <- rpois(n = length(x), round(mean(x)))
+      return( sd(predicted)/round(mean(predicted)) )
+    }))
+  return(round(observed/predicted, 2))
 }
 
 glm_to_distsamp <- function(m=NULL, umdf=NULL){
@@ -411,12 +415,11 @@ par_unmarked_predict <- function(unmarked_models=NULL, predict_df=NULL, type="la
   steps <- round(seq(1,nrow(predict_df), length.out=parallel::detectCores()-1))
   # add 1 to the last step to accomodate our lapply splitting
   steps[length(steps)] <- steps[length(steps)]+1
-
-  parallel::clusterExport(cl, varlist=c("predict_df","steps"))
+  parallel::clusterExport(cl, varlist=c("predict_df","steps","type"), envir=environment())
   predicted <- lapply(
    X=unmarked_models,
    FUN=function(model){
-     parallel::clusterExport(cl, varlist=c("model","type"))
+     parallel::clusterExport(cl, varlist=c("model"), envir=environment())
      return(parallel::parLapply(
        cl=cl,
        X=1:(length(steps)-1),
@@ -473,7 +476,8 @@ par_unmarked_predict <- function(unmarked_models=NULL, predict_df=NULL, type="la
 #
 
 # define the vars we are going to use
-vars <- c("grass_ar","shrub_ar","crp_ar","wetland_ar","pat_ct", "lat", "lon")
+#vars <- c("grass_ar","shrub_ar","crp_ar","wetland_ar","pat_ct", "lat", "lon")
+vars <- c("grass_ar","shrub_ar","crp_ar","wetland_ar","pat_ct")
 
 # calculate exhaustive (all possible) variable mCombinations
 # for model selection
@@ -485,24 +489,24 @@ original_formulas <- unmarked_models <- calc_all_distsamp_combinations(vars)
 # input data (s@data is attributed IMBCR grid centroids)
 
 umdf <- unmarked::unmarkedFrameGDS(
-    y=as.matrix(detections$y),
-    siteCovs=s@data,
-    dist.breaks=detections$breaks,
-    numPrimary=1,
-    survey="point",
-    unitsIn="m"
-  )
+  y=as.matrix(detections$y),
+  siteCovs=s@data,
+  dist.breaks=detections$breaks,
+  numPrimary=1,
+  survey="point",
+  unitsIn="m"
+)
 
-  cat(
-      " -- fitting a first round of negbin models and testing quadratic terms",
-      "(this may take 40-80 minutes)\n")
+cat(
+    " -- fitting a first round of negbin models and testing quadratic terms",
+    "(this may take 40-80 minutes)\n")
 
-  # make an over-fit model of all variables to stare at
-  # and wonder
-  m_negbin_full_model <- fit_gdistsamp(
-    paste(paste("poly(",vars,",2,raw=T)",sep=""), collapse="+"),
-    umdf=umdf
-  )
+# make an over-fit model of all variables to stare at
+# and wonder
+m_negbin_full_model <- fit_gdistsamp(
+  paste(paste("poly(",vars,",2,raw=T)",sep=""), collapse="+"),
+  umdf=umdf
+)
 
 # takes about 45 minutes
 unmarked_models <- aic_test_quadratic_terms_gdistsamp(
@@ -517,7 +521,11 @@ unmarked_models <- fit_gdistsamp(
   lambdas=lapply(
     X=unmarked_models,
     FUN=function(x){
-      return(paste(paste(x, collapse="+"), "+offset(log(effort))", sep=""))
+      if (!grepl(paste(x, collapse="+"), pattern="offset")){
+        return(paste(paste(x, collapse="+"), "+offset(log(effort))", sep=""))
+      } else {
+        return(paste(x, collapse="+"))
+      }
     }),
   umdf=umdf
 )
