@@ -314,16 +314,22 @@ if(length(quadratics)>0){
 }
 
 # use model selection with interactions across our candidate variables
-tests <- glmulti::glmulti(m, intercept=T, family=poisson, level=1)
+tests <- glmulti::glmulti(
+  m,
+  intercept=T, 
+  family=poisson, 
+  offset=offset(log(effort)), 
+  level=1,
+  plotty=F)
 
 # predict across our full run dataset
 predicted <- units
 
-vals <- as.vector(predict(
+vals <- suppressWarnings(as.vector(predict(
       tests,
       select=AIC_SUBSTANTIAL_THRESHOLD,
       newdata=units@data,
-      type="response"))
+      type="response")))
 
 if(class(vals)!="numeric"){
   # average across all models within 2 AIC of the top model
@@ -332,16 +338,19 @@ if(class(vals)!="numeric"){
         tests,
         select=AIC_SUBSTANTIAL_THRESHOLD,
         newdata=units@data,
+        offset=offset(log(median(effort))),
         type="response")$averages)
       )
     )
   # if there was only one top model, averaging won't work
 } else {
   predicted@data <- data.frame(
-    pred=as.vector(floor(predict(
-      tests@objects[[1]],
+    pred=as.vector(floor(suppressWarnings(predict(
+      tests,
+      select=AIC_SUBSTANTIAL_THRESHOLD,
       newdata=units@data,
-      type="response"))
+      #offset=offset(log(effort)),
+      type="response")))
     )
   )
 }
