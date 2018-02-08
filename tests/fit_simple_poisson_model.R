@@ -325,14 +325,8 @@ tests <- glmulti::glmulti(
 # predict across our full run dataset
 predicted <- units
 
-vals <- suppressWarnings(as.vector(predict(
-      tests,
-      select=AIC_SUBSTANTIAL_THRESHOLD,
-      newdata=units@data,
-      type="response")))
-
-if(class(vals)!="numeric"){
-  # average across all models within 2 AIC of the top model
+if(length(tests)>1){
+  # average across all models within some threshold AIC of the top model
   predicted@data <- data.frame(
       pred=as.vector(floor(predict(
         tests,
@@ -360,20 +354,22 @@ if(class(vals)!="numeric"){
   )
 }
 
-
-rm(vals)
-
-# censor any predictions greater than K (max)
-cat(
-    " -- number of sites with prediction greater than predicted max(K):",
-    sum(predicted$pred > max(round(predict(tests@objects[[1]], type="response")))),
-    "\n"
-  )
-
 if(inherits(tests, 'glm')){
+  # censor any predictions greater than K (max)
+  cat(
+      " -- number of sites with prediction greater than predicted max(K):",
+      sum(predicted$pred > max(round(predict(tests, type="response")))),
+      "\n"
+    )
   predicted$pred[( predicted$pred > max(round(predict(tests, type="response"))) )] <-
     max(round(predict(tests, type="response")))
 } else {
+  # censor any predictions greater than K (max)
+  cat(
+      " -- number of sites with prediction greater than predicted max(K):",
+      sum(predicted$pred > max(round(predict(tests@objects[[1]], type="response")))),
+      "\n"
+    )
   predicted$pred[( predicted$pred > max(round(predict(tests@objects[[1]], type="response"))) )] <-
     max(round(predict(tests@objects[[1]], type="response")))
 }
