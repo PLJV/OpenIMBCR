@@ -65,9 +65,9 @@ calc_intercept_statistics <- function(x=NULL){
     n_hat=mean(unmarked::predict(intercept_m, type="state")[,1])*PLJV_AREA
   ))
 }
-#' wrapper function for calc_intercept_statistics that will accept a 
+#' wrapper function for calc_intercept_statistics that will accept a
 #' vector of rdata filenames and build a summary table of results for
-#' all birds 
+#' all birds
 calc_descriptive_statistics_rdata_files <- function(x=NULL){
   cat(" -- processing:")
   descriptive_statistics <- do.call(rbind, lapply(
@@ -302,13 +302,13 @@ if(length(quadratics)>0){
 
   # refit our full model minus un-intuitive quadratics
   m <- glm(
-      formula=paste(
+      formula=as.formula(paste(
         "est_abund~",
         paste(vars, collapse="+"),
-        "+offset(log(effort))",
         sep=""
-      ),
+      )),
       family=poisson,
+      offset=log(effort),
       data=s@data
     )
 }
@@ -316,9 +316,9 @@ if(length(quadratics)>0){
 # use model selection with interactions across our candidate variables
 tests <- glmulti::glmulti(
   m,
-  intercept=T, 
-  family=poisson, 
-  offset=offset(log(effort)), 
+  intercept=T,
+  family=poisson,
+  offset=log(effort),
   level=1,
   plotty=F)
 
@@ -338,18 +338,23 @@ if(class(vals)!="numeric"){
         tests,
         select=AIC_SUBSTANTIAL_THRESHOLD,
         newdata=units@data,
-        offset=offset(log(median(effort))),
+        offset=log(effort),
         type="response")$averages)
       )
     )
   # if there was only one top model, averaging won't work
 } else {
+  # re-fit our standard model
+  tests <- 
+  glm(formula=tests@objects[[1]]$formula,
+      offset=log(effort),
+      family=poisson,
+      data=s@data)
   predicted@data <- data.frame(
     pred=as.vector(floor(suppressWarnings(predict(
       tests,
-      select=AIC_SUBSTANTIAL_THRESHOLD,
       newdata=units@data,
-      #offset=offset(log(effort)),
+      offset=log(effort),
       type="response")))
     )
   )
