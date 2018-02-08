@@ -370,8 +370,14 @@ cat(
     "\n"
   )
 
-predicted$pred[( predicted$pred > max(round(predict(tests@objects[[1]], type="response"))) )] <-
-  max(round(predict(tests@objects[[1]], type="response")))
+if(inherits(tests, 'glm')){
+  predicted$pred[( predicted$pred > max(round(predict(tests, type="response"))) )] <-
+    max(round(predict(tests, type="response")))
+} else {
+  predicted$pred[( predicted$pred > max(round(predict(tests@objects[[1]], type="response"))) )] <-
+    max(round(predict(tests@objects[[1]], type="response")))
+}
+
 
 predicted$pred[predicted$pred<1] <- 0
 
