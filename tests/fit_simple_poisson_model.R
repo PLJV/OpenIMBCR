@@ -88,6 +88,13 @@ calc_descriptive_statistics_rdata_files <- function(x=NULL){
     )
 }
 
+refit_glm <- function(m, s=NULL, effort=NULL){
+  glm(formula=m$formula,
+      offset=log(effort),
+      family=poisson,
+      data=s@data)
+}
+
 #
 # MAIN
 #
@@ -325,18 +332,33 @@ tests <- glmulti::glmulti(
 # predict across our full run dataset
 predicted <- units
 
-if(length(tests)>1){
-  # average across all models within some threshold AIC of the top model
-  predicted@data <- data.frame(
-      pred=as.vector(floor(predict(
-        tests,
-        select=AIC_SUBSTANTIAL_THRESHOLD,
-        newdata=units@data,
-        offset=log(effort),
-        type="response")$averages)
+# are there multiple top models to work from?
+if(sum((tests@crits)-min(tests@crits) < AIC_SUBSTANTIAL_THRESHOLD) > 1){
+  models <- which((tests@crits)-min(tests@crits) < AIC_SUBSTANTIAL_THRESHOLD)
+  weights <- tests@crits[models]
+    weights <- OpenIMBCR:::akaike_weights(weights)
+  models <- lapply(
+    X=models, 
+    FUN=function(x){
+      m <- tests@objects[[x]]
+      return(refit_glm(m, s, effort))
+  })
+  models <- do.call(cbind, lapply(
+    X=models, 
+    FUN=function(x){
+      m <- predict(
+          x,
+          offset=log(effort),
+          family=poisson,
+          type="response",
+          newdata=units@data
       )
-    )
-  # if there was only one top model, averaging won't work
+    }))
+  predicted@data <- data.frame(
+    pred=apply(models, MARGIN=1, FUN=weighted.mean, weights=weights)
+  )
+  rm(models)
+# if there was only one top model, averaging won't work
 } else {
   # re-fit our standard model
   tests <- 
