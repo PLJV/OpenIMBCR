@@ -21,7 +21,7 @@ CORRELATION_THRESHOLD     <- 0.65
 #
 
 plot_hn_det <- function(x=NULL, breaks=NULL){
-  param <- exp(coef(x, type = "det"))
+  param <- exp(unmarked::coef(x, type = "det"))
   plot(
       function(x) gxhn(x, param), 0, max(breaks),
   	  xlab = "Distance (m)", ylab = "Detection probability"
@@ -58,23 +58,23 @@ plot_model_pi <- function(tests = NULL, unmarked_m = NULL){
   grid(); grid();
 }
 
-quadratics_to_keep <-function(m){
-
-     linear_terms <- grepl(names(unmarked::coef(m)), pattern = ")1")
-  quadratic_terms <- grepl(names(unmarked::coef(m)), pattern = ")2")
-
-  # test : are we negative and are we a quadratic term?
-  keep <- (unmarked::coef(m) < 0) * quadratic_terms
-    keep <- names(unmarked::coef(m))[keep==1]
-      keep <- gsub(keep, pattern = ")2", replacement = ")")
-  if(length(keep)>0){
-    keep <- gsub(keep, pattern = "lam[(]", replacement = "")
-      keep <- gsub(keep, pattern = "[)][)]", replacement = ")")
-    return(keep)
-  } else {
-    return(NULL)
-  }
-}
+#quadratics_to_keep <-function(m){
+#
+#     linear_terms <- grepl(names(unmarked::coef(m)), pattern = ")1")
+#  quadratic_terms <- grepl(names(unmarked::coef(m)), pattern = ")2")
+#
+#  # test : are we negative and are we a quadratic term?
+#  keep <- (unmarked::coef(m) < 0) * quadratic_terms
+#    keep <- names(unmarked::coef(m))[keep==1]
+#      keep <- gsub(keep, pattern = ")2", replacement = ")")
+#  if(length(keep)>0){
+#    keep <- gsub(keep, pattern = "lam[(]", replacement = "")
+#      keep <- gsub(keep, pattern = "[)][)]", replacement = ")")
+#    return(keep)
+#  } else {
+#    return(NULL)
+#  }
+#}
 
 quadratics_to_keep <- function(m){
   quadratic_terms <- grepl(names(unmarked::coef(m)), pattern = "[)]2")
@@ -86,7 +86,7 @@ quadratics_to_keep <- function(m){
     return(NULL)
   # negative quadratic? let's make sure the linear term is positive
   } else {
-    quadratic_terms <- gsub(quadratic_terms, pattern = "[)]2", replacement = ")")
+    quadratic_terms <- gsub(quadratic_terms, pattern = "[)]2|[)]2.0", replacement = ")")
     quadratic_terms <- gsub(quadratic_terms, pattern = "lambda[(]|lam[(]", replacement="")
     quadratic_terms <- gsub(quadratic_terms, pattern = "[)][)]", replacement=")")
     # test: are we a positive linear term and a negative quadratic
@@ -268,7 +268,7 @@ aic_test_quadratic_terms_gdistsamp <- function(unmarked_models=NULL, original_fo
               sep=""
             )
           )
-          m_lin_var <- OpenIMBCR:::AIC(unmarked::gdistsamp(
+          m_lin_var <- try(OpenIMBCR:::AIC(unmarked::gdistsamp(
             pformula=as.formula("~1"),
             lambdaformula=as.formula(lambda_formula),
             phiformula=as.formula("~1"),
@@ -278,7 +278,10 @@ aic_test_quadratic_terms_gdistsamp <- function(unmarked_models=NULL, original_fo
             mixture="NB",
             unitsOut="kmsq",
             output="abund"
-          )) + AIC_RESCALE_CONST
+          )) + AIC_RESCALE_CONST)
+          if(class(m_lin_var) == "try-error"){
+            return(NA)
+          }
           lambda_formula <- ifelse(
             length(v)==0,
             # empty v?
@@ -301,7 +304,7 @@ aic_test_quadratic_terms_gdistsamp <- function(unmarked_models=NULL, original_fo
               sep=""
             ))
           )
-          m_quad_var <- OpenIMBCR:::AIC(unmarked::gdistsamp(
+          m_quad_var <- try(OpenIMBCR:::AIC(unmarked::gdistsamp(
             pformula=as.formula("~1"),
             lambdaformula=as.formula(lambda_formula),
             phiformula=as.formula("~1"),
@@ -311,7 +314,10 @@ aic_test_quadratic_terms_gdistsamp <- function(unmarked_models=NULL, original_fo
             mixture="NB",
             unitsOut="kmsq",
             output="abund"
-          )) + AIC_RESCALE_CONST
+          )) + AIC_RESCALE_CONST)
+          if(class(m_quad_var) == "try-error"){
+            return(NA)
+          }
           # if we don't improve our AIC with the quadratic by at-least 8 aic units
           # (pretty substatial support), keep the linear version
           if( m_lin_var-m_quad_var < AIC_SUBSTANTIAL_THRESHOLD ){
@@ -511,8 +517,8 @@ m_negbin_full_model <- fit_gdistsamp(
 
 # takes about 45 minutes
 unmarked_models <- aic_test_quadratic_terms_gdistsamp(
-  fit_gdistsamp(unmarked_models, umdf),
-  original_formulas,
+  fit_gdistsamp(unmarked_models[1:10], umdf),
+  original_formulas[1:10],
   umdf
 )
 
