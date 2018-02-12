@@ -58,29 +58,17 @@ plot_model_pi <- function(tests = NULL, unmarked_m = NULL){
   grid(); grid();
 }
 
-#quadratics_to_keep <-function(m){
-#
-#     linear_terms <- grepl(names(unmarked::coef(m)), pattern = ")1")
-#  quadratic_terms <- grepl(names(unmarked::coef(m)), pattern = ")2")
-#
-#  # test : are we negative and are we a quadratic term?
-#  keep <- (unmarked::coef(m) < 0) * quadratic_terms
-#    keep <- names(unmarked::coef(m))[keep==1]
-#      keep <- gsub(keep, pattern = ")2", replacement = ")")
-#  if(length(keep)>0){
-#    keep <- gsub(keep, pattern = "lam[(]", replacement = "")
-#      keep <- gsub(keep, pattern = "[)][)]", replacement = ")")
-#    return(keep)
-#  } else {
-#    return(NULL)
-#  }
-#}
-
 quadratics_to_keep <- function(m){
+  direction_of_coeffs <- unmarked::coef(m)/abs(unmarked::coef(m))
   quadratic_terms <- grepl(names(unmarked::coef(m)), pattern = "[)]2")
   # test : are we negative and are we a quadratic term?
   keep <- (unmarked::coef(m) < 0) * quadratic_terms
   quadratic_terms <- names(unmarked::coef(m))[keep == 1]
+  # bug-fix: drop any alpha or p parameters, they mess things up
+  is_lambda <- grepl(tolower(names(unmarked::coef(m))), pattern="lam")
+  direction_of_coeffs <- direction_of_coeffs[is_lambda]
+  quadratic_terms <- quadratic_terms[is_lambda]
+  keep <- keep[is_lambda]
   # no negative quadratics? then leave
   if(length(quadratic_terms)==0){
     return(NULL)
@@ -90,7 +78,6 @@ quadratics_to_keep <- function(m){
     quadratic_terms <- gsub(quadratic_terms, pattern = "lambda[(]|lam[(]", replacement="")
     quadratic_terms <- gsub(quadratic_terms, pattern = "[)][)]", replacement=")")
     # test: are we a positive linear term and a negative quadratic
-    direction_of_coeffs <- unmarked::coef(m)/abs(unmarked::coef(m))
     steps <- seq(2, length(direction_of_coeffs), by = 2) # always skip the intercept
     keep <- names(which(direction_of_coeffs[steps] + direction_of_coeffs[steps+1]  == 0))
     # are our negative quadratic(s) in the "keep" array?
