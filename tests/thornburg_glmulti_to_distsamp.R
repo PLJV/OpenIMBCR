@@ -66,9 +66,9 @@ quadratics_to_keep <- function(m){
   quadratic_terms <- names(unmarked::coef(m))[keep == 1]
   # bug-fix: drop any alpha or p parameters, they mess things up
   is_lambda <- grepl(tolower(names(unmarked::coef(m))), pattern="lam")
-  direction_of_coeffs <- direction_of_coeffs[is_lambda]
-  quadratic_terms <- quadratic_terms[is_lambda]
-  keep <- keep[is_lambda]
+  direction_of_coeffs <- na.omit(direction_of_coeffs[is_lambda])
+  quadratic_terms <- na.omit(quadratic_terms[is_lambda])
+  keep <- na.omit(keep[is_lambda])
   # no negative quadratics? then leave
   if(length(quadratic_terms)==0){
     return(NULL)
@@ -80,6 +80,9 @@ quadratics_to_keep <- function(m){
     # test: are we a positive linear term and a negative quadratic
     steps <- seq(2, length(direction_of_coeffs), by = 2) # always skip the intercept
     keep <- names(which(direction_of_coeffs[steps] + direction_of_coeffs[steps+1]  == 0))
+    if(length(keep)==0){
+      return(NULL)
+    }
     # are our negative quadratic(s) in the "keep" array?
     quadratic_terms <-
       quadratic_terms[grepl(gsub(quadratic_terms, pattern=" ", ""), gsub(keep, pattern=" ", ""))]
@@ -504,8 +507,8 @@ m_negbin_full_model <- fit_gdistsamp(
 
 # takes about 45 minutes
 unmarked_models <- aic_test_quadratic_terms_gdistsamp(
-  fit_gdistsamp(unmarked_models[1:10], umdf),
-  original_formulas[1:10],
+  fit_gdistsamp(unmarked_models, umdf),
+  original_formulas,
   umdf
 )
 
