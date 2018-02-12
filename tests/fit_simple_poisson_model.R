@@ -187,8 +187,9 @@ coords <- as.data.frame(rgeos::gCentroid(sp::spTransform(units,"+init=epsg:4326"
 
 # define the covariates we are going to use in our analysis
 
+vars <- c("grass_ar","shrub_ar","crp_ar","wetland_ar","pat_ct", "map", "mat")
 #vars <- c("grass_ar","shrub_ar","crp_ar","wetland_ar","pat_ct", "lat", "lon")
-vars <- c("grass_ar","shrub_ar","crp_ar","wetland_ar","pat_ct")
+#vars <- c("grass_ar","shrub_ar","crp_ar","wetland_ar","pat_ct")
 
 # ensure a consistent scale for our input data (we will use this a lot)
 

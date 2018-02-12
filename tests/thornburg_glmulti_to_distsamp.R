@@ -477,7 +477,8 @@ par_unmarked_predict <- function(unmarked_models=NULL, predict_df=NULL, type="la
 
 # define the vars we are going to use
 #vars <- c("grass_ar","shrub_ar","crp_ar","wetland_ar","pat_ct", "lat", "lon")
-vars <- c("grass_ar","shrub_ar","crp_ar","wetland_ar","pat_ct")
+#vars <- c("grass_ar","shrub_ar","crp_ar","wetland_ar","pat_ct")
+vars <- c("grass_ar","shrub_ar","crp_ar","wetland_ar","pat_ct", "mat", "map")
 
 # calculate exhaustive (all possible) variable mCombinations
 # for model selection
