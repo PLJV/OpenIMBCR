@@ -330,7 +330,7 @@ extract_by <- function(polygon=NULL, r=NULL){
       )
   }
   e_cl <- parallel::makeCluster(parallel::detectCores()-1)
-  parallel::clusterExport(cl=e_cl, varlist=c("r"))
+  parallel::clusterExport(cl=e_cl, varlist=c("r"), envir=environment())
   ret <- parallel::parLapply(
       e_cl,
       X=polygon,
