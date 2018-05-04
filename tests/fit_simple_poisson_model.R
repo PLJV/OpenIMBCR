@@ -22,12 +22,12 @@ quadratics_to_keep <- function(m){
   keep <- (coefficients(m) < 0) * quadratic_terms
   quadratic_terms <- names(coefficients(m))[keep == 1]
     quadratic_terms <- gsub(quadratic_terms, pattern = "[)]2", replacement = ")")
-  # test: are we a positive linear term and a negative quadratic 
+  # test: are we a positive linear term and a negative quadratic
   direction_of_coeffs <- coefficients(m)/abs(coefficients(m))
   steps <- seq(2, length(direction_of_coeffs), by = 2)
   keep <- names(which(direction_of_coeffs[steps] + direction_of_coeffs[steps+1]  == 0))
     quadratic_terms <- gsub(keep, pattern = "[)]1", replacement = ")")
-  # test are both our linear and quadratic terms negative? drop if so 
+  # test are both our linear and quadratic terms negative? drop if so
   if (length(quadratic_terms) > 0){
     return(quadratic_terms)
   } else {
@@ -77,35 +77,35 @@ effort     <- as.vector(OpenIMBCR:::calc_transect_effort(s))
 # fit an intercept-only detection function in unmarked
 
 umdf <- unmarked::unmarkedFrameDS(
-    y=as.matrix(detections$y), 
-    siteCovs=data.frame(effort=effort), 
-    dist.breaks=detections$breaks, 
-    survey="point", 
+    y=as.matrix(detections$y),
+    siteCovs=data.frame(effort=effort),
+    dist.breaks=detections$breaks,
+    survey="point",
     unitsIn="m"
   )
 
 intercept_m <- unmarked::distsamp(
-    formula = ~1 ~1+offset(log(effort)), 
-    data = umdf, 
-    se = T, 
+    formula = ~1 ~1+offset(log(effort)),
+    data = umdf,
+    se = T,
     keyfun = "halfnorm",
     unitsOut = "kmsq",
     output = "abund"
   )
 
 per_obs_det_probabilities <- round(sapply(
-    s$radialdistance, 
-    function(x) pred_hn_det_from_distance(intercept_m, dist=x)), 
+    s$radialdistance,
+    function(x) pred_hn_det_from_distance(intercept_m, dist=x)),
     2
   )
 
 
-# calculate an estimate of abundance (accounting for p-det) 
+# calculate an estimate of abundance (accounting for p-det)
 s$est_abund <- round(s$cl_count > 0 / per_obs_det_probabilities)
 
 s <- calc_transect_summary_detections(
-    s=s, 
-    name=toupper(argv[2]), 
+    s=s,
+    name=toupper(argv[2]),
     field='est_abund'
   )
 
@@ -144,7 +144,7 @@ s@data <- as.data.frame(scale(s@data))
 
 s$effort <- effort
 
-# make sure the scale of the units we are predicting into is consistent 
+# make sure the scale of the units we are predicting into is consistent
 # with the training data
 
 units@data <- as.data.frame(
@@ -283,7 +283,7 @@ cat(
     "\n"
   )
 
-predicted$pred[( predicted$pred > max(round(predict(tests@objects[[1]], type="response"))) )] <- 
+predicted$pred[( predicted$pred > max(round(predict(tests@objects[[1]], type="response"))) )] <-
   max(round(predict(tests@objects[[1]], type="response")))
 
 predicted$pred[predicted$pred<1] <- 0

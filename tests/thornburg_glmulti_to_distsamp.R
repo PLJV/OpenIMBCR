@@ -103,12 +103,12 @@ quadratics_to_keep <- function(m){
   }
   quadratic_terms <- names(coef(m))[keep == 1]
   quadratic_terms <- gsub(quadratic_terms, pattern = "[)]2", replacement = ")")
-  # test: are we a positive linear term and a negative quadratic 
+  # test: are we a positive linear term and a negative quadratic
   direction_of_coeffs <- coef(m)/abs(coef(m))
   steps <- seq(2, length(direction_of_coeffs), by = 2)
   keep <- names(which(direction_of_coeffs[steps] + direction_of_coeffs[steps+1]  == 0))
   quadratic_terms <- gsub(keep, pattern = "[)]1", replacement = ")")
-  # test are both our linear and quadratic terms negative? drop if so 
+  # test are both our linear and quadratic terms negative? drop if so
   if (length(quadratic_terms) > 0){
     return(quadratic_terms)
   } else {
@@ -185,24 +185,36 @@ original_formulas <- unmarked_models <- calc_all_distsamp_combinations(vars)
   unmarked_models <- paste(unmarked_models, "+offset(log(effort))", sep="")
 
 unmarked_models <- lapply(
-    X=unmarked_models, 
+    X=unmarked_models,
     FUN=function(m){
-      glm_to_distsamp(glm(paste("est_abund~",m, sep=""), data=s@data), umdf=umdf)  
+      glm_to_distsamp(glm(paste("est_abund~",m, sep=""), data=s@data), umdf=umdf)
   })
 
 quadratic_terms <- lapply(
-    unmarked_models, 
+    unmarked_models,
     FUN=quadratics_to_keep
   )
 
+# use model selection to justify using linear vs quadratic terms
+# for our covariates
 unmarked_models <- mapply(
   FUN=function(...){
-    # drop the lam() prefix 
-    quadratics <- gsub(gsub(quadratics, pattern="lam[(]", replacement=""), pattern="[)][)]", replacement=")")
+    # drop the lam() prefix
+    quadratics <- gsub(
+        gsub(quadratics, pattern="lam[(]", replacement=""),
+        pattern="[)][)]",
+        replacement=")"
+      )
     # drop poly() notation from the list of all covariates using in this model
-    vars <- gsub(gsub(vars, pattern="poly[(]", replacement=""), pattern="*.[0-2].*..*", replacement="")
+    vars <- gsub(
+        gsub(vars, pattern="poly[(]", replacement=""),
+        pattern="*.[0-2].*..*",
+        replacement=""
+      )
     if(length(quadratics)>0){
-      vars <- vars[!as.vector(sapply(vars, FUN=function(p){ sum(grepl(x=quadratics, pattern=p))>0  }))]
+      vars <- vars[!as.vector(sapply(vars, FUN=function(p){
+          sum(grepl(x=quadratics, pattern=p))>0
+        }))]
       # use AIC to justify our proposed quadratic terms
       for(q in quadratics){
         lin_var <- gsub(
@@ -210,7 +222,7 @@ unmarked_models <- mapply(
           pattern=", 2,",
           replacement=", 1,"
         )
-        
+
         m_lin_var <- OpenIMBCR:::AIC(unmarked::distsamp(
           formula=as.formula(paste("~1~",
                         paste(
@@ -243,7 +255,7 @@ unmarked_models <- mapply(
           vars <- c(vars,gsub(gsub(lin_var, pattern="poly[(]", replacement=""), pattern=", [0-9], raw.*=*.T[)]", replacement=""))
         }
       }
-      
+
       vars <- c(paste("poly(", paste(vars, ", 1, raw=T)", sep=""), sep=""), quadratics)
     }
     return(vars)
@@ -254,7 +266,7 @@ unmarked_models <- mapply(
 
 # refit our models
 unmarked_models <- lapply(
-  X=unmarked_models, 
+  X=unmarked_models,
   FUN=function(x){
     return(
       unmarked::distsamp(
@@ -267,7 +279,7 @@ unmarked_models <- lapply(
         se=T,
         keyfun="halfnorm",
         unitsOut="kmsq",
-        output="abund" 
+        output="abund"
       ))}
 )
 
