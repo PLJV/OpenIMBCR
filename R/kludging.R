@@ -329,6 +329,7 @@ buildUnmarkedDistanceDf <- function(r=NULL, s=NULL, spp=NULL,
 #' kludging to back-fill any transect stations in an imbcr data.frame
 #' that were sampled, but where a focal species wasn't observed, with
 #' NA values. 
+#' @export
 scrub_imbcr_df <- function(df,
                            allow_duplicate_timeperiods=F,
                            four_letter_code=NULL){
@@ -346,7 +347,7 @@ scrub_imbcr_df <- function(df,
   # drop in NA values for our species of interest
   df_final[, birdcode_fieldname(df)] <- four_letter_code
   df_final$cl_count <- NA
-  df_final$radialdistance <- NA
+  df_final[ , distance_fieldname(df)] <- NA
   # iterate over df_final, pulling matches for our species of interest as we go
   columns_retained <- c('transectnum', 'year', 'point', 'timeperiod', 'birdcode', distance_fieldname(df), 'cl_count')
   df_final <- do.call(rbind, lapply(
