@@ -61,9 +61,14 @@ partialPredict <- function(m=NULL, var=NULL, type='state', plot=T, nCores=NULL,
 }
 #' plot a half-normal detection function from an unmarked object
 plot_hn_det <- function(x=NULL, breaks=NULL){
+  # if no distance breaks were specified, extract
+  # them from the unmarked model object
+  if (is.null(breaks)) {
+    breaks <- x@data@dist.breaks
+  }
   param <- exp(coef(x, type = "det"))
   plot(
-    function(x) unmarked:::gxhn(x, param), 0, max(breaks),
+    function(x) unmarked:::gxhn(x, param), min(breaks), max(breaks),
     xlab = "Distance (m)", ylab = "Detection probability"
   )
   grid(); grid();

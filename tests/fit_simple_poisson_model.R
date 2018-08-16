@@ -129,6 +129,11 @@ s <- OpenIMBCR:::scrub_imbcr_df(
 detections <- OpenIMBCR:::calc_dist_bins(s)
 effort     <- as.vector(OpenIMBCR:::calc_transect_effort(s))
 
+if(sum(s$radialdistance>0, na.rm=T) < 180){
+  cat(" -- not enough detection to fit a model (quitting)\n")
+  quit("no")
+}
+
 # fit an intercept-only detection function in unmarked
 
 umdf <- unmarked::unmarkedFrameDS(

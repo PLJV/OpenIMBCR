@@ -155,18 +155,6 @@ imbcrTableToShapefile <- function(filename=NULL,outfile=NULL,
   }
   return(s)
 }
-#' fetch IMBCR Metadata to Landfire code conversions
-fetchImbcrToLandfireMetadata <-function(
-  url=paste("https://docs.google.com/spreadsheets/d/1wJ3Xwr67GTYYfim29cKQ9m3AJgoOQ",
-        "ryYTHc9v5gJB2g/pub?gid=0&single=true&output=csv", sep="")
-){
-  download.file(url,destfile="imbcr_meta_codes.csv",quiet=T);
-    t <- read.csv("imbcr_meta_codes.csv")
-      names(t) <- tolower(names(t))
-  # clean-up and return
-  file.remove("imbcr_meta_codes.csv")
-  return(t[,c(1,2)])
-}
 #' hidden function that will calculate the centroids of a USNG
 #' (SpatialPolygons) and return only unique (non-duplicated)
 #' units
@@ -340,65 +328,45 @@ buildUnmarkedDistanceDf <- function(r=NULL, s=NULL, spp=NULL,
 }
 #' kludging to back-fill any transect stations in an imbcr data.frame
 #' that were sampled, but where a focal species wasn't observed, with
-#' NA values
-#' @export
+#' NA values. 
 scrub_imbcr_df <- function(df,
                            allow_duplicate_timeperiods=F,
-                           four_letter_code=NULL,
-                           back_fill_all_na=F,
-                           drop_na="none"){
+                           four_letter_code=NULL){
   # throw-out any lurking 88 values, count before start values, and
   # -1 distance observations
   df <- df[!df@data[, timeperiod_fieldname(df)] == 88, ]
   df <- df[!df@data[, timeperiod_fieldname(df)] == -1, ]
   df <- df[!df@data[, distance_fieldname(df)]   == -1, ]
-  # build a dataframe for our detections
-  detected <- toupper(df@data[, birdcode_fieldname(df)]) ==
-    toupper(four_letter_code)
-  # define a pool of potential non-detections
-  not_detected <- df[!detected, ]
-  not_detected@data[, distance_fieldname(df)] <- NA
-  not_detected@data[, birdcode_fieldname(df)] <- toupper(four_letter_code)
-  not_detected@data[, commonname_fieldname(df)] <-
-    as.character(df@data[which(detected == T)[1],commonname_fieldname(df)])
-  not_detected@data[, 'cl_count']             <- 0 # not used, but stay honest
-  # allow a single NA value for each station, but only keep the NA values
-  # if we didn't observe the bird at that point -- by default, don't allow
-  # duplicate NA's within a time-period
-  not_detected <- not_detected[!duplicated(not_detected@data[,
-                    c(transect_fieldname(not_detected), "year", "point",
-                      if (allow_duplicate_timeperiods)
-                        timeperiod_fieldname(not_detected)
-                      else NULL
-                    )
-                  ]), ]
-  # allow multiple detections at stations
-  detected <- df[detected, ]
-  # take the merge of detections and non-duplicated, non-detections as
-  # our new data.frame
-  transect_heuristic <- function(x=NULL){
-    x <- x@data[, c(transect_fieldname(df), 'year', 'point')]
-    return(round(sqrt(as.numeric(x[,1])) + sqrt(x[,2]) + sqrt(x[,3]),5))
-  }
-  not_detected <- not_detected[
-      !transect_heuristic(not_detected) %in%
-      transect_heuristic(detected),
-    ]
-  df <- rbind(y=detected, x=not_detected)
-  # zero-inflation fix (1) : don't drop any transects
-  if(grepl(tolower(drop_na), pattern="none")){
-      df <- sp:::rbind.SpatialPointsDataFrame(detected, not_detected)
-  }
-  # zero-inflation fix (2) : drop transects without at least one detection
-  else if(grepl(tolower(drop_na),pattern="some")){
-    valid_transects <- unique(detected@data[,transect_fieldname(df)])
-    df <- df[df@data[,transect_fieldname(df)] %in% valid_transects,]
-  }
-  # zero-inflation fix (3) : drop all NA values
-  else if(grep(tolower(drop_na), pattern="all")){
-    df <- detected
-  }
-  df[order(sqrt(as.numeric(df$transectnum))+sqrt(df$year)+sqrt(df$point)),]
+  # build an empty (NA) data.frame for our species that we will populate with
+  # valid values interatively
+  df_final <- unique(df@data[,c('transectnum', 'year', 'point')])
+  # add-in 6 minute periods for each station sampled
+  df_final <- df_final[ sort(rep(1:nrow(unique(df@data[,c('transectnum', 'year', 'point')])), 6)), ]
+  df_final <- cbind(df_final, data.frame(timeperiod=1:6))
+  # drop in NA values for our species of interest
+  df_final[, birdcode_fieldname(df)] <- four_letter_code
+  df_final$cl_count <- NA
+  df_final$radialdistance <- NA
+  # iterate over df_final, pulling matches for our species of interest as we go
+  columns_retained <- c('transectnum', 'year', 'point', 'timeperiod', 'birdcode', distance_fieldname(df), 'cl_count')
+  df_final <- do.call(rbind, lapply(
+      X=1:nrow(df_final),
+      FUN=function(i){
+        query <- df_final[i, c('transectnum', 'year', 'point', 'timeperiod', 'birdcode')]
+        match <- merge(df@data, query, all=F)
+        if(nrow(match) == 0){
+          # return some sane defaults
+          df_final[ i, distance_fieldname(df) ] <- NA 
+          df_final[ i, 'cl_count' ] <- 0
+          return(df_final[i, columns_retained])
+        } else {
+          # the return here could have multiple rows in the same minute period
+          return(match[ , columns_retained ])
+        }
+      }
+  ))
+  # return to user
+  return(df_final)
 }
 #' accepts a formatted IMBCR SpatialPointsDataFrame and builds an
 #' unmarkedFrameGDS data.frame that we can use for modeling with
