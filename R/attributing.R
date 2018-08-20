@@ -325,7 +325,7 @@ extract_by <- function(polygon=NULL, r=NULL){
   # and then crop our input raster using a local cluster instance
   if(!raster::compareCRS(polygon[[1]],r)){
     warning(paste("input polygon= object(s) needed to be reprojected to",
-    "the CRS of r= this may lead to RAM issues", sep = ""))
+    "the CRS of r= this may lead to RAM issues", sep = " "))
     polygon <- lapply(
         polygon,
         FUN=sp::spTransform,
