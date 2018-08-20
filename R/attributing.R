@@ -222,8 +222,10 @@ spatial_join <- function(x=NULL, y=NULL, drop=T){
       y = y
     )
   x@data <- cbind(x@data, over)
+  # drop non-overlapping features using the NA values
+  # attributed to the first column of y@data
   if (drop) {
-    x <- x[ , !is.na(x@data[,colnames(y@data)[1]]) ]
+    x <- x[ !is.na(x@data[,colnames(y@data)[1]]) , ]
   }
   return(x)
 }
