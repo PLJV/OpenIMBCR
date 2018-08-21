@@ -213,7 +213,7 @@ pool_by_transect_year <- function(x=NULL, df=NULL, breaks=NULL, covs=NULL,
 #' shorthand vector extraction function that performs a spatial join attributes
 #' vector features in x with overlapping features in y. Will automatically
 #' reproject to a consistent CRS.
-spatial_join <- function(x=NULL, y=NULL){
+spatial_join <- function(x=NULL, y=NULL, drop=T){
   over <- sp::over(
       x = sp::spTransform(
           x,
@@ -222,6 +222,11 @@ spatial_join <- function(x=NULL, y=NULL){
       y = y
     )
   x@data <- cbind(x@data, over)
+  # drop non-overlapping features using the NA values
+  # attributed to the first column of y@data
+  if (drop) {
+    x <- x[ !is.na(x@data[,colnames(y@data)[1]]) , ]
+  }
   return(x)
 }
 #' generate a square buffer around a single input feature
@@ -322,7 +327,7 @@ extract_by <- function(polygon=NULL, r=NULL){
   # and then crop our input raster using a local cluster instance
   if(!raster::compareCRS(polygon[[1]],r)){
     warning(paste("input polygon= object(s) needed to be reprojected to",
-    "the CRS of r= this may lead to RAM issues", sep = ""))
+    "the CRS of r= this may lead to RAM issues", sep = " "))
     polygon <- lapply(
         polygon,
         FUN=sp::spTransform,

@@ -59,7 +59,7 @@ BIC <- function(m) (m$minimum*2) + (q*log(m$size))
 #' calculate SE from a likelihood function optimization procedure
 SE <- function(m) sqrt(diag(solve(m$hessian)))
 #' calculate Akaike weights from a vector of AIC values
-akaike_weights <- function(aic_values=NULL, precision=5){
-  weights <- exp( -0.5 * (aic_values-min(aic_values)) )
-  return(round(weights/sum(weights), precision))
+akaike_weights <- function (aic_values = NULL, precision = 5){
+  weights <- exp(-0.5 * (aic_values - min(aic_values, na.rm=T)))
+  return(round(weights/sum(weights, na.rm=T), precision))
 }
