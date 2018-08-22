@@ -455,7 +455,7 @@ calc_patch_count <- function(x=NULL){
 #' reclassify each input raster to a binary using binary_reclassify() if a
 #' non-null value is passed to from=
 #' @export
-par_calc_stat <- function(X=NULL, fun=NULL, from=NULL, backfill_missing_w=0){
+par_calc_stat <- function(X=NULL, fun=NULL, from=NULL, backfill_missing_w=0, ...){
   stopifnot(inherits(fun, 'function'))
   e_cl <- parallel::makeCluster(parallel::detectCores()-1)
   # assume our nodes will always need 'raster' and kick-in our
@@ -469,6 +469,8 @@ par_calc_stat <- function(X=NULL, fun=NULL, from=NULL, backfill_missing_w=0){
       e_cl,
       function(x) library("raster")
     )
+  # if we have a non-null value for from, assume
+  # that we want to do a re-classification
   ret <- unlist(parallel::parLapply(
       e_cl,
       # assume x is already a binary if from is NULL
@@ -483,7 +485,8 @@ par_calc_stat <- function(X=NULL, fun=NULL, from=NULL, backfill_missing_w=0){
             from=from
           )
       },
-      fun = fun
+      fun = fun,
+      ...
     ))
   # account for any null/na return values from our FUN statistic
   if (!is.null(backfill_missing_w) && length(ret < length(X))){

@@ -4,13 +4,12 @@
 \alias{scrub_imbcr_df}
 \title{kludging to back-fill any transect stations in an imbcr data.frame
 that were sampled, but where a focal species wasn't observed, with
-NA values}
+NA values.}
 \usage{
-scrub_imbcr_df(df, allow_duplicate_timeperiods = F, four_letter_code = NULL,
-  back_fill_all_na = F, drop_na = "none")
+scrub_imbcr_df(df, allow_duplicate_timeperiods = F, four_letter_code = NULL)
 }
 \description{
 kludging to back-fill any transect stations in an imbcr data.frame
 that were sampled, but where a focal species wasn't observed, with
-NA values
+NA values.
 }
