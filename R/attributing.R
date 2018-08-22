@@ -434,6 +434,7 @@ calc_mean_patch_area <- function(x=NULL, area_of_cell = NULL){
     return(SDMTools::ClassStat(x)$mean.patch.area * area_of_cell)
   }
 }
+#' shorthand function for calculating the mean of a raster
 #' @export
 calc_mean <- function(x=NULL, na.rm=T){
   # if there are no habitat patches don't try to calc
