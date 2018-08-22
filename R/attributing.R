@@ -485,8 +485,7 @@ par_calc_stat <- function(X=NULL, fun=NULL, from=NULL, backfill_missing_w=0, ...
             from=from
           )
       },
-      fun = fun,
-      ...
+      fun = function(x) { fun(as.vector(x), ...) },
     ))
   # account for any null/na return values from our FUN statistic
   if (!is.null(backfill_missing_w) && length(ret < length(X))){
