@@ -480,7 +480,7 @@ par_calc_stat <- function(X=NULL, fun=NULL, from=NULL, backfill_missing_w=0, ...
     )
   # if we have a non-null value for from, assume
   # that we want to do a re-classification
-  ret <- unlist(parallel::parLapply(
+  ret <- try(unlist(parallel::parLapply(
       e_cl,
       # assume x is already a binary if from is NULL
       X = if(is.null(from)){
@@ -495,7 +495,12 @@ par_calc_stat <- function(X=NULL, fun=NULL, from=NULL, backfill_missing_w=0, ...
           )
       },
       fun = function(i, ...) { fun(i, ...) }
-    ))
+    )))
+  if ( class(ret) == "try-error") {
+    stop(paste("encountered an error trying to process X=;",
+    "is the function you are specifying compatible with raster",
+    "objects?", sep=""))
+  }
   # account for any null/na return values from our FUN statistic
   if (!is.null(backfill_missing_w) && length(ret < length(X))){
     null_ret_values <- seq(1, length(X))[
