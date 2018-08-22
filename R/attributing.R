@@ -434,6 +434,15 @@ calc_mean_patch_area <- function(x=NULL, area_of_cell = NULL){
     return(SDMTools::ClassStat(x)$mean.patch.area * area_of_cell)
   }
 }
+#' @export
+calc_mean <- function(x=NULL, na.rm=T){
+  # if there are no habitat patches don't try to calc
+  if (sum(!is.na(raster::values(x))) == 0) {
+    return(0)
+  }
+  # assume it's valid
+  return( mean(raster::values(x), na.rm=na.rm) )
+}
 #' hidden function that will use SDMTools to calculate the number of unique patches
 #' on a given raster object
 #' @export
@@ -485,7 +494,7 @@ par_calc_stat <- function(X=NULL, fun=NULL, from=NULL, backfill_missing_w=0, ...
             from=from
           )
       },
-      fun = function(i, ...) { fun(as.vector(i), ...) },
+      fun = function(i, ...) { fun(i, ...) }
     ))
   # account for any null/na return values from our FUN statistic
   if (!is.null(backfill_missing_w) && length(ret < length(X))){
