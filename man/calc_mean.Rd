@@ -2,10 +2,10 @@
 % Please edit documentation in R/attributing.R
 \name{calc_mean}
 \alias{calc_mean}
-\title{shorthand function for calculating the mean of a raster}
+\title{shorthand mean calculation function}
 \usage{
 calc_mean(x = NULL, na.rm = T)
 }
 \description{
-shorthand function for calculating the mean of a raster
+shorthand mean calculation function
 }

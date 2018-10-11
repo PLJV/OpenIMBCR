@@ -6,12 +6,8 @@
 that were sampled, but where a focal species wasn't observed, with
 NA values.}
 \usage{
-<<<<<<< HEAD
 scrub_imbcr_df(df, allow_duplicate_timeperiods = F,
   four_letter_code = NULL)
-=======
-scrub_imbcr_df(df, allow_duplicate_timeperiods = F, four_letter_code = NULL)
->>>>>>> f949e6146cc6200557ef8f9ebe5a6d7ad2ee9c39
 }
 \description{
 kludging to back-fill any transect stations in an imbcr data.frame
