@@ -388,7 +388,20 @@ binary_reclassify <- function(x=NULL, from=NULL, nomatch=NA){
         fun=function(x,na.rm=F){x>=1}
       ))
 }
-
+#' shorthand mean calculation function
+#' @export
+calc_mean <- function(x=NULL, na.rm=T){
+   # sanity check : is x even valid?
+   if(is.null(x) || !inherits(x, 'Raster')){
+     return(NA)
+   }
+   # sanity check : are all of our values NA?
+   if(all(is.na(values(x)))){
+     return(NA)
+   }
+   
+   return(raster::cellStats(x, stat=mean, na.rm=na.rm))
+}
 #' shorthand total area calculation function
 #' @export
 calc_total_area <- function(x=NULL, area_of_cell = NULL){
