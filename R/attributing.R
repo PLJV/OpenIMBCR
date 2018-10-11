@@ -304,12 +304,14 @@ par_buffer_grid_units <- function(units=NULL, radius=1500){
         library("raster");
       }
     )
-  return(parallel::parLapply(
+  ret <- parallel::parLapply(
     cl=e_cl,
     X=units,
     fun=buffer_grid_unit,
     radius=radius
-  ))
+  )
+  parallel::stopCluster(e_cl); rm(e_cl); gc()
+  return(ret)
 }
 #' extract an input raster dataset using polygon feature(s). Bulk process list
 #' objects using the parallel package. Avoid passing raster files that are
