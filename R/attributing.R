@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#'
+#' calculate transect effort for a given IMBCR spatial data.frame
 #' @export
 calc_transect_effort <- function(df = NULL) {
   if(inherits(df,"Spatial")){
@@ -25,17 +25,21 @@ calc_transect_effort <- function(df = NULL) {
   effort <- sapply(
     unique(as.character(df[,transect_fieldname(df)])),
     FUN = function(n){
-      sum(length(unique(df[ df[,transect_fieldname(df)] == n, ]$point)), na.rm = T)
+      sum(
+        length(unique(df[ df[,transect_fieldname(df)] == n, ]$point)), 
+        na.rm = T
+      )
     }
   )
   return(effort)
 }
-#'
+#' calculate time-of-day for a given IMBCR spatial data.frame
 #' @export
 calc_time_of_day <- function(df=NULL){
   df$tod <- as.numeric(df$starttime)
+  return(df)
 }
-#'
+#' calculate day-of-year for a given IMBCR spatial data.frame
 #' @export
 calc_day_of_year <- function(df=NULL){
   if(inherits(df,"Spatial")){
@@ -334,7 +338,14 @@ extract_by <- function(polygon=NULL, r=NULL){
   ret <- parallel::parLapply(
       e_cl,
       X=polygon,
-      fun=function(x){ raster::crop(x=r, y=x) }
+      fun=function(x){ 
+        ret <- try(raster::crop(x=r, y=x))
+        if(class(ret) == "try-error"){
+          return(NA)
+        } else {
+          return(ret)
+        } 
+      }
     )
   parallel::stopCluster(cl=e_cl); rm(e_cl); gc();
   return(ret)
@@ -360,7 +371,7 @@ extract_by_large_df <- function(polygon=NULL, r=NULL){
 #' calculations done with the SDMTools package.
 binary_reclassify <- function(x=NULL, from=NULL, nomatch=NA){
   if (!inherits(x, 'list')){
-    return(raster::match(x, table=from, nomatch=NA) >= 1)
+    return(raster::match(x, table=from, nomatch=nomatch) >= 1)
   }
   return(lapply(lapply(
           x,
@@ -376,8 +387,17 @@ binary_reclassify <- function(x=NULL, from=NULL, nomatch=NA){
 #' shorthand total area calculation function
 #' @export
 calc_total_area <- function(x=NULL, area_of_cell = NULL){
+   # sanity check : is x even valid?
+   if(is.null(x) || !inherits(x, 'Raster')){
+     return(NA)
+   }
+   # sanity check : are all of our values NA?
+   if(all(is.na(values(x)))){
+     return(NA)
+   }
    if(is.null(area_of_cell)){
-     warning("no area units specified -- will use meters->square-kilometers")
+     warning("no area units specified; will assume meters and express units",
+             "as square kilometers")
      area_of_cell <- 10^-6
    }
    ret <- raster::cellStats(x, stat=sum, na.rm=T) *
@@ -392,6 +412,10 @@ calc_total_area <- function(x=NULL, area_of_cell = NULL){
 #' function
 #' @export
 calc_interpatch_distance <- function(x=NULL, stat=mean){
+   # sanity check : is x even valid?
+   if(is.null(x) || !inherits(x, 'Raster')){
+     return(NA)
+   }
   # if there are no habitat patches (issolation would theoretically be
   # very high), don't try to calc inter-patch distance because distance()
   # will throw an error
@@ -414,6 +438,10 @@ calc_interpatch_distance <- function(x=NULL, stat=mean){
 #' of a given cell
 #' @export
 calc_mean_patch_area <- function(x=NULL, area_of_cell = NULL){
+   # sanity check : is x even valid?
+   if(is.null(x) || !inherits(x, 'Raster')){
+     return(NA)
+   }
   if(is.null(area_of_cell)){
     warning("no area_of_cell argument supplied -- area will be calulated as square-kilometers")
     area_of_cell <- 10^-6
@@ -433,6 +461,10 @@ calc_mean_patch_area <- function(x=NULL, area_of_cell = NULL){
 #' on a given raster object
 #' @export
 calc_patch_count <- function(x=NULL){
+  # sanity check : is x even valid?
+  if(is.null(x) || !inherits(x, 'Raster')){
+    return(NA)
+  }
   # if there are no habitat patches don't try to calc
   if (sum(!is.na(raster::values(x))) == 0){
     return(0)
@@ -475,7 +507,8 @@ par_calc_stat <- function(X=NULL, fun=NULL, from=NULL, backfill_missing_w=0){
             cl=e_cl,
             X=X,
             fun=binary_reclassify,
-            from=from
+            from=from,
+            nomatch=0
           )
       },
       fun = fun

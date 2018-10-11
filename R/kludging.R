@@ -345,9 +345,9 @@ scrub_imbcr_df <- function(df,
   df_final <- df_final[ sort(rep(1:nrow(unique(df@data[,c('transectnum', 'year', 'point')])), 6)), ]
   df_final <- cbind(df_final, data.frame(timeperiod=1:6))
   # drop in NA values for our species of interest
-  df_final[, birdcode_fieldname(df)] <- four_letter_code
+  df_final[, OpenIMBCR:::birdcode_fieldname(df)] <- four_letter_code
   df_final$cl_count <- NA
-  df_final[ , distance_fieldname(df)] <- NA
+  df_final[ , OpenIMBCR:::distance_fieldname(df)] <- NA
   # iterate over df_final, pulling matches for our species of interest as we go
   columns_retained <- c('transectnum', 'year', 'point', 'timeperiod', 'birdcode', distance_fieldname(df), 'cl_count')
   df_final <- do.call(rbind, lapply(

@@ -7,7 +7,8 @@ unmarkedFrameGDS data.frame that we can use for modeling with
 the unmarked package.}
 \usage{
 build_unmarked_gds(df = NULL, numPrimary = 1, distance_breaks = NULL,
-  covs = NULL, unitsIn = "m", summary_fun = median, drop_na_values = T)
+  covs = NULL, unitsIn = "m", summary_fun = median,
+  drop_na_values = T)
 }
 \description{
 accepts a formatted IMBCR SpatialPointsDataFrame and builds an
