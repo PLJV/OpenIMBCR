@@ -6,7 +6,7 @@
 vector features in x with overlapping features in y. Will automatically
 reproject to a consistent CRS.}
 \usage{
-spatial_join(x = NULL, y = NULL)
+spatial_join(x = NULL, y = NULL, drop = T)
 }
 \description{
 shorthand vector extraction function that performs a spatial join attributes

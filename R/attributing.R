@@ -217,7 +217,7 @@ pool_by_transect_year <- function(x=NULL, df=NULL, breaks=NULL, covs=NULL,
 #' shorthand vector extraction function that performs a spatial join attributes
 #' vector features in x with overlapping features in y. Will automatically
 #' reproject to a consistent CRS.
-spatial_join <- function(x=NULL, y=NULL){
+spatial_join <- function(x=NULL, y=NULL, drop=T){
   over <- sp::over(
       x = sp::spTransform(
           x,
@@ -226,6 +226,11 @@ spatial_join <- function(x=NULL, y=NULL){
       y = y
     )
   x@data <- cbind(x@data, over)
+  # drop non-overlapping features using the NA values
+  # attributed to the first column of y@data
+  if (drop) {
+    x <- x[ !is.na(x@data[,colnames(y@data)[1]]) , ]
+  }
   return(x)
 }
 #' generate a square buffer around a single input feature
@@ -326,7 +331,7 @@ extract_by <- function(polygon=NULL, r=NULL){
   # and then crop our input raster using a local cluster instance
   if(!raster::compareCRS(polygon[[1]],r)){
     warning(paste("input polygon= object(s) needed to be reprojected to",
-    "the CRS of r= this may lead to RAM issues", sep = ""))
+    "the CRS of r= this may lead to RAM issues", sep = " "))
     polygon <- lapply(
         polygon,
         FUN=sp::spTransform,
@@ -457,6 +462,16 @@ calc_mean_patch_area <- function(x=NULL, area_of_cell = NULL){
     return(SDMTools::ClassStat(x)$mean.patch.area * area_of_cell)
   }
 }
+#' shorthand function for calculating the mean of a raster
+#' @export
+calc_mean <- function(x=NULL, na.rm=T){
+  # if there are no habitat patches don't try to calc
+  if (sum(!is.na(raster::values(x))) == 0) {
+    return(0)
+  }
+  # assume it's valid
+  return( mean(raster::values(x), na.rm=na.rm) )
+}
 #' hidden function that will use SDMTools to calculate the number of unique patches
 #' on a given raster object
 #' @export
@@ -482,7 +497,7 @@ calc_patch_count <- function(x=NULL){
 #' reclassify each input raster to a binary using binary_reclassify() if a
 #' non-null value is passed to from=
 #' @export
-par_calc_stat <- function(X=NULL, fun=NULL, from=NULL, backfill_missing_w=0){
+par_calc_stat <- function(X=NULL, fun=NULL, from=NULL, backfill_missing_w=0, ...){
   stopifnot(inherits(fun, 'function'))
   e_cl <- parallel::makeCluster(parallel::detectCores()-1)
   # assume our nodes will always need 'raster' and kick-in our
@@ -496,7 +511,9 @@ par_calc_stat <- function(X=NULL, fun=NULL, from=NULL, backfill_missing_w=0){
       e_cl,
       function(x) library("raster")
     )
-  ret <- unlist(parallel::parLapply(
+  # if we have a non-null value for from, assume
+  # that we want to do a re-classification
+  ret <- try(unlist(parallel::parLapply(
       e_cl,
       # assume x is already a binary if from is NULL
       X = if(is.null(from)){
@@ -511,8 +528,13 @@ par_calc_stat <- function(X=NULL, fun=NULL, from=NULL, backfill_missing_w=0){
             nomatch=0
           )
       },
-      fun = fun
-    ))
+      fun = function(i, ...) { fun(i, ...) }
+    )))
+  if ( class(ret) == "try-error") {
+    stop(paste("encountered an error trying to process X=;",
+    "is the function you are specifying compatible with raster",
+    "objects?", sep=""))
+  }
   # account for any null/na return values from our FUN statistic
   if (!is.null(backfill_missing_w) && length(ret < length(X))){
     null_ret_values <- seq(1, length(X))[
