@@ -318,12 +318,14 @@ par_buffer_grid_units <- function(units=NULL, radius=1500){
 #' loaded on a network filesystem. Prefer local cached data, otherwise parallel
 #' may fail unexpectedly.
 #' @export
-extract_by <- function(polygon=NULL, r=NULL){
+extract_by <- function(polygon=NULL, r=NULL, updatevalue=NA){
   if (!inherits(polygon, 'list')){
-    return(raster::crop(
-        x=r,
-        y=spTransform(polygon, sp::CRS(raster::projection(r)))
-      ))
+    r <- raster::crop(r, spTransform(polygon, sp::CRS(raster::projection(r))))
+    return(raster::mask(
+         	x=r,
+	        mask=spTransform(polygon, sp::CRS(raster::projection(r))),
+		updatevalue=updatevalue
+    ))
   }
   # simplify our input polygons list to save RAM
   if(inherits(polygon[[1]], 'SpatialPolygonsDataFrame')){
@@ -341,12 +343,18 @@ extract_by <- function(polygon=NULL, r=NULL){
       )
   }
   e_cl <- parallel::makeCluster(parallel::detectCores()-1)
-  parallel::clusterExport(cl=e_cl, varlist=c("r"), envir=environment())
+  parallel::clusterExport(cl=e_cl, varlist=c("r","updatevalue"), envir=environment())
   ret <- parallel::parLapply(
       e_cl,
       X=polygon,
       fun=function(x){ 
-        ret <- try(raster::crop(x=r, y=x))
+	# save us some ram by cropping our raster
+	r.local <- try(raster::crop(x=r, y=x));
+	if(class(r.local) == "try-error"){
+	  return(NA)
+	}
+        # now mask out any lurking cell values around our shape
+        ret <- try(raster::mask(x=r.local, mask=x, updatevalue=updatevalue))
         if(class(ret) == "try-error"){
           return(NA)
         } else {
@@ -416,9 +424,8 @@ calc_total_area <- function(x=NULL, area_of_cell = NULL){
      return(NA)
    }
    if(is.null(area_of_cell)){
-     warning("no area units specified; will assume meters and express units",
-             "as square kilometers")
-     area_of_cell <- 10^-6
+     warning("no area units specified; will not adjust sum operation")
+     area_of_cell <- 1
    }
    ret <- raster::cellStats(x, stat=sum, na.rm=T) *
           prod(raster::res(x)) * area_of_cell
@@ -509,7 +516,7 @@ par_calc_stat <- function(X=NULL, fun=NULL, from=NULL, backfill_missing_w=0, ...
   # copy of the binary_reclassify shorthand while we are at it
   parallel::clusterExport(
       e_cl,
-      varlist=c('binary_reclassify'),
+      varlist=c('binary_reclassify', ...),
       envir=environment()
     )
   parallel::clusterCall(
