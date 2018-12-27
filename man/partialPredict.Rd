@@ -5,8 +5,8 @@
 \title{build a response plot for a given variable using a fitted unmarked model}
 \usage{
 partialPredict(m = NULL, var = NULL, type = "state", plot = T,
-  nCores = NULL, xlab = NULL, ylab = NULL, main = NULL,
-  xlim = NULL, ylim = NULL, xTransform = NULL)
+  nCores = NULL, xlab = NULL, ylab = NULL, main = NULL, xlim = NULL,
+  ylim = NULL, xTransform = NULL)
 }
 \description{
 build a response plot for a given variable using a fitted unmarked model

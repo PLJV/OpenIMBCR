@@ -7,8 +7,8 @@ by year (with list comprehension). This allows you to calculate covariates
 at the IMBCR station level and then pool (summarize) the observations by
 transect and year}
 \usage{
-pool_by_transect_year(x = NULL, df = NULL, breaks = NULL,
-  covs = NULL, summary_fun = median)
+pool_by_transect_year(x = NULL, df = NULL, breaks = NULL, covs = NULL,
+  summary_fun = median)
 }
 \description{
 hidden function that summarizes imbcr transect covariate data and metadata

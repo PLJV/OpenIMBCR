@@ -7,7 +7,7 @@ objects using the parallel package. Avoid passing raster files that are
 loaded on a network filesystem. Prefer local cached data, otherwise parallel
 may fail unexpectedly.}
 \usage{
-extract_by(polygon = NULL, r = NULL)
+extract_by(polygon = NULL, r = NULL, updatevalue = NA)
 }
 \description{
 extract an input raster dataset using polygon feature(s). Bulk process list

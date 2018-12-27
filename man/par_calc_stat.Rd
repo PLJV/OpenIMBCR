@@ -8,8 +8,8 @@ scalar value attributable to each grid unit. Will optionally
 reclassify each input raster to a binary using binary_reclassify() if a
 non-null value is passed to from=}
 \usage{
-par_calc_stat(X = NULL, fun = NULL, from = NULL,
-  backfill_missing_w = 0, ...)
+par_calc_stat(X = NULL, fun = NULL, from = NULL, backfill_missing_w = 0,
+  ...)
 }
 \description{
 shorthand function that applies an arbitrary, user-supplied summary
