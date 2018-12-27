@@ -333,6 +333,7 @@ buildUnmarkedDistanceDf <- function(r=NULL, s=NULL, spp=NULL,
 scrub_imbcr_df <- function(df,
                            allow_duplicate_timeperiods=F,
                            four_letter_code=NULL){
+  LARGE_CLUSTER_SIZE=100
   # throw-out any lurking 88 values, count before start values, and
   # -1 distance observations
   df <- df[!df@data[, timeperiod_fieldname(df)] == 88, ]
@@ -350,13 +351,26 @@ scrub_imbcr_df <- function(df,
   df_final[ , OpenIMBCR:::distance_fieldname(df)] <- NA
   # iterate over df_final, pulling matches for our species of interest as we go
   columns_retained <- c('transectnum', 'year', 'point', 'timeperiod', 'birdcode', distance_fieldname(df), 'cl_count')
-  df_final <- do.call(rbind, lapply(
+  # prepare to parallelize our large df operation
+  cl <- parallel::makeCluster(LARGE_CLUSTER_SIZE)
+  parallel::clusterExport(
+    cl,
+    varlist=c("df", "df_final","columns_retained"),
+    envir=environment()
+  )
+  parallel::clusterExport(
+    cl,
+    varlist=c("distance_fieldname"),
+    envir=globalenv()
+  )
+  df_final <- do.call(rbind, parallel::parLapply(
+      cl=cl,
       X=1:nrow(df_final),
-      FUN=function(i){
+      fun=function(i){
         query <- df_final[i, c('transectnum', 'year', 'point', 'timeperiod', 'birdcode')]
         match <- merge(df@data, query, all=F)
         if(nrow(match) == 0){
-          # return some sane defaults
+          # return some sane defaults if there was no match
           df_final[ i, distance_fieldname(df) ] <- NA 
           df_final[ i, 'cl_count' ] <- 0
           return(df_final[i, columns_retained])
@@ -366,6 +380,9 @@ scrub_imbcr_df <- function(df,
         }
       }
   ))
+  # clean-up
+  parallel::stopCluster(cl);
+  rm(cl);
   # return to user
   return(df_final)
 }
