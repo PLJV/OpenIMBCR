@@ -350,18 +350,13 @@ scrub_imbcr_df <- function(df,
   df_final$cl_count <- NA
   df_final[ , OpenIMBCR:::distance_fieldname(df)] <- NA
   # iterate over df_final, pulling matches for our species of interest as we go
-  columns_retained <- c('transectnum', 'year', 'point', 'timeperiod', 'birdcode', distance_fieldname(df), 'cl_count')
+  columns_retained <- c('transectnum', 'year', 'point', 'timeperiod', 'birdcode', 'radialdistance', 'cl_count')
   # prepare to parallelize our large df operation
   cl <- parallel::makeCluster(LARGE_CLUSTER_SIZE)
   parallel::clusterExport(
     cl,
     varlist=c("df", "df_final","columns_retained"),
     envir=environment()
-  )
-  parallel::clusterExport(
-    cl,
-    varlist=c("distance_fieldname"),
-    envir=globalenv()
   )
   df_final <- do.call(rbind, parallel::parLapply(
       cl=cl,
@@ -371,7 +366,7 @@ scrub_imbcr_df <- function(df,
         match <- merge(df@data, query, all=F)
         if(nrow(match) == 0){
           # return some sane defaults if there was no match
-          df_final[ i, distance_fieldname(df) ] <- NA 
+          df_final[ i, 'radialdistance' ] <- NA 
           df_final[ i, 'cl_count' ] <- 0
           return(df_final[i, columns_retained])
         } else {
