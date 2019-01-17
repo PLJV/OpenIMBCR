@@ -537,4 +537,55 @@ scrub_unmarked_dataframe <- function(x=NULL, normalize=T, prune_cutoff=NULL){
   }
   return(x)
 }
-
+#' will generate a uniform vector grid within a US National Grid
+#' unit. Typically this is a 250 meter grid, but the size of each
+#' grid cell is arbitrary. Will return units as SpatialPolygons.
+#' @export
+generate_fishnet_grid <- function(usng_unit, res=250){
+    METERS_TO_KM = 1E-06
+    MIN_UNIT_SIZE = 0.9 # in square-kilometers -- most units should be ~1
+    N_GRID_CELLS = ceiling( sqrt(rgeos::gArea(usng_unit))  / res ) 
+    # sanity check our unit
+    if ( (rgeos::gArea(usng_unit) * METERS_TO_KM) < MIN_UNIT_SIZE ){ 
+      warning("dropping zipper grid unit")
+      return(NA)
+    }
+    # solves for the rotation parameter in 'sf' function
+    rotate <- function(a) matrix(c(cos(a), sin(a), -sin(a), cos(a)), 2, 2)
+    # get the bounding-box point coords for our unit -- the slot
+    # handling is sloppy here and may break in the future
+    ul <- which.max(usng_unit@polygons[[1]]@Polygons[[1]]@coords[,2])
+      ul <- usng_unit@polygons[[1]]@Polygons[[1]]@coords[ul,]
+    ur <- which.max(usng_unit@polygons[[1]]@Polygons[[1]]@coords[,1])
+      ur <- usng_unit@polygons[[1]]@Polygons[[1]]@coords[ur,]  
+    ll <- which.min(usng_unit@polygons[[1]]@Polygons[[1]]@coords[,1])
+      ll <- usng_unit@polygons[[1]]@Polygons[[1]]@coords[ll,]  
+    # dig up old Pythagoras and solve for the hypotenuse -- we will
+    # use this to solve for our angle of rotation 
+    opp <- ul[2]-ur[2]
+    adj <- ur[1]-ul[1]
+    hyp <- sqrt(opp^2 + adj^2)
+    # here's the angle of rotation associated with each 250 m
+    # grid unit
+    theta <- asin(opp/hyp) * 57.29578 # convert radians-to-degrees
+    # build-out our grid using per-unit specifications
+    grd <- sf::st_make_grid(
+        usng_unit, 
+        cellsize=0.995 * ( sqrt(rgeos::gArea(usng_unit)) / N_GRID_CELLS ), 
+        square=T, 
+        offset=c(ll[1]+52, ll[2]-50)
+      )
+    grd_rot <- (grd - st_centroid(st_union(grd))) * rotate(theta * pi / 180) + 
+      st_centroid(st_union(grd))
+    grd_rot <- sf::as_Spatial(grd_rot)
+    # restore our projection to the adjusted grid
+    raster::projection(grd_rot) <- raster::projection(usng_unit)
+    # make sure we clip any boundaries for grid units so the grid is 
+    # fully consistent with the larger USNG unit
+    grd_rot <- rgeos::gIntersection(grd_rot, usng_unit, byid=T)
+    # drop any slivers from our intersect operation
+    slivers <- sapply(split(grd_rot, 1:length(grd_rot)), FUN=rgeos::gArea)
+      slivers <- slivers < mean(slivers)
+    # return to user as SpatialPolygons
+    return(grd_rot[!slivers,])
+}
