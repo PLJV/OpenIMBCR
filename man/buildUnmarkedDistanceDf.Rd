@@ -6,9 +6,9 @@
 and a species common name and returns a formatted unmarked distance data.frame
 that can be used for model fitting with unmarked.}
 \usage{
-buildUnmarkedDistanceDf(r = NULL, s = NULL, spp = NULL, vars = c("doy",
-  "starttime"), fun = mean, d = c(0, 100, 200, 300, 400, 500, 600, 700,
-  800))
+buildUnmarkedDistanceDf(r = NULL, s = NULL, spp = NULL,
+  vars = c("doy", "starttime"), fun = mean, d = c(0, 100, 200, 300,
+  400, 500, 600, 700, 800))
 }
 \description{
 accepts a named raster stack of covariates, an IMBCR SpatialPointsDataFrame,

@@ -577,6 +577,9 @@ polygon_to_fishnet_grid <- function(usng_unit=NULL, res=250, x_offset=0, y_offse
       )
     grd_rot <- (grd - sf::st_centroid(st_union(grd))) * rotate(theta * pi / 180) + 
       st_centroid(sf::st_union(grd))
+    # shift our rotated grid by variable lengths based on the dimensions of
+    # our polygon -- this was made to accomodate the USNG and may break things
+    # if other polygons are used
     grd_rot <- grd_rot + c(
         rgeos::gArea(usng_unit)*1.499E-05, 
         rgeos::gArea(usng_unit)*-1.799E-05

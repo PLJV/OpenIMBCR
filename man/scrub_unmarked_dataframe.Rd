@@ -10,7 +10,8 @@ pruning' precursor for principal components analysis. Prefer dropping the NA
 bin here (rather than in scrub_imbcr_df), so that we still have an accurate
 account of total sampling effort to attribute in scrub_unmarked_dataframe().}
 \usage{
-scrub_unmarked_dataframe(x = NULL, normalize = T, prune_cutoff = NULL)
+scrub_unmarked_dataframe(x = NULL, normalize = T,
+  prune_cutoff = NULL)
 }
 \description{
 hidden function used to clean-up an unmarked data.frame (umdf) by dropping
