@@ -537,16 +537,16 @@ scrub_unmarked_dataframe <- function(x=NULL, normalize=T, prune_cutoff=NULL){
   }
   return(x)
 }
-#' will generate a uniform vector grid within a US National Grid
-#' unit. Typically this is a 250 meter grid, but the size of each
+#' will generate a uniform vector grid within a polygon. Typically 
+#' this is a 250 meter grid, but the size of each
 #' grid cell is arbitrary. Will return units as SpatialPolygons.
-#' @export
-generate_fishnet_grid <- function(usng_unit, res=250){
+polygon_to_fishnet_grid <- function(usng_unit=NULL, res=250, x_offset=0, y_offset=0){
     METERS_TO_KM = 1E-06
-    MIN_UNIT_SIZE = 0.9 # in square-kilometers -- most units should be ~1
-    N_GRID_CELLS = ceiling( sqrt(rgeos::gArea(usng_unit))  / res ) 
+    # assume that anything less than 3% of the unit size is a sliver
+    MIN_UNIT_SIZE = rgeos::gArea(usng_unit)*0.03 
+    ZIPPER_UNIT_SIZE = 600245.2 # ~60% of a full USNG unit
     # sanity check our unit
-    if ( (rgeos::gArea(usng_unit) * METERS_TO_KM) < MIN_UNIT_SIZE ){ 
+    if ( rgeos::gArea(usng_unit) < ZIPPER_UNIT_SIZE ){ 
       warning("dropping zipper grid unit")
       return(NA)
     }
@@ -571,21 +571,38 @@ generate_fishnet_grid <- function(usng_unit, res=250){
     # build-out our grid using per-unit specifications
     grd <- sf::st_make_grid(
         usng_unit, 
-        cellsize=0.995 * ( sqrt(rgeos::gArea(usng_unit)) / N_GRID_CELLS ), 
+        cellsize=c(res, res+1),
         square=T, 
-        offset=c(ll[1]+52, ll[2]-50)
+        offset=c(ll[1]+x_offset, ll[2]+y_offset)
       )
-    grd_rot <- (grd - st_centroid(st_union(grd))) * rotate(theta * pi / 180) + 
-      st_centroid(st_union(grd))
+    grd_rot <- (grd - sf::st_centroid(st_union(grd))) * rotate(theta * pi / 180) + 
+      st_centroid(sf::st_union(grd))
     grd_rot <- sf::as_Spatial(grd_rot)
     # restore our projection to the adjusted grid
     raster::projection(grd_rot) <- raster::projection(usng_unit)
-    # make sure we clip any boundaries for grid units so the grid is 
-    # fully consistent with the larger USNG unit
+    # make sure we clip any boundaries for grid units so the grid is
+    # fully consistent with the larger polygon unit
     grd_rot <- rgeos::gIntersection(grd_rot, usng_unit, byid=T)
     # drop any slivers from our intersect operation
     slivers <- sapply(split(grd_rot, 1:length(grd_rot)), FUN=rgeos::gArea)
-      slivers <- slivers < mean(slivers)
+      slivers <- slivers < MIN_UNIT_SIZE
     # return to user as SpatialPolygons
     return(grd_rot[!slivers,])
+}
+#' generate a uniform fishnet grid for a variable polygon dataset containing
+#' one or more geometries. Will fix the rotation of the grid using the bounding
+#' box of the polygon dataset.
+#' @export
+generate_fishnet_grid <- function(units=NULL, res=250){
+  grid <- do.call(
+    rbind, 
+    lapply(units, FUN=function(x) polygon_to_fishnet_grid(x, res=res))
+  )
+  # force consistent naming of our polygon ID's for SpatialPolygonsDataFrame()
+  for(i in 1:length(grid@polygons)) { 
+    slot(grid@polygons[[i]], "ID") <- as.character(i) 
+  }
+  return(
+    SpatialPolygonsDataFrame(grid, data=data.frame(id=1:length(grid@polygons)))
+  )
 }
