@@ -577,6 +577,10 @@ polygon_to_fishnet_grid <- function(usng_unit=NULL, res=250, x_offset=0, y_offse
       )
     grd_rot <- (grd - sf::st_centroid(st_union(grd))) * rotate(theta * pi / 180) + 
       st_centroid(sf::st_union(grd))
+    grd_rot <- grd_rot + c(
+        rgeos::gArea(usng_unit)*1.499E-05, 
+        rgeos::gArea(usng_unit)*-1.799E-05
+      )
     grd_rot <- sf::as_Spatial(grd_rot)
     # restore our projection to the adjusted grid
     raster::projection(grd_rot) <- raster::projection(usng_unit)
