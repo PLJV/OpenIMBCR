@@ -575,7 +575,7 @@ polygon_to_fishnet_grid <- function(usng_unit=NULL, res=250, x_offset=0, y_offse
         square=T, 
         offset=c(ll[1]+x_offset, ll[2]+y_offset)
       )
-    grd_rot <- (grd - sf::st_centroid(st_union(grd))) * rotate(theta * pi / 180) + 
+    grd_rot <- (grd - sf::st_centroid(sf::st_union(grd))) * rotate(theta * pi / 180) + 
       st_centroid(sf::st_union(grd))
     # shift our rotated grid by variable lengths based on the dimensions of
     # our polygon -- this was made to accomodate the USNG and may break things
@@ -601,9 +601,16 @@ polygon_to_fishnet_grid <- function(usng_unit=NULL, res=250, x_offset=0, y_offse
 #' box of the polygon dataset.
 #' @export
 generate_fishnet_grid <- function(units=NULL, res=250){
+  suppressMessages(require(sp)) # needed for splitting to a list
+  if(class(units) != "list"){
+    units <- split(units, 1:nrow(units))
+  } 
   grid <- do.call(
     rbind, 
-    lapply(units, FUN=function(x) polygon_to_fishnet_grid(x, res=res))
+    lapply(
+      units, 
+      FUN=function(x) polygon_to_fishnet_grid(x, res=res)
+    )
   )
   # force consistent naming of our polygon ID's for SpatialPolygonsDataFrame()
   for(i in 1:length(grid@polygons)) { 
