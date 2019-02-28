@@ -601,7 +601,7 @@ polygon_to_fishnet_grid <- function(usng_unit=NULL, res=250, x_offset=0, y_offse
 #' box of the polygon dataset.
 #' @export
 generate_fishnet_grid <- function(units=NULL, res=250){
-  suppressMessages(require(sp)) # needed for splitting to a list
+  suppressMessages(require(rgdal)) # needed for splitting to a list
   if(class(units) != "list"){
     units <- split(units, 1:nrow(units))
   } 
@@ -609,7 +609,7 @@ generate_fishnet_grid <- function(units=NULL, res=250){
     rbind, 
     lapply(
       units, 
-      FUN=function(x) polygon_to_fishnet_grid(x, res=res)
+      FUN=function(x) OpenIMBCR:::polygon_to_fishnet_grid(x, res=res)
     )
   )
   # force consistent naming of our polygon ID's for SpatialPolygonsDataFrame()
