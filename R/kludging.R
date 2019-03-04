@@ -576,7 +576,7 @@ polygon_to_fishnet_grid <- function(usng_unit=NULL, res=250, x_offset=0, y_offse
         offset=c(ll[1]+x_offset, ll[2]+y_offset)
       )
     grd_rot <- (grd - sf::st_centroid(sf::st_union(grd))) * rotate(theta * pi / 180) + 
-      st_centroid(sf::st_union(grd))
+      sf::st_centroid(sf::st_union(grd))
     # shift our rotated grid by variable lengths based on the dimensions of
     # our polygon -- this was made to accomodate the USNG and may break things
     # if other polygons are used
@@ -600,18 +600,22 @@ polygon_to_fishnet_grid <- function(usng_unit=NULL, res=250, x_offset=0, y_offse
 #' one or more geometries. Will fix the rotation of the grid using the bounding
 #' box of the polygon dataset.
 #' @export
-generate_fishnet_grid <- function(units=NULL, res=250){
-  suppressMessages(require(rgdal)) # needed for splitting to a list
-  if(class(units) != "list"){
-    units <- split(units, 1:nrow(units))
-  } 
+generate_fishnet_grid <- function(units=NULL, res=251){
+  STEPS <- round(seq(0, nrow(units), length.out=1000));
+  e_cl <- parallel::makeCluster(parallel::detectCores()-1)
+  parallel::clusterExport(e_cl, varlist=c('units', 'STEPS', 'res'))
   grid <- do.call(
     rbind, 
-    lapply(
-      units, 
-      FUN=function(x) OpenIMBCR:::polygon_to_fishnet_grid(x, res=res)
+    parallel::parLapply(
+      cl = e_cl,
+      X = 1:(length(STEPS)-1),
+      fun = function(i) {
+        require(sf)
+        OpenIMBCR:::polygon_to_fishnet_grid(units[seq(STEPS[i], STEPS[i+1]-1),], res=res)
+      }
     )
   )
+
   # force consistent naming of our polygon ID's for SpatialPolygonsDataFrame()
   for(i in 1:length(grid@polygons)) { 
     slot(grid@polygons[[i]], "ID") <- as.character(i) 
