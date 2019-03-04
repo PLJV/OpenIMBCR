@@ -601,7 +601,12 @@ polygon_to_fishnet_grid <- function(usng_unit=NULL, res=250, x_offset=0, y_offse
 #' box of the polygon dataset.
 #' @export
 generate_fishnet_grid <- function(units=NULL, res=251){
-  STEPS <- round(seq(0, nrow(units), length.out=1000));
+  STEPS <- 1000
+  if( nrow(units) > STEPS ){
+    STEPS <- round(seq(1, nrow(units), length.out=STEPS));
+  } else {
+    STEPS <- c(1, nrow(units)+1)
+  }
   e_cl <- parallel::makeCluster(parallel::detectCores()-1)
   parallel::clusterExport(e_cl, varlist=c('units', 'STEPS', 'res'))
   grid <- do.call(
