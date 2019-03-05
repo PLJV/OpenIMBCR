@@ -56,10 +56,10 @@ readOGRfromPath <- function(path=NULL, verbose=F){
   return(rgdal:::readOGR(dsn,layer,verbose=verbose))
 }
 #' strip non-essential characters and spaces from a species common name in a field
-stripCommonName <- function(x) tolower(gsub(x,pattern=" |'|-",replacement=""))
+strip_common_name <- function(x) tolower(gsub(x,pattern=" |'|-",replacement=""))
 #' recursively find all files in folder (root) that match the pattern (name)
 #' @export
-recursiveFindFile <- function(name=NULL,root=Sys.getenv("HOME")){
+recursive_find_file <- function(name=NULL,root=Sys.getenv("HOME")){
   if(is.null(name)){
     return(NULL)
   } else {
@@ -76,7 +76,7 @@ imbcrTableToShapefile <- function(filename=NULL,outfile=NULL,
     stop("cannot write shapefile to disk without an outfile= or filename.ext to parse")
   }
   # sanity-check to see if our output shapefile already exists
-  s <- recursiveFindFile(outfile)[1]
+  s <- recursive_find_file(outfile)[1]
   if(!is.null(s)){
     s <- OpenIMBCR:::readOGRfromPath(s)
   # Parse ALL BCR raw data tables into a single table
@@ -88,7 +88,7 @@ imbcrTableToShapefile <- function(filename=NULL,outfile=NULL,
         t <- read.csv(filename)
       # legacy support : rbind across multiple CSV files
       } else {
-        t <- lapply(recursiveFindFile(
+        t <- lapply(recursive_find_file(
               name=filename
             ),
             read.csv
@@ -172,126 +172,11 @@ drop_overlapping_units <- function(units=NULL){
       units[!duplicated , ]
     )
 }
-#' accepts a SpatialPointsDataFrame of IMBCR data and parses observations into counts for a focal
-#' species specified by the user.
-#' @param spp character string specifying focal species common name
-#' @export
-parseDetectionsBySpecies <- function(s,spp=NULL){
-  in_sample <- which(stripCommonName(s$common.name) %in% stripCommonName(spp[1]))
-  out_sample <- which(!(1:length(s) %in% in_sample))
-
-  t <- s@data
-    t$common.name <- as.character(t$common.name)
-
-  t[out_sample,]$common.name <- spp[1]
-  t[out_sample,]$cl_count <- 0
-
-  s@data <- t
-  return(s)
-}
-#' parse relavent metadata for estimating p-detection and leave station-level count information in-place
-#' return a list of M data.frames (one for each IMBCR transect) that can be post-processed later for occupancy or abundance
-#' modeling.
-#' @export
-parseStationLevelMetadata <- function(s,spp=NULL){
-
-        s_spp <- parseDetectionsBySpecies(s,spp=spp) # parse our SpatialPointsDataFrame for focal species (spp)
-
-  detectionHist <- list()
-  for(t in as.character(unique(s_spp$transectnum))){
-
-        counts <- s_spp[s_spp$transectnum == t,]$cl_count
-           det <- as.numeric(counts > 0)
-      station  <- s_spp[s_spp$transectnum == t,]$point
-      interval <- s_spp[s_spp$transectnum == t,]$timeperiod
-          dist <- s_spp[s_spp$transectnum == t,]$radialdistance
-           doy <- as.numeric(strftime(as.POSIXct(as.Date(as.character(s_spp[s_spp$transectnum == t,]$date), "%m/%d/%Y")),format="%j"))
-           tod <- as.numeric(s_spp[s_spp$transectnum == t,]$starttime)
-           obs <- as.character(s_spp[s_spp$transectnum == t,]$observer)
-
-      distance_disqualifier <- s_spp[s_spp$transectnum == t,]$radialdistance
-        distance_disqualifier <- (distance_disqualifier < 0 | distance_disqualifier > 800)
-
-        detectionHist[[length(detectionHist)+1]] <- data.frame(
-                                                      counts=counts,
-                                                      detection=det,
-                                                      station=station,
-                                                      interval=interval,
-                                                      dist=dist,
-                                                      doy=doy,
-                                                      tod=tod,
-                                                      obs=obs,
-                                                      disqualified=distance_disqualifier
-                                                    )
-  }
-  # return our list of data.frames to user
-  return(detectionHist)
-}
-#' accepts a list of data.frames (as returned by parseStationLevelMetadata) and post-processes
-#' the counts into binomial detections that can be used to fit occupancy.
-#' @export
-parseStationCountsAsOccupancy <- function(detectionHist,na.rm=F){
-  # tod (HH:MM) -> Minutes since midnight
-  hhmm_to_min <- function(x){
-    (as.numeric(substr(as.character(x),1,nchar(as.character(x))-2))*60) + (as.numeric(substr(as.character(x),2,nchar(as.character(x)))))
-  }
-  for(i in 1:length(detectionHist)){
-    d <- as.numeric(aggregate(counts~station,detectionHist[[i]],function(x){sum(x>0)})$counts > 0)  # did we observe ANY birds across our 6 minute count for each station?
-    if(!na.rm){
-      det <- rep(".",16)
-      det[which(as.numeric(unique(detectionHist[[i]]$station)) %in% 1:16)] <- d
-        det <- paste(det,collapse="")
-    } else {
-      det <- d;
-    }
-    tod <- hhmm_to_min(round(median(detectionHist[[i]]$tod,na.rm=T)))
-    doy <- round(median(detectionHist[[i]]$doy,na.rm=T))
-    obs <- landscapeAnalysis:::Mode(detectionHist[[i]]$obs)
-    intensity <- length(unique(detectionHist[[i]]$station))
-    detectionHist[[i]] <- data.frame(det=det,tod=tod,doy=doy,obs=obs,intensity=intensity)
-  }
-  do.call(rbind,detectionHist)
-}
-#' extract (and optionally, summarize using the fun= argument) raster data across IMBCR transects
-#' @export
-extractByTransect <- function(s=NULL,r=NULL,fun=NULL){
-  # sanity-check
-  if(sum(is.null(list(s,r)))>0) stop("s= and r= arguments can't be null")
-  # ensure consistent projections
-  orig_crs <- sp::CRS(raster::projection(s))
-  s <- sp::spTransform(s,sp::CRS(raster::projection(r)))
-  # search for a meaningful transect field
-  transect_field <- names(s)
-    transect_field <- transect_field[grepl(transect_field, pattern="trns|transect")][1] # by convention, use the first field that has "transect" or "trns" in it
-      if(length(transect_field) == 0) stop("couldn't find a meaningful IMBCR transect field in object s=")
-  # iterate over our transect data, processing as we go
-  transects <- unique(as.character(s@data[,transect_field]))
-  for(i in 1:length(transects)){
-    focal <- s@data[,transect_field] == transects[i]
-      focal <- s[focal,]
-        focal <- focal[!duplicated(focal$point),]
-    # extract and assign our habitat values
-    rVal <- extract(r,focal)
-    # assign a summary statistic, specified by fun=function()
-    if(is.function(fun)){
-      s@data[s@data[,transect_field] == as.vector(unique(focal@data[,transect_field])),names(r)[1]] <- fun(rVal)
-    }
-    # assign our values point-by-point
-    else {
-      for(j in 1:length(focal$point)){
-        s@data[s@data[,'point'] == focal$point[j],names(r)[1]] <-  rVal[j]
-      }
-    }
-  }
-  # restore our original CRS
-  s <- sp::spTransform(s,orig_crs)
-  return(s)
-}
 #' accepts a named raster stack of covariates, an IMBCR SpatialPointsDataFrame,
 #' and a species common name and returns a formatted unmarked distance data.frame
 #' that can be used for model fitting with unmarked.
 #' @export
-buildUnmarkedDistanceDf <- function(r=NULL, s=NULL, spp=NULL,
+build_unmarked_distance_df <- function(r=NULL, s=NULL, spp=NULL,
                                     vars=c("doy","starttime"), #
                                     fun=mean,
                                     d=c(0,100,200,300,400,500,600,700,800)){
@@ -607,8 +492,9 @@ generate_fishnet_grid <- function(units=NULL, res=251){
   } else {
     STEPS <- c(1, nrow(units)+1)
   }
-  e_cl <- parallel::makeCluster(parallel::detectCores()-1)
-  parallel::clusterExport(e_cl, varlist=c('units', 'STEPS', 'res'))
+  e_cl <- parallel::makeCluster(parallel::detectCores()*0.5)
+  parallel::clusterExport(e_cl, varlist=c('units', 'res'))
+  parallel::clusterExport(e_cl, varlist=c('STEPS'), envir=environment())
   grid <- do.call(
     rbind, 
     parallel::parLapply(

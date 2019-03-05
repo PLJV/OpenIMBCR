@@ -6,7 +6,7 @@
 one or more geometries. Will fix the rotation of the grid using the bounding
 box of the polygon dataset.}
 \usage{
-generate_fishnet_grid(units = NULL, res = 250)
+generate_fishnet_grid(units = NULL, res = 251)
 }
 \description{
 generate a uniform fishnet grid for a variable polygon dataset containing
