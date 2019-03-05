@@ -493,7 +493,7 @@ generate_fishnet_grid <- function(units=NULL, res=251){
     STEPS <- c(1, nrow(units)+1)
   }
   e_cl <- parallel::makeCluster(parallel::detectCores()*0.5)
-  parallel::clusterExport(e_cl, varlist=c('units', 'res'))
+  parallel::clusterExport(e_cl, varlist=c('units', 'res'), envir=environment())
   parallel::clusterExport(e_cl, varlist=c('STEPS'), envir=environment())
   grid <- do.call(
     rbind, 
@@ -506,7 +506,8 @@ generate_fishnet_grid <- function(units=NULL, res=251){
       }
     )
   )
-
+  # clean-up
+  parallel::stopCluster(e_cl); rm(e_cl); 
   # force consistent naming of our polygon ID's for SpatialPolygonsDataFrame()
   for(i in 1:length(grid@polygons)) { 
     slot(grid@polygons[[i]], "ID") <- as.character(i) 
