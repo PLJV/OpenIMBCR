@@ -486,33 +486,36 @@ polygon_to_fishnet_grid <- function(usng_unit=NULL, res=250, x_offset=0, y_offse
 #' box of the polygon dataset.
 #' @export
 generate_fishnet_grid <- function(units=NULL, res=251){
-  STEPS <- 1000
-  if( nrow(units) > STEPS ){
-    STEPS <- round(seq(1, nrow(units), length.out=STEPS));
-  } else {
-    STEPS <- c(1, nrow(units)+1)
-  }
-  e_cl <- parallel::makeCluster(parallel::detectCores()*0.5)
-  parallel::clusterExport(e_cl, varlist=c('units', 'res'), envir=environment())
-  parallel::clusterExport(e_cl, varlist=c('STEPS'), envir=environment())
-  grid <- do.call(
-    rbind, 
-    parallel::parLapply(
+  units <- sp::split(units, 1:nrow(units))
+  e_cl <- parallel::makeCluster(parallel::detectCores()*0.75)
+  parallel::clusterExport(e_cl, varlist=c('res'), envir=environment())
+  units <- parallel::parLapply(
       cl = e_cl,
-      X = 1:(length(STEPS)-1),
-      fun = function(i) {
-        require(sf)
-        OpenIMBCR:::polygon_to_fishnet_grid(units[seq(STEPS[i], STEPS[i+1]-1),], res=res)
+      X = units,
+      fun = function(unit){
+        return(
+          OpenIMBCR:::polygon_to_fishnet_grid(unit, res=res)
+        )
       }
     )
-  )
-  # clean-up
+  # clean-up our parallelized operation
   parallel::stopCluster(e_cl); rm(e_cl); 
+  # accept that some zipper units may product NA values that we drop here
+  SUCCEEDED <- sapply(
+      units, 
+      FUN=function(x) inherits(x, 'SpatialPolygons')
+    )
+  # drop the failures and return to user a single SpatialPolygonsDataFrame
+  units <- do.call(
+    sp::rbind.SpatialPolygons, 
+    units[SUCCEEDED]
+  )
   # force consistent naming of our polygon ID's for SpatialPolygonsDataFrame()
-  for(i in 1:length(grid@polygons)) { 
-    slot(grid@polygons[[i]], "ID") <- as.character(i) 
-  }
+  units@polygons <- lapply(
+      X=1:length(units@polygons), 
+      function(i){ f <- units@polygons[[i]]; f@ID <- as.character(i); return(f) }
+    )
   return(
-    SpatialPolygonsDataFrame(grid, data=data.frame(id=1:length(grid@polygons)))
+    SpatialPolygonsDataFrame(units, data=data.frame(id=1:length(units@polygons)))
   )
 }
