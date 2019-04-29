@@ -426,12 +426,13 @@ scrub_unmarked_dataframe <- function(x=NULL, normalize=T, prune_cutoff=NULL){
 #' this is a 250 meter grid, but the size of each
 #' grid cell is arbitrary. Will return units as SpatialPolygons.
 polygon_to_fishnet_grid <- function(usng_unit=NULL, res=250, x_offset=0, y_offset=0){
+
     METERS_TO_KM = 1E-06
     # assume that anything less than 3% of the unit size is a sliver
-    MIN_UNIT_SIZE = rgeos::gArea(usng_unit)*0.03 
+    MIN_UNIT_SIZE = rgeos::gArea(usng_unit)*0.03
     ZIPPER_UNIT_SIZE = 600245.2 # ~60% of a full USNG unit
     # sanity check our unit
-    if ( rgeos::gArea(usng_unit) < ZIPPER_UNIT_SIZE ){ 
+    if ( rgeos::gArea(usng_unit) < ZIPPER_UNIT_SIZE ){
       warning("dropping zipper grid unit")
       return(NA)
     }
@@ -442,32 +443,36 @@ polygon_to_fishnet_grid <- function(usng_unit=NULL, res=250, x_offset=0, y_offse
     ul <- which.max(usng_unit@polygons[[1]]@Polygons[[1]]@coords[,2])
       ul <- usng_unit@polygons[[1]]@Polygons[[1]]@coords[ul,]
     ur <- which.max(usng_unit@polygons[[1]]@Polygons[[1]]@coords[,1])
-      ur <- usng_unit@polygons[[1]]@Polygons[[1]]@coords[ur,]  
+      ur <- usng_unit@polygons[[1]]@Polygons[[1]]@coords[ur,]
     ll <- which.min(usng_unit@polygons[[1]]@Polygons[[1]]@coords[,1])
-      ll <- usng_unit@polygons[[1]]@Polygons[[1]]@coords[ll,]  
+      ll <- usng_unit@polygons[[1]]@Polygons[[1]]@coords[ll,]
     # dig up old Pythagoras and solve for the hypotenuse -- we will
-    # use this to solve for our angle of rotation 
+    # use this to solve for our angle of rotation
     opp <- ul[2]-ur[2]
     adj <- ur[1]-ul[1]
     hyp <- sqrt(opp^2 + adj^2)
     # here's the angle of rotation associated with each 250 m
     # grid unit
     theta <- asin(opp/hyp) * 57.29578 # convert radians-to-degrees
+    print(theta)
     # build-out our grid using per-unit specifications
     grd <- sf::st_make_grid(
-        usng_unit, 
+        usng_unit,
         cellsize=c(res, res+1),
-        square=T, 
+        square=T,
         offset=c(ll[1]+x_offset, ll[2]+y_offset)
       )
-    grd_rot <- (grd - sf::st_centroid(sf::st_union(grd))) * rotate(theta * pi / 180) + 
+    grd_rot <- (grd - sf::st_centroid(sf::st_union(grd))) * rotate(theta * pi / 180) +
       sf::st_centroid(sf::st_union(grd))
     # shift our rotated grid by variable lengths based on the dimensions of
     # our polygon -- this was made to accomodate the USNG and may break things
     # if other polygons are used
+    THETA_OFFSET <- 1.650835 # empirically derived -- hold on to your hat
+    X_OFFSET_CORRECTION <- 1.5E-05 * ( theta / THETA_OFFSET )
+    Y_OFFSET_CORRECTION <- -1.78E-05 * ( theta / THETA_OFFSET )
     grd_rot <- grd_rot + c(
-        rgeos::gArea(usng_unit)*1.499E-05, 
-        rgeos::gArea(usng_unit)*-1.799E-05
+        rgeos::gArea(usng_unit) * X_OFFSET_CORRECTION,
+        rgeos::gArea(usng_unit) * Y_OFFSET_CORRECTION
       )
     grd_rot <- sf::as_Spatial(grd_rot)
     # restore our projection to the adjusted grid
