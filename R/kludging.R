@@ -425,17 +425,24 @@ scrub_unmarked_dataframe <- function(x=NULL, normalize=T, prune_cutoff=NULL){
 #' will generate a uniform vector grid within a polygon. Typically 
 #' this is a 250 meter grid, but the size of each
 #' grid cell is arbitrary. Will return units as SpatialPolygons.
-polygon_to_fishnet_grid <- function(usng_unit=NULL, res=250, x_offset=0, y_offset=0){
-
+polygon_to_fishnet_grid <- function(
+  usng_unit=NULL,
+  res=250,
+  x_offset=0,
+  y_offset=0,
+  clip=F,
+  as_spatial_pts=F
+){
     METERS_TO_KM = 1E-06
     # assume that anything less than 3% of the unit size is a sliver
-    MIN_UNIT_SIZE = rgeos::gArea(usng_unit)*0.03
+    MIN_UNIT_SIZE = rgeos::gArea(usng_unit) * 0.03
     ZIPPER_UNIT_SIZE = 600245.2 # ~60% of a full USNG unit
     # sanity check our unit
     if ( rgeos::gArea(usng_unit) < ZIPPER_UNIT_SIZE ){
       warning("dropping zipper grid unit")
       return(NA)
     }
+    THEORETICAL_N_SUBUNITS <- round(gArea(usng_unit) / res^2)
     # solves for the rotation parameter in 'sf' function
     rotate <- function(a) matrix(c(cos(a), sin(a), -sin(a), cos(a)), 2, 2)
     # get the bounding-box point coords for our unit -- the slot
@@ -454,37 +461,64 @@ polygon_to_fishnet_grid <- function(usng_unit=NULL, res=250, x_offset=0, y_offse
     # here's the angle of rotation associated with each 250 m
     # grid unit
     theta <- asin(opp/hyp) * 57.29578 # convert radians-to-degrees
-    print(theta)
+    #print(theta)
     # build-out our grid using per-unit specifications
-    grd <- sf::st_make_grid(
+    grd <- try(sf::st_make_grid(
         usng_unit,
-        cellsize=c(res, res+1),
-        square=T,
-        offset=c(ll[1]+x_offset, ll[2]+y_offset)
-      )
-    grd_rot <- (grd - sf::st_centroid(sf::st_union(grd))) * rotate(theta * pi / 180) +
-      sf::st_centroid(sf::st_union(grd))
-    # shift our rotated grid by variable lengths based on the dimensions of
-    # our polygon -- this was made to accomodate the USNG and may break things
-    # if other polygons are used
-    THETA_OFFSET <- 1.650835 # empirically derived -- hold on to your hat
-    X_OFFSET_CORRECTION <- 1.5E-05 * ( theta / THETA_OFFSET )
-    Y_OFFSET_CORRECTION <- -1.78E-05 * ( theta / THETA_OFFSET )
-    grd_rot <- grd_rot + c(
-        rgeos::gArea(usng_unit) * X_OFFSET_CORRECTION,
-        rgeos::gArea(usng_unit) * Y_OFFSET_CORRECTION
-      )
+        n=c(sqrt(THEORETICAL_N_SUBUNITS),sqrt(THEORETICAL_N_SUBUNITS)),
+        square=T
+    ))
+    if( inherits(grd, "try-error") ){
+      return(usng_unit)
+    }
+    if( length(grd) < THEORETICAL_N_SUBUNITS){
+      stop("st_make_grid failed to generate enough subunits")
+    }
+    #grd_rot <- (grd - sf::st_centroid(sf::st_union(grd))) * rotate(theta * pi / 180) + sf::st_centroid(sf::st_union(grd))
+    grd_rot <- grd
     grd_rot <- sf::as_Spatial(grd_rot)
     # restore our projection to the adjusted grid
     raster::projection(grd_rot) <- raster::projection(usng_unit)
     # make sure we clip any boundaries for grid units so the grid is
     # fully consistent with the larger polygon unit
-    grd_rot <- rgeos::gIntersection(grd_rot, usng_unit, byid=T)
-    # drop any slivers from our intersect operation
-    slivers <- sapply(split(grd_rot, 1:length(grd_rot)), FUN=rgeos::gArea)
-      slivers <- slivers < MIN_UNIT_SIZE
-    # return to user as SpatialPolygons
-    return(grd_rot[!slivers,])
+    if(clip){
+      grd_rot <- rgeos::gIntersection(grd_rot, usng_unit, byid=T)
+      # drop any slivers from our intersect operation
+      slivers <- sapply(split(grd_rot, 1:length(grd_rot)), FUN=rgeos::gArea)
+        slivers <- slivers < MIN_UNIT_SIZE
+      # return to user as SpatialPolygons
+      grd_rot <- grd_rot[!slivers,]
+    }
+    # attribute station id's
+    # grd_rot@coords
+    if(as_spatial_pts){
+      grd_rot <- rgeos::gCentroid(
+        grd_rot,
+        byid=T
+      )
+      # sort row by increasing x-values
+      rows <- sort(unique(round(coordinates(grd_rot)[,2])), decreasing=T)
+      coords_order <- vector()
+      for(row in rows){
+        coords   <- round(coordinates(grd_rot))
+        y_coords <- coords[,2]
+        # sort this row by decreasing longitude values
+        coords_order <- append(
+          coords_order,
+          names(sort(coords[y_coords == row , 1], decreasing=T))
+        )
+      }
+      grd_rot <- SpatialPointsDataFrame(
+        coordinates(grd_rot)[coords_order,],
+        data=data.frame(station=1:THEORETICAL_N_SUBUNITS)
+      )
+      raster::projection(grd_rot) <- raster::projection(usng_unit)
+    }
+    # last sanity check
+    if( length(grd_rot) < THEORETICAL_N_SUBUNITS){
+      stop("failed to generate enough subunits for polygon features")
+    }
+    return(grd_rot)
 }
 #' generate a uniform fishnet grid for a variable polygon dataset containing
 #' one or more geometries. Will fix the rotation of the grid using the bounding
