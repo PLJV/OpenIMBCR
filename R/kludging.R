@@ -490,14 +490,106 @@ polygon_to_fishnet_grid <- function(
       grd_rot <- grd_rot[!slivers,]
     }
     # attribute station id's
-    # grd_rot@coords
-    if(as_spatial_pts){
+polygon_to_fishnet_grid <- function(
+  usng_unit=NULL,
+  res=250,
+  x_offset=0,
+  y_offset=0,
+  clip=F,
+  centers=F
+){
+    MIN_UNIT_SIZE    = rgeos::gArea(usng_unit) * 0.03
+    ZIPPER_UNIT_SIZE = 600245.2 # ~60% of a full USNG unit
+    N_SUBUNITS       = round(rgeos::gArea(usng_unit) / res^2)
+    # sanity check our unit size
+    if ( rgeos::gArea(usng_unit) < ZIPPER_UNIT_SIZE ){
+      warning("dropping zipper grid unit")
+      return(NA)
+    }
+    # solves for the rotation parameter in 'sf' function
+    rotate <- function(a) matrix(c(cos(a), sin(a), -sin(a), cos(a)), 2, 2)
+    # get the bounding-box point coords for our unit -- the slot
+    # handling is sloppy here and may break in the future
+    ul <- which.max(usng_unit@polygons[[1]]@Polygons[[1]]@coords[,2])
+      ul <- usng_unit@polygons[[1]]@Polygons[[1]]@coords[ul,]
+    ur <- which.max(usng_unit@polygons[[1]]@Polygons[[1]]@coords[,1])
+      ur <- usng_unit@polygons[[1]]@Polygons[[1]]@coords[ur,]
+    ll <- which.min(usng_unit@polygons[[1]]@Polygons[[1]]@coords[,1])
+      ll <- usng_unit@polygons[[1]]@Polygons[[1]]@coords[ll,]
+    # dig up old Pythagoras and solve for the hypotenuse -- we will
+    # use this to solve for our angle of rotation
+    opp <- ul[2]-ur[2]
+    adj <- ur[1]-ul[1]
+    hyp <- sqrt(opp^2 + adj^2)
+    # here's the angle of rotation associated with each 250 m
+    # grid unit
+    theta <- asin(opp/hyp) * 57.29578 # convert radians-to-degrees
+    #print(theta)
+    # build-out our grid using per-unit specifications
+    grd <- try(sf::st_make_grid(
+        usng_unit,
+        n=c(sqrt(N_SUBUNITS),sqrt(N_SUBUNITS)),
+        what="polygons",
+        crs=sp::CRS(raster::projection(usng_unit)),
+        square=T
+    ))
+    if( inherits(grd, "try-error") ){
+      warning(
+        "sf::st_make_grid failed to generate subunits from parent unit ",
+        "features -- returning NA"
+      )
+      return(NA)
+    }
+    if( length(grd) < N_SUBUNITS){
+      warning(
+        "sf::st_make_grid failed to generate enough subunits -- ",
+        "returning NA"
+      )
+      return(NA)
+    }
+    # if we aren't using the n= specification for st_make_grid,
+    # we'll need to rotate our units so they are spatially
+    # consistent with our parent unit
+    # grd_rot <- (grd - sf::st_centroid(sf::st_union(grd))) *
+    #   rotate(theta * pi / 180) + sf::st_centroid(sf::st_union(grd))
+    # testing: the n= specification can accomodate our rotation for us?
+    grd_rot <- grd
+    grd_rot <- try(sf::as_Spatial(grd_rot))
+    if( inherits(grd_rot, 'try-error') ){
+      warning(
+        "sf::as_Spatial may have encountered some failed geometries ",
+        "in our generated subgrid -- here is a print-out of the geometries: ",
+        as.character(as.data.frame(grd))
+      )
+      return(NA)
+    }
+    # restore our projection to the adjusted grid
+    raster::projection(grd_rot) <- raster::projection(usng_unit)
+    # make sure we clip any boundaries for grid units so the grid is
+    # fully consistent with the larger polygon unit
+    if(clip){
+      grd_rot <- rgeos::gIntersection(
+        grd_rot,
+        usng_unit,
+        byid=T
+      )
+      # drop any slivers from our intersect operation
+      slivers <- sapply(
+        sp::split(grd_rot, seq_len(nrow(grd_rot))),
+        FUN=rgeos::gArea
+      ) < MIN_UNIT_SIZE
+
+      grd_rot <- grd_rot[!slivers,]
+    }
+    # attribute station id's in a funky zig-zag pattern typically
+    # used with IMBCR sampling
+    if(centers){
       grd_rot <- rgeos::gCentroid(
         grd_rot,
         byid=T
       )
-      # sort row by increasing x-values
-      rows <- sort(unique(round(coordinates(grd_rot)[,2])), decreasing=T)
+      # sort rows (latitude) by increasing longitudinal-values
+      rows <- sort(unique(round(sp::coordinates(grd_rot)[,2])), decreasing=T)
       coords_order <- vector()
       for(row in rows){
         coords   <- round(coordinates(grd_rot))
@@ -508,15 +600,16 @@ polygon_to_fishnet_grid <- function(
           names(sort(coords[y_coords == row , 1], decreasing=T))
         )
       }
-      grd_rot <- SpatialPointsDataFrame(
-        coordinates(grd_rot)[coords_order,],
-        data=data.frame(station=1:THEORETICAL_N_SUBUNITS)
+      grd_rot <- sp::SpatialPointsDataFrame(
+        sp::coordinates(grd_rot)[coords_order,],
+        data=data.frame(station=seq_len(N_SUBUNITS))
       )
       raster::projection(grd_rot) <- raster::projection(usng_unit)
     }
     # last sanity check
-    if( length(grd_rot) < THEORETICAL_N_SUBUNITS){
-      stop("failed to generate enough subunits for polygon features")
+    if( length(grd_rot) < N_SUBUNITS){
+      warning("failed to generate enough subunits for polygon features")
+      return(NA)
     }
     return(grd_rot)
 }
