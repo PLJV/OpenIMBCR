@@ -70,7 +70,7 @@ recursive_find_file <- function(name=NULL,root=Sys.getenv("HOME")){
 #' as a SpatialPointsDataFrame to the user for post-processing or
 #' conversion to unmarked data.frame objects for modeling
 #' @export
-imbcrTableToShapefile <- function(filename=NULL,outfile=NULL,
+imbcr_df_to_spatial_points <- function(filename=NULL,outfile=NULL,
                                   write=F, calc_spatial_covs=T){
   if(is.null(outfile) && write && !is.character(filename)){
     stop("cannot write shapefile to disk without an outfile= or filename.ext to parse")
