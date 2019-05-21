@@ -213,7 +213,7 @@ build_unmarked_distance_df <- function(r=NULL, s=NULL, spp=NULL,
 }
 #' kludging to back-fill any transect stations in an imbcr data.frame
 #' that were sampled, but where a focal species wasn't observed, with
-#' NA values. 
+#' NA values.
 #' @export
 scrub_imbcr_df <- function(df,
                            allow_duplicate_timeperiods=F,
@@ -251,7 +251,7 @@ scrub_imbcr_df <- function(df,
         match <- merge(df@data, query, all=F)
         if(nrow(match) == 0){
           # return some sane defaults if there was no match
-          df_final[ i, 'radialdistance' ] <- NA 
+          df_final[ i, 'radialdistance' ] <- NA
           df_final[ i, 'cl_count' ] <- 0
           return(df_final[i, columns_retained])
         } else {
@@ -422,74 +422,9 @@ scrub_unmarked_dataframe <- function(x=NULL, normalize=T, prune_cutoff=NULL){
   }
   return(x)
 }
-#' will generate a uniform vector grid within a polygon. Typically 
+#' will generate a uniform vector grid within a polygon. Typically
 #' this is a 250 meter grid, but the size of each
 #' grid cell is arbitrary. Will return units as SpatialPolygons.
-polygon_to_fishnet_grid <- function(
-  usng_unit=NULL,
-  res=250,
-  x_offset=0,
-  y_offset=0,
-  clip=F,
-  as_spatial_pts=F
-){
-    METERS_TO_KM = 1E-06
-    # assume that anything less than 3% of the unit size is a sliver
-    MIN_UNIT_SIZE = rgeos::gArea(usng_unit) * 0.03
-    ZIPPER_UNIT_SIZE = 600245.2 # ~60% of a full USNG unit
-    # sanity check our unit
-    if ( rgeos::gArea(usng_unit) < ZIPPER_UNIT_SIZE ){
-      warning("dropping zipper grid unit")
-      return(NA)
-    }
-    THEORETICAL_N_SUBUNITS <- round(gArea(usng_unit) / res^2)
-    # solves for the rotation parameter in 'sf' function
-    rotate <- function(a) matrix(c(cos(a), sin(a), -sin(a), cos(a)), 2, 2)
-    # get the bounding-box point coords for our unit -- the slot
-    # handling is sloppy here and may break in the future
-    ul <- which.max(usng_unit@polygons[[1]]@Polygons[[1]]@coords[,2])
-      ul <- usng_unit@polygons[[1]]@Polygons[[1]]@coords[ul,]
-    ur <- which.max(usng_unit@polygons[[1]]@Polygons[[1]]@coords[,1])
-      ur <- usng_unit@polygons[[1]]@Polygons[[1]]@coords[ur,]
-    ll <- which.min(usng_unit@polygons[[1]]@Polygons[[1]]@coords[,1])
-      ll <- usng_unit@polygons[[1]]@Polygons[[1]]@coords[ll,]
-    # dig up old Pythagoras and solve for the hypotenuse -- we will
-    # use this to solve for our angle of rotation
-    opp <- ul[2]-ur[2]
-    adj <- ur[1]-ul[1]
-    hyp <- sqrt(opp^2 + adj^2)
-    # here's the angle of rotation associated with each 250 m
-    # grid unit
-    theta <- asin(opp/hyp) * 57.29578 # convert radians-to-degrees
-    #print(theta)
-    # build-out our grid using per-unit specifications
-    grd <- try(sf::st_make_grid(
-        usng_unit,
-        n=c(sqrt(THEORETICAL_N_SUBUNITS),sqrt(THEORETICAL_N_SUBUNITS)),
-        square=T
-    ))
-    if( inherits(grd, "try-error") ){
-      return(usng_unit)
-    }
-    if( length(grd) < THEORETICAL_N_SUBUNITS){
-      stop("st_make_grid failed to generate enough subunits")
-    }
-    #grd_rot <- (grd - sf::st_centroid(sf::st_union(grd))) * rotate(theta * pi / 180) + sf::st_centroid(sf::st_union(grd))
-    grd_rot <- grd
-    grd_rot <- sf::as_Spatial(grd_rot)
-    # restore our projection to the adjusted grid
-    raster::projection(grd_rot) <- raster::projection(usng_unit)
-    # make sure we clip any boundaries for grid units so the grid is
-    # fully consistent with the larger polygon unit
-    if(clip){
-      grd_rot <- rgeos::gIntersection(grd_rot, usng_unit, byid=T)
-      # drop any slivers from our intersect operation
-      slivers <- sapply(split(grd_rot, 1:length(grd_rot)), FUN=rgeos::gArea)
-        slivers <- slivers < MIN_UNIT_SIZE
-      # return to user as SpatialPolygons
-      grd_rot <- grd_rot[!slivers,]
-    }
-    # attribute station id's
 polygon_to_fishnet_grid <- function(
   usng_unit=NULL,
   res=250,
@@ -631,20 +566,20 @@ generate_fishnet_grid <- function(units=NULL, res=251){
       }
     )
   # clean-up our parallelized operation
-  parallel::stopCluster(e_cl); rm(e_cl); 
+  parallel::stopCluster(e_cl); rm(e_cl);
   # accept that some zipper units may product NA values that we drop here
   SUCCEEDED <- sapply(
-      units, 
+      units,
       FUN=function(x) inherits(x, 'SpatialPolygons')
     )
   # drop the failures and return to user a single SpatialPolygonsDataFrame
   units <- do.call(
-    sp::rbind.SpatialPolygons, 
+    sp::rbind.SpatialPolygons,
     units[SUCCEEDED]
   )
   # force consistent naming of our polygon ID's for SpatialPolygonsDataFrame()
   units@polygons <- lapply(
-      X=1:length(units@polygons), 
+      X=1:length(units@polygons),
       function(i){ f <- units@polygons[[i]]; f@ID <- as.character(i); return(f) }
     )
   return(

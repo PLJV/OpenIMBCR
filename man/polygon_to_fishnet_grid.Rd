@@ -2,15 +2,15 @@
 % Please edit documentation in R/kludging.R
 \name{polygon_to_fishnet_grid}
 \alias{polygon_to_fishnet_grid}
-\title{will generate a uniform vector grid within a polygon. Typically 
+\title{will generate a uniform vector grid within a polygon. Typically
 this is a 250 meter grid, but the size of each
 grid cell is arbitrary. Will return units as SpatialPolygons.}
 \usage{
 polygon_to_fishnet_grid(usng_unit = NULL, res = 250, x_offset = 0,
-  y_offset = 0)
+  y_offset = 0, clip = F, centers = F)
 }
 \description{
-will generate a uniform vector grid within a polygon. Typically 
+will generate a uniform vector grid within a polygon. Typically
 this is a 250 meter grid, but the size of each
 grid cell is arbitrary. Will return units as SpatialPolygons.
 }
